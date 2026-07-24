@@ -8,19 +8,20 @@ The project is configured with an `upToNextMajorVersion` requirement starting at
 
 ## Dashboard Setup
 
-1. In RevenueCat, create or select the Glassy Desk project and app.
-2. Create these products in the Test Store while developing, and mirror them in App Store Connect before release:
-   - `monthly`: monthly subscription
-   - `yearly`: yearly subscription
-   - `lifetime`: non-consumable lifetime unlock
+1. Use the `Glassy Desk` RevenueCat project and the `Glassy Desk (App Store)` app for bundle identifier `dev.bunn.glassydesk`.
+2. The production App Store products are:
+   - `dev.bunn.glassydesk.pro.monthly`: monthly subscription
+   - `dev.bunn.glassydesk.pro.yearly`: yearly subscription
+   - `dev.bunn.glassydesk.pro`: non-consumable lifetime unlock
+   The separate Test Store products remain attached for development builds.
 3. Keep the existing entitlement identifier `Glassy View Pro` for purchase compatibility.
-4. Attach `monthly`, `yearly`, and `lifetime` to `Glassy View Pro`.
-5. Create an offering, usually `default`, and mark it as the default offering.
-6. Add packages for the three products:
-   - Monthly package -> `monthly`
-   - Annual/yearly package -> `yearly`
-   - Lifetime package -> `lifetime`
-7. Create a RevenueCat Paywall for the default offering.
+4. Keep all three Test Store products and all three App Store products attached to `Glassy View Pro`.
+5. Keep the `default` offering marked current.
+6. The offering packages map to the matching Test Store and App Store products:
+   - Monthly package -> monthly products
+   - Annual package -> yearly products
+   - Lifetime package -> lifetime products
+7. Keep the RevenueCat Paywall attached to the default offering.
 8. Enable Customer Center if your RevenueCat plan supports it.
 
 If RevenueCat requires a different entitlement identifier, update `SubscriptionStore.proEntitlementIdentifier` to match exactly.
@@ -29,13 +30,12 @@ If RevenueCat requires a different entitlement identifier, update `SubscriptionS
 
 The app reads the public SDK key from the `RevenueCatAPIKey` key in `Support/Info.plist`, which expands from the `REVENUECAT_API_KEY` build setting.
 
-Debug currently sets:
+The build configurations use separate RevenueCat apps:
 
 ```text
-REVENUECAT_API_KEY = test_RMgvIJaZNhHZuuEztlmXnxXFXUj
+Debug   -> Test Store public SDK key
+Release -> App Store production public SDK key
 ```
-
-Release is intentionally empty. Before App Store submission, set Release to the public Apple platform key from RevenueCat Project Settings -> API keys. Do not ship a Test Store key.
 
 ## SwiftUI Entry Points
 
