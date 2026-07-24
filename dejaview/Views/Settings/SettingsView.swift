@@ -24,22 +24,12 @@ struct SettingsView: View {
                             }
                         }
                     } label: {
-                        Label("Glassy View Pro", systemImage: proSystemImage)
+                        Label("Glassy Desk Pro", systemImage: proSystemImage)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-
-                if let productIdentifier = subscriptionStore.activeProductIdentifier {
-                    LabeledContent("Product", value: productIdentifier)
-                }
-
-                if let expirationDate = subscriptionStore.proExpirationDate {
-                    LabeledContent("Renews or Expires") {
-                        Text(expirationDate, format: .dateTime.year().month().day())
-                    }
-                }
 
                 if let managementURL = subscriptionStore.managementURL {
                     Link(destination: managementURL) {
@@ -52,7 +42,7 @@ struct SettingsView: View {
                 NavigationLink {
                     OnboardingView()
                 } label: {
-                    Label("How Glassy View Works", systemImage: "sparkles.rectangle.stack")
+                    Label("How Glassy Desk Works", systemImage: "sparkles.rectangle.stack")
                 }
             }
 
@@ -72,7 +62,7 @@ struct SettingsView: View {
                 NavigationLink {
                     AboutView()
                 } label: {
-                    Label("About Glassy View", systemImage: "info.circle")
+                    Label("About Glassy Desk", systemImage: "info.circle")
                 }
             }
         }

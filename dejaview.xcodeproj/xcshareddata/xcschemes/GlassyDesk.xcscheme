@@ -16,8 +16,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "AA0000000000000000000005"
-               BuildableName = "GlassyView.app"
-               BlueprintName = "dejaview"
+               BuildableName = "GlassyDesk.app"
+               BlueprintName = "GlassyDesk"
                ReferencedContainer = "container:dejaview.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -47,8 +47,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "AA0000000000000000000005"
-            BuildableName = "GlassyView.app"
-            BlueprintName = "dejaview"
+            BuildableName = "GlassyDesk.app"
+            BlueprintName = "GlassyDesk"
             ReferencedContainer = "container:dejaview.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -64,8 +64,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "AA0000000000000000000005"
-            BuildableName = "GlassyView.app"
-            BlueprintName = "dejaview"
+            BuildableName = "GlassyDesk.app"
+            BlueprintName = "GlassyDesk"
             ReferencedContainer = "container:dejaview.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

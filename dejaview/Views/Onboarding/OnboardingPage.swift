@@ -26,13 +26,13 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .welcome:
-            "Glassy View connects your iPhone or iPad to macOS Screen Sharing so you can view and control your desktop from the devices you already carry."
+            "Glassy Desk connects your iPhone or iPad to macOS Screen Sharing so you can view and control your desktop from the devices you already carry."
         case .setup:
             "A good session starts with the Mac advertising Screen Sharing and being reachable from your current network."
         case .connect:
             "Use nearby discovery when it is available, or save a host manually for one-tap connections later."
         case .supported:
-            "Glassy View is tuned for Apple's classic Screen Sharing path over VNC/RFB."
+            "Glassy Desk is tuned for Apple's classic Screen Sharing path over VNC/RFB."
         }
     }
 
@@ -73,7 +73,7 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
                                  detail: "Your iPhone or iPad and Mac need to be on the same local network, or connected through a VPN that can reach the Mac."),
                 OnboardingBullet(systemImage: "powerplug",
                                  title: "Keep the Mac available",
-                                 detail: "The Mac must be awake and allowed through any firewall before Glassy View can connect.")
+                                 detail: "The Mac must be awake and allowed through any firewall before Glassy Desk can connect.")
             ]
         case .connect:
             [

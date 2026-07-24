@@ -25,7 +25,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @State private var inputFocused = false
     @State private var externalKeyboardFocused = true
 
-    private let freeSessionDurationInterval: TimeInterval = 60
+    private let freeSessionDurationInterval: TimeInterval = 2 * 60
 
     init(session: Session,
          preferences: Binding<SessionPreferences>,

@@ -2,7 +2,7 @@ import AppIntents
 
 struct ConnectSavedMachineIntent: AppIntent {
     static let title: LocalizedStringResource = "Connect to Computer"
-    static let description = IntentDescription("Open Glassy View and connect to a saved computer.")
+    static let description = IntentDescription("Open Glassy Desk and connect to a saved computer.")
     static let openAppWhenRun = true
 
     @Parameter(title: "Computer")

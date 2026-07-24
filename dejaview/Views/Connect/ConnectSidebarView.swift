@@ -18,7 +18,7 @@ struct ConnectSidebarView: View {
                 }
             }
         }
-        .navigationTitle("Glassy View")
+        .navigationTitle("Glassy Desk")
         .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 340)
     }
 

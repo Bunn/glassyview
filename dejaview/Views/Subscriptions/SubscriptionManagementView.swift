@@ -57,7 +57,7 @@ struct SubscriptionManagementView: View {
                     }
                 }
             }
-            .navigationTitle("Glassy View Pro")
+            .navigationTitle("Glassy Desk Pro")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
@@ -85,7 +85,7 @@ struct SubscriptionManagementView: View {
     }
 
     private var accessText: String {
-        subscriptionStore.hasProAccess ? "Glassy View Pro" : "Free"
+        subscriptionStore.hasProAccess ? "Glassy Desk Pro" : "Free"
     }
 
     private var accessSystemImage: String {

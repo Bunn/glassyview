@@ -79,7 +79,7 @@ struct EditMachineView<Store: MachineStoring>: View {
                 } header: {
                     Text("Wake on LAN")
                 } footer: {
-                    Text("When this Mac is unreachable, Glassy View can wake it and connect automatically. Enable “Wake for network access” in macOS System Settings.")
+                    Text("When this Mac is unreachable, Glassy Desk can wake it and connect automatically. Enable “Wake for network access” in macOS System Settings.")
                 }
 
                 if isNew, connectAfterDismiss != nil {

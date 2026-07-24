@@ -5,7 +5,7 @@ enum DejaViewDestination: String, CaseIterable, AppEnum {
     case hosts
     case nearby
 
-    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Glassy View Section")
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Glassy Desk Section")
 
     static let caseDisplayRepresentations: [DejaViewDestination: DisplayRepresentation] = [
         .hosts: DisplayRepresentation(title: "Hosts", subtitle: "Saved and discovered screen sharing targets"),
@@ -23,8 +23,8 @@ enum DejaViewDestination: String, CaseIterable, AppEnum {
 }
 
 struct OpenDejaViewIntent: AppIntent {
-    static let title: LocalizedStringResource = "Open Glassy View"
-    static let description = IntentDescription("Open Glassy View to a selected section.")
+    static let title: LocalizedStringResource = "Open Glassy Desk"
+    static let description = IntentDescription("Open Glassy Desk to a selected section.")
     static let openAppWhenRun = true
 
     @Parameter(title: "Section", default: .hosts)
@@ -43,7 +43,7 @@ struct OpenDejaViewIntent: AppIntent {
 
 struct RefreshNearbyMacsIntent: AppIntent {
     static let title: LocalizedStringResource = "Refresh Nearby Computers"
-    static let description = IntentDescription("Open Glassy View and refresh nearby Screen Sharing hosts.")
+    static let description = IntentDescription("Open Glassy Desk and refresh nearby Screen Sharing hosts.")
     static let openAppWhenRun = true
 
     static var parameterSummary: some ParameterSummary {
@@ -59,7 +59,7 @@ struct RefreshNearbyMacsIntent: AppIntent {
 
 struct AddSavedMachineIntent: AppIntent {
     static let title: LocalizedStringResource = "Add Saved Computer"
-    static let description = IntentDescription("Save a computer for future Glassy View connections.")
+    static let description = IntentDescription("Save a computer for future Glassy Desk connections.")
     static let openAppWhenRun = false
 
     @Parameter(title: "Host")
@@ -111,7 +111,7 @@ struct AddSavedMachineIntent: AppIntent {
 
 struct DisconnectRemoteSessionIntent: AppIntent {
     static let title: LocalizedStringResource = "Disconnect Remote Session"
-    static let description = IntentDescription("Disconnect the current Glassy View remote session.")
+    static let description = IntentDescription("Disconnect the current Glassy Desk remote session.")
     static let openAppWhenRun = true
 
     static var parameterSummary: some ParameterSummary {

@@ -1,10 +1,10 @@
 # WWDC 2026 Feature Ideas
 
-Validated against Apple WWDC 2026 session coverage, current developer documentation, and the local `$wwdc` skill notes. The most valuable direction for Glassy View is to make saved remote sessions faster to launch, easier to discover from system surfaces, and more adaptive across modern Apple device contexts.
+Validated against Apple WWDC 2026 session coverage, current developer documentation, and the local `$wwdc` skill notes. The most valuable direction for Glassy Desk is to make saved remote sessions faster to launch, easier to discover from system surfaces, and more adaptive across modern Apple device contexts.
 
 ## 1. Siri and Shortcuts: Connect to My Mac
 
-Expose saved machines through App Intents so users can run phrases such as "Connect to my Mac" from Siri, Shortcuts, Spotlight, and system suggestions. This should start with a narrow intent that opens Glassy View and hands off to the existing saved-machine connection flow.
+Expose saved machines through App Intents so users can run phrases such as "Connect to my Mac" from Siri, Shortcuts, Spotlight, and system suggestions. This should start with a narrow intent that opens Glassy Desk and hands off to the existing saved-machine connection flow.
 
 Value: Reduces the core task to one voice or shortcut action without duplicating VNC session logic.
 

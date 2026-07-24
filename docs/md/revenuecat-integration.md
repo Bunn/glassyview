@@ -8,12 +8,12 @@ The project is configured with an `upToNextMajorVersion` requirement starting at
 
 ## Dashboard Setup
 
-1. In RevenueCat, create or select the Glassy View project and app.
+1. In RevenueCat, create or select the Glassy Desk project and app.
 2. Create these products in the Test Store while developing, and mirror them in App Store Connect before release:
    - `monthly`: monthly subscription
    - `yearly`: yearly subscription
    - `lifetime`: non-consumable lifetime unlock
-3. Create the entitlement identifier `Glassy View Pro`.
+3. Keep the existing entitlement identifier `Glassy View Pro` for purchase compatibility.
 4. Attach `monthly`, `yearly`, and `lifetime` to `Glassy View Pro`.
 5. Create an offering, usually `default`, and mark it as the default offering.
 6. Add packages for the three products:
@@ -61,7 +61,7 @@ WindowGroup {
 `ContentView` exposes subscription actions from the More menu:
 
 ```swift
-Button("Glassy View Pro", systemImage: proStatusSystemImage, action: presentSubscriptionManagement)
+Button("Glassy Desk Pro", systemImage: proStatusSystemImage, action: presentSubscriptionManagement)
 Button("Present Paywall", systemImage: "creditcard", action: presentRevenueCatPaywall)
 Button("Customer Center", systemImage: "person.crop.circle", action: presentCustomerCenter)
 ```

@@ -21,11 +21,11 @@ enum SubscriptionProductID: String, CaseIterable, Identifiable {
     var fallbackDescription: String {
         switch self {
         case .lifetime:
-            "One-time access to Glassy View Pro."
+            "One-time access to Glassy Desk Pro."
         case .yearly:
-            "Annual access to Glassy View Pro."
+            "Annual access to Glassy Desk Pro."
         case .monthly:
-            "Monthly access to Glassy View Pro."
+            "Monthly access to Glassy Desk Pro."
         }
     }
 

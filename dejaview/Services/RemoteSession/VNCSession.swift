@@ -309,7 +309,7 @@ final class VNCSession: NSObject, ObservableObject, RemoteSessionControlling, @u
         let attempt = automaticReconnectAttempt + 1
 
         guard let delay = automaticReconnectPolicy.delay(beforeAttempt: attempt) else {
-            let message = "Glassy View couldn't reconnect after \(automaticReconnectPolicy.maximumAttempts) attempts."
+            let message = "Glassy Desk couldn't reconnect after \(automaticReconnectPolicy.maximumAttempts) attempts."
             AppLog.session.error("Automatic reconnect attempts exhausted")
             finishDisconnected(message: message)
             return

@@ -12,20 +12,26 @@ struct RevenueCatPaywallSheet: View {
     }
 
     var body: some View {
-        if Purchases.isConfigured {
-            PaywallView()
-                .onPurchaseCompleted { customerInfo in
-                    handle(customerInfo)
-                }
-                .onRestoreCompleted { customerInfo in
-                    handle(customerInfo)
-                }
-                .task {
-                    await subscriptionStore.refresh()
-                }
-        } else {
-            RevenueCatUnavailableView()
+        Group {
+            if Purchases.isConfigured {
+                PaywallView()
+                    // Match the compact layout configured in RevenueCat's phone preview.
+                    .environment(\.horizontalSizeClass, .compact)
+                    .onPurchaseCompleted { customerInfo in
+                        handle(customerInfo)
+                    }
+                    .onRestoreCompleted { customerInfo in
+                        handle(customerInfo)
+                    }
+                    .task {
+                        await subscriptionStore.refresh()
+                    }
+            } else {
+                RevenueCatUnavailableView()
+            }
         }
+        // The default iPad form sheet is too short for this full-height paywall.
+        .presentationSizing(.page)
     }
 
     private func handle(_ customerInfo: CustomerInfo) {

@@ -1,4 +1,4 @@
-# Glassy View
+# Glassy Desk
 
 Starter iOS client for macOS Screen Sharing (VNC/RFB), built on [RoyalVNC](https://github.com/royalapplications/royalvnc).
 
@@ -6,7 +6,7 @@ Starter iOS client for macOS Screen Sharing (VNC/RFB), built on [RoyalVNC](https
 
 1. Open `dejaview.xcodeproj` in Xcode (26 or later).
 2. Wait for Xcode to resolve the RoyalVNC Swift package.
-3. Select the dejaview target → Signing & Capabilities → choose your development team.
+3. Select the GlassyDesk target → Signing & Capabilities → choose your development team.
 4. Build and run on a device or simulator on the same network as the target Mac.
 
 On the target Mac: System Settings → General → Sharing → enable **Screen Sharing**.

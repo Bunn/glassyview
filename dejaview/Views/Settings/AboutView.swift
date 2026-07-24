@@ -25,7 +25,7 @@ struct AboutView: View {
                             .frame(width: 100, height: 100)
                             .background(.thinMaterial, in: .rect(cornerRadius: 22))
 
-                        Text("Glassy View")
+                        Text("Glassy Desk")
                             .font(.title2)
                             .bold()
 
