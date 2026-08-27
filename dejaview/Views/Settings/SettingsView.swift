@@ -3,6 +3,10 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(SubscriptionStore.self) private var subscriptionStore
+    @Environment(GlassyHostBrowser.self) private var glassyHostBrowser
+
+    @AppStorage(RemoteConnectionMode.storageKey)
+    private var connectionMode = RemoteConnectionMode.default
 
     @State private var isPaywallPresented = false
 
@@ -36,6 +40,35 @@ struct SettingsView: View {
                         Label("Manage Subscription", systemImage: "link")
                     }
                 }
+            }
+
+            Section {
+                Picker("Connection Mode", selection: $connectionMode) {
+                    ForEach(RemoteConnectionMode.allCases) { mode in
+                        Label(mode.title, systemImage: mode.systemImage)
+                            .tag(mode)
+                    }
+                }
+
+                if connectionMode == .automatic {
+                    LabeledContent {
+                        HStack(spacing: 8) {
+                            if glassyHostBrowser.state == .searching {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+
+                            Text(glassyHostStatusText)
+                                .foregroundStyle(glassyHostStatusColor)
+                        }
+                    } label: {
+                        Label("Nearby Glassy Host", systemImage: "macbook.and.iphone")
+                    }
+                }
+            } header: {
+                Text("Streaming")
+            } footer: {
+                Text(connectionMode.description)
             }
 
             Section("Getting Started") {
@@ -94,6 +127,28 @@ struct SettingsView: View {
         } else {
             "Free"
         }
+    }
+
+    private var glassyHostStatusText: String {
+        if !glassyHostBrowser.hosts.isEmpty {
+            let count = glassyHostBrowser.hosts.count
+            return count == 1 ? "1 Found" : "\(count) Found"
+        }
+
+        return switch glassyHostBrowser.state {
+        case .stopped:
+            "Not Started"
+        case .searching:
+            "Looking"
+        case .ready:
+            "Not Found"
+        case .failed:
+            "Unavailable"
+        }
+    }
+
+    private var glassyHostStatusColor: Color {
+        glassyHostBrowser.hosts.isEmpty ? .secondary : .green
     }
 
     private var proStatusColor: Color {
@@ -179,4 +234,5 @@ struct SettingsView: View {
             .navigationTitle("Settings")
     }
     .environment(SubscriptionStore())
+    .environment(GlassyHostBrowser())
 }

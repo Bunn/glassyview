@@ -4,6 +4,7 @@
 <dict>
 	<key>NSBonjourServices</key>
 	<array>
+		<string>_glassydesk._tcp</string>
 		<string>_rfb._tcp</string>
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>

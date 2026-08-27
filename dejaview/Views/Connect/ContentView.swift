@@ -12,12 +12,15 @@ struct ContentView<Session: RemoteSessionControlling,
     @State private var store: Store
     @State private var intentRouter: Router
     @State private var networkPathObserver = NetworkPathObserver()
+    @State private var glassyHostBrowser = GlassyHostBrowser()
     private let wakeOnLANSender: any WakeOnLANSending
 
     @State private var selectedSection: ConnectSection? = .hosts
     @State private var searchText = ""
 
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage(RemoteConnectionMode.storageKey)
+    private var connectionMode = RemoteConnectionMode.default
     @State private var isOnboardingPresented = false
     @State private var isSessionPresented = false
     @State private var isSettingsPresented = false
@@ -79,6 +82,7 @@ struct ContentView<Session: RemoteSessionControlling,
         .sheet(isPresented: $isSettingsPresented) {
             NavigationStack {
                 SettingsView()
+                    .environment(glassyHostBrowser)
                     .navigationTitle("Settings")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -114,6 +118,7 @@ struct ContentView<Session: RemoteSessionControlling,
         .onAppear {
             AppLog.ui.info("Connect view appeared; starting nearby Mac discovery")
             browser.start()
+            updateGlassyHostDiscovery()
             networkPathObserver.start()
             presentOnboardingIfNeeded()
             handlePendingIntentRequest()
@@ -123,7 +128,11 @@ struct ContentView<Session: RemoteSessionControlling,
             }
         }
         .onDisappear {
+            glassyHostBrowser.stop()
             networkPathObserver.stop()
+        }
+        .onChange(of: connectionMode) { _, _ in
+            updateGlassyHostDiscovery()
         }
         .onChange(of: intentRouter.request) { _, request in
             guard let request else { return }
@@ -157,6 +166,15 @@ struct ContentView<Session: RemoteSessionControlling,
         }
         .task(id: machineReachabilitySignature) {
             await monitorSavedMachineReachability()
+        }
+    }
+
+    private func updateGlassyHostDiscovery() {
+        switch connectionMode {
+        case .automatic:
+            glassyHostBrowser.start()
+        case .vncOnly:
+            glassyHostBrowser.stop()
         }
     }
 
