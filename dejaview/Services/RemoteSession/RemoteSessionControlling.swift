@@ -34,6 +34,7 @@ protocol RemoteSessionControlling: ObservableObject, RemoteSessionInputControlli
     var cursor: RemoteCursor? { get }
     var cursorPublisher: AnyPublisher<RemoteCursor?, Never> { get }
     var quality: RemoteSessionQuality { get }
+    var supportedQualities: [RemoteSessionQuality] { get }
     var preferredFrameRate: RemoteFrameRate { get }
     var displays: [RemoteDisplay] { get }
     var displayOptions: [RemoteDisplayOption] { get }

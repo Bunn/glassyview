@@ -130,6 +130,9 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .onChange(of: session.preferredFrameRate) { _, frameRate in
             updatePreference(\.frameRate, to: frameRate)
         }
+        .onChange(of: session.quality) { _, quality in
+            updatePreference(\.quality, to: quality)
+        }
         .onChange(of: streamZoomScale) { _, zoomScale in
             updatePreference(\.zoomScale, to: Double(zoomScale))
         }

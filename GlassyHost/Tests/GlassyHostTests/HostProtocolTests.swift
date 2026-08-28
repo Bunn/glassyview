@@ -136,11 +136,13 @@ func pairingCodeRotation() {
     )
 }
 
-@Test("Protocol v1 reserves direct input and keyframe recovery values")
+@Test("Protocol v1 reserves input, recovery, and quality-control values")
 func directInputWireValues() throws {
     #expect(HostProtocol.Capabilities.directInput.rawValue == 0x0000_0004)
-    #expect(HostProtocol.advertisedCapabilities.rawValue == 0x0000_0007)
+    #expect(HostProtocol.Capabilities.streamQualityControl.rawValue == 0x0000_0008)
+    #expect(HostProtocol.advertisedCapabilities.rawValue == 0x0000_000F)
     #expect(HostProtocol.MessageKind.keyFrameRequest.rawValue == 0x12)
+    #expect(HostProtocol.MessageKind.streamQualityRequest.rawValue == 0x13)
     #expect(HostProtocol.MessageKind.pointerInput.rawValue == 0x20)
     #expect(HostProtocol.MessageKind.scrollInput.rawValue == 0x21)
     #expect(HostProtocol.MessageKind.keyInput.rawValue == 0x22)
@@ -149,6 +151,32 @@ func directInputWireValues() throws {
     try HostProtocol.decodeKeyFrameRequest(Data())
     #expect(throws: HostProtocol.ProtocolError.self) {
         try HostProtocol.decodeKeyFrameRequest(Data([0]))
+    }
+}
+
+@Test("Stream quality request codec uses exact allowlisted values")
+func streamQualityRequestCodec() throws {
+    #expect(HostProtocol.StreamQuality.dataSaver.rawValue == 0)
+    #expect(HostProtocol.StreamQuality.balanced.rawValue == 1)
+    #expect(HostProtocol.StreamQuality.best.rawValue == 2)
+
+    for quality in HostProtocol.StreamQuality.allCases {
+        let encoded = HostProtocol.encodeStreamQualityRequest(quality)
+        #expect(encoded == Data([quality.rawValue, 0, 0, 0]))
+        #expect(try HostProtocol.decodeStreamQualityRequest(encoded) == quality)
+    }
+
+    #expect(throws: HostProtocol.ProtocolError.self) {
+        _ = try HostProtocol.decodeStreamQualityRequest(Data([3, 0, 0, 0]))
+    }
+    #expect(throws: HostProtocol.ProtocolError.self) {
+        _ = try HostProtocol.decodeStreamQualityRequest(Data([0, 0, 1, 0]))
+    }
+    #expect(throws: HostProtocol.ProtocolError.self) {
+        _ = try HostProtocol.decodeStreamQualityRequest(Data([0, 0, 0]))
+    }
+    #expect(throws: HostProtocol.ProtocolError.self) {
+        _ = try HostProtocol.decodeStreamQualityRequest(Data([0, 0, 0, 0, 0]))
     }
 }
 

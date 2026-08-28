@@ -20,6 +20,7 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
     let hostName: String
     let maximumMediaPayloadLength: Int
     let resumedSession: Bool
+    let supportsStreamQuality: Bool
 }
 
 enum GlassyStreamEvent: Equatable, Sendable {
@@ -39,6 +40,7 @@ struct GlassyStreamConnectionConfiguration: @unchecked Sendable {
     let savedMachineID: UUID
     let pairingCode: String?
     let expectedHostIdentifier: Data?
+    let desiredQuality: RemoteSessionQuality
     let clientName: String
     let authenticationTimeout: TimeInterval
 
@@ -46,12 +48,14 @@ struct GlassyStreamConnectionConfiguration: @unchecked Sendable {
          savedMachineID: UUID,
          pairingCode: String? = nil,
          expectedHostIdentifier: Data? = nil,
+         desiredQuality: RemoteSessionQuality = .best,
          clientName: String = ProcessInfo.processInfo.hostName,
          authenticationTimeout: TimeInterval = 10) {
         self.endpoint = endpoint
         self.savedMachineID = savedMachineID
         self.pairingCode = pairingCode
         self.expectedHostIdentifier = expectedHostIdentifier
+        self.desiredQuality = desiredQuality
         self.clientName = clientName
         self.authenticationTimeout = authenticationTimeout
     }

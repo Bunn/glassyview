@@ -12,6 +12,7 @@ import RoyalVNCKit
 final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessionControlling {
     @Published private(set) var status: RemoteSessionStatus = .idle
     @Published private(set) var quality: RemoteSessionQuality = .best
+    @Published private(set) var supportedQualities: [RemoteSessionQuality] = [.best]
     @Published private(set) var preferredFrameRate: RemoteFrameRate = .responsive
     @Published private(set) var touchMode: RemoteTouchMode = .direct
     @Published private(set) var displays: [RemoteDisplay] = []
@@ -70,14 +71,17 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         endpoint: NWEndpoint,
         savedMachineID: UUID,
         pairingCode: String?,
-        expectedHostIdentifier: Data? = nil
+        expectedHostIdentifier: Data? = nil,
+        desiredQuality: RemoteSessionQuality = .best
     ) async throws -> GlassyStreamAuthentication {
         cancelRetryTask()
+        quality = desiredQuality
         let configuration = ConnectionConfiguration(
             endpoint: endpoint,
             savedMachineID: savedMachineID,
             pairingCode: pairingCode,
-            expectedHostIdentifier: expectedHostIdentifier
+            expectedHostIdentifier: expectedHostIdentifier,
+            desiredQuality: desiredQuality
         )
         retryConfiguration = configuration
         return try await connect(using: configuration)
@@ -96,7 +100,8 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
             endpoint: .hostPort(host: NWEndpoint.Host(host), port: networkPort),
             savedMachineID: fallbackSavedMachineID,
             pairingCode: nil,
-            expectedHostIdentifier: nil
+            expectedHostIdentifier: nil,
+            desiredQuality: quality
         )
         retryConfiguration = configuration
         startRetryTask(using: configuration)
@@ -121,6 +126,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         controller.disconnect()
         retryConfiguration = nil
         clearGeometry()
+        supportedQualities = [.best]
         status = .idle
         disconnectRequested = false
     }
@@ -150,11 +156,22 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         let preferences = preferences.normalized
         touchMode = preferences.touchMode
         setPreferredFrameRate(preferences.frameRate)
+        if status == .connected {
+            setQuality(preferences.quality)
+        } else {
+            quality = preferences.quality
+            retryConfiguration?.desiredQuality = preferences.quality
+        }
         displaySelection = .all
     }
 
     func setQuality(_ newQuality: RemoteSessionQuality) {
+        guard supportedQualities.contains(newQuality) else { return }
+        guard newQuality != quality else { return }
+
         quality = newQuality
+        retryConfiguration?.desiredQuality = newQuality
+        controller.setStreamQuality(newQuality)
     }
 
     func setPreferredFrameRate(_ frameRate: RemoteFrameRate) {
@@ -331,6 +348,8 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         disconnectRequested = false
         releaseActiveInputState()
         clearGeometry()
+        supportedQualities = [.best]
+        quality = configuration.desiredQuality
         status = .connecting
 
         do {
@@ -338,13 +357,23 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
                 endpoint: configuration.endpoint,
                 savedMachineID: configuration.savedMachineID,
                 pairingCode: configuration.pairingCode,
-                expectedHostIdentifier: configuration.expectedHostIdentifier
+                expectedHostIdentifier: configuration.expectedHostIdentifier,
+                desiredQuality: configuration.desiredQuality
             )
+            supportedQualities = authentication.supportsStreamQuality
+                ? RemoteSessionQuality.allCases
+                : [.best]
+            // Keep the user's requested preset even when an older host cannot
+            // negotiate it. The options menu is capability-gated, and retaining
+            // this value prevents a legacy connection from overwriting the saved
+            // per-machine preference.
+            quality = configuration.desiredQuality
             retryConfiguration = ConnectionConfiguration(
                 endpoint: configuration.endpoint,
                 savedMachineID: configuration.savedMachineID,
                 pairingCode: nil,
-                expectedHostIdentifier: authentication.hostIdentifier
+                expectedHostIdentifier: authentication.hostIdentifier,
+                desiredQuality: configuration.desiredQuality
             )
             status = .connected
             return authentication
@@ -573,4 +602,5 @@ private struct ConnectionConfiguration: @unchecked Sendable {
     let savedMachineID: UUID
     let pairingCode: String?
     let expectedHostIdentifier: Data?
+    var desiredQuality: RemoteSessionQuality
 }

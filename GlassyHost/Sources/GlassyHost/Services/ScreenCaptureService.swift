@@ -61,9 +61,14 @@ enum ScreenCaptureServiceError: LocalizedError, Sendable {
 }
 
 enum ScreenCaptureEvent: Sendable {
-    case started(displayID: CGDirectDisplayID, width: Int, height: Int)
-    case stopped
-    case failed(message: String)
+    case started(
+        displayID: CGDirectDisplayID,
+        width: Int,
+        height: Int,
+        generation: HostPipelineGeneration
+    )
+    case stopped(generation: HostPipelineGeneration)
+    case failed(message: String, generation: HostPipelineGeneration)
 }
 
 /// Owns one ScreenCaptureKit display stream.
@@ -117,7 +122,8 @@ actor ScreenCaptureService {
     /// and returns the frame stream owned by this capture generation.
     func start(
         displayID requestedDisplayID: CGDirectDisplayID? = nil,
-        configuration: ScreenCaptureConfiguration = .init()
+        configuration: ScreenCaptureConfiguration = .init(),
+        pipelineGeneration: HostPipelineGeneration
     ) async throws -> AsyncStream<CapturedScreenFrame> {
         operationGeneration &+= 1
         let generation = operationGeneration
@@ -193,6 +199,7 @@ actor ScreenCaptureService {
 
         activeCapture = ActiveCapture(
             generation: generation,
+            pipelineGeneration: pipelineGeneration,
             displayID: display.displayID,
             stream: stream,
             output: frameOutput,
@@ -203,7 +210,8 @@ actor ScreenCaptureService {
             .started(
                 displayID: display.displayID,
                 width: outputSize.width,
-                height: outputSize.height
+                height: outputSize.height,
+                generation: pipelineGeneration
             )
         )
         return frameRelay.stream
@@ -222,7 +230,7 @@ actor ScreenCaptureService {
         try? activeCapture.stream.removeStreamOutput(activeCapture.output, type: .screen)
         activeCapture.frameRelay.finish()
         if notify {
-            eventHandler(.stopped)
+            eventHandler(.stopped(generation: activeCapture.pipelineGeneration))
         }
     }
 
@@ -231,7 +239,12 @@ actor ScreenCaptureService {
         self.activeCapture = nil
         try? activeCapture.stream.removeStreamOutput(activeCapture.output, type: .screen)
         activeCapture.frameRelay.finish()
-        eventHandler(.failed(message: message))
+        eventHandler(
+            .failed(
+                message: message,
+                generation: activeCapture.pipelineGeneration
+            )
+        )
     }
 
     private static func selectDisplay(
@@ -290,6 +303,7 @@ actor ScreenCaptureService {
 private extension ScreenCaptureService {
     struct ActiveCapture {
         let generation: UInt64
+        let pipelineGeneration: HostPipelineGeneration
         let displayID: CGDirectDisplayID
         let stream: SCStream
         let output: CaptureOutput

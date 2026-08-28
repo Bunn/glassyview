@@ -18,7 +18,7 @@ On the target Mac: System Settings → General → Sharing → enable **Screen S
 - **Rendering**: full-screen framebuffer drawn into a `CALayer` (aspect-fit), status bar and home indicator hidden.
 - **Input**: tap = left click, drag = click-drag; a floating glass pill toggles a keystroke bar and disconnects.
 - **Liquid Glass** styling using iOS 26-native `glassEffect`, `.glass`/`.glassProminent` buttons, and morphing glass controls.
-- **Options menu**: bottom-right glass button with quality, frame-rate, trackpad-mode, and external-display controls. Quality settings are immutable per connection, so changes briefly reconnect (with a 2s grace period).
+- **Options menu**: bottom-right glass button with per-machine Glassy Stream quality presets (Data Saver at 720p/15 FPS/~2 Mbps, Balanced at 1080p/30 FPS/~5 Mbps, or Best at up to 4K/60 FPS/~12 Mbps), plus VNC frame-rate, trackpad-mode, and external-display controls. Glassy quality changes reconfigure the host stream without disconnecting the session.
 - **Saved machines**: one-tap connect entries with editable name/host/port/login (`MachineStore`). Metadata, encrypted passwords, and connection history are stored in SwiftData with private CloudKit sync; passwords are also cached locally in the Keychain.
 
 ## Notes & next steps

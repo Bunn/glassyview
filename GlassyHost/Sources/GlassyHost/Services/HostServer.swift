@@ -21,6 +21,7 @@ final class HostServer: @unchecked Sendable {
     typealias ClientCountHandler = @Sendable (Int) -> Void
     typealias StatusHandler = @Sendable (Status) -> Void
     typealias RemoteInputHandler = @Sendable (HostProtocol.RemoteInputEvent) -> Void
+    typealias StreamQualityHandler = @Sendable (HostProtocol.StreamQuality) -> Void
 
     struct PairingCode: Equatable, Sendable {
         let value: String
@@ -85,6 +86,13 @@ final class HostServer: @unchecked Sendable {
     /// core never invokes this callback before the encrypted handshake finishes.
     func setRemoteInputHandler(_ handler: RemoteInputHandler?) {
         core.setRemoteInputHandler(handler)
+    }
+
+    /// Installs the sink for the effective host-wide stream quality. One encoder
+    /// serves every viewer, so the network core selects the most conservative
+    /// request made by any authenticated client. With no clients, this is Best.
+    func setStreamQualityHandler(_ handler: StreamQualityHandler?) {
+        core.setStreamQualityHandler(handler)
     }
 
     /// Removes H.264 bootstrap data and queued media from the capture generation
@@ -183,6 +191,8 @@ private extension HostServer {
         private let mediaIngress = MediaIngress()
         private var keyFrameRequestHandler: (@Sendable () -> Void)?
         private var remoteInputHandler: RemoteInputHandler?
+        private var streamQualityHandler: StreamQualityHandler = { _ in }
+        private var streamQualityArbitration = HostStreamQualityArbitration()
         private var lastPublishedClientCount = 0
         private var lastStatus: Status = .stopped
         private var clientCountHandler: ClientCountHandler = { _ in }
@@ -236,6 +246,15 @@ private extension HostServer {
         func setRemoteInputHandler(_ handler: RemoteInputHandler?) {
             queue.async { [weak self] in
                 self?.remoteInputHandler = handler
+            }
+        }
+
+        func setStreamQualityHandler(_ handler: StreamQualityHandler?) {
+            queue.async { [weak self] in
+                guard let self else { return }
+                streamQualityHandler = handler ?? { _ in }
+                guard handler != nil else { return }
+                publishEffectiveStreamQualityIfNeeded(force: true)
             }
         }
 
@@ -403,6 +422,7 @@ private extension HostServer {
                 client.isClosed = true
             }
             publishAuthenticatedClientCountIfNeeded(force: true)
+            publishEffectiveStreamQualityIfNeeded()
             if publishStopped {
                 publishStatus(.stopped)
             }
@@ -691,6 +711,11 @@ private extension HostServer {
                 try HostProtocol.decodeKeyFrameRequest(plaintext)
                 client.needsKeyFrame = true
                 requestKeyFrameIfNeeded(for: [client])
+            case .streamQualityRequest:
+                let requestedQuality = try HostProtocol.decodeStreamQualityRequest(plaintext)
+                guard requestedQuality != client.requestedQuality else { return }
+                client.requestedQuality = requestedQuality
+                publishEffectiveStreamQualityIfNeeded()
             case .pointerInput, .scrollInput, .keyInput, .textInput:
                 let input = try HostProtocol.decodeRemoteInput(
                     kind: frame.kind,
@@ -842,6 +867,7 @@ private extension HostServer {
             client.connection.stateUpdateHandler = nil
             client.connection.cancel()
             publishAuthenticatedClientCountIfNeeded()
+            publishEffectiveStreamQualityIfNeeded()
         }
 
         private func pairingAttemptIsAllowed(at date: Date = Date()) -> Bool {
@@ -860,6 +886,15 @@ private extension HostServer {
             guard force || count != lastPublishedClientCount else { return }
             lastPublishedClientCount = count
             clientCountHandler(count)
+        }
+
+        private func publishEffectiveStreamQualityIfNeeded(force: Bool = false) {
+            let requestedQualities = authenticatedClients.lazy.map(\.requestedQuality)
+            guard let quality = streamQualityArbitration.qualityToPublish(
+                for: requestedQualities,
+                force: force
+            ) else { return }
+            streamQualityHandler(quality)
         }
 
         private func secureRandomData(count: Int) throws -> Data {
@@ -995,6 +1030,8 @@ private extension HostServer.Core {
         var isClosed = false
         var needsKeyFrame = true
         var keyFrameRequestOutstanding = false
+        // A client that never sends the optional request retains legacy quality.
+        var requestedQuality: HostProtocol.StreamQuality = .best
 
         init(connection: NWConnection) {
             self.connection = connection
@@ -1052,6 +1089,28 @@ struct HostVideoBootstrapCache: Sendable {
 
     mutating func clear() {
         codecConfiguration = nil
+    }
+}
+
+struct HostStreamQualityArbitration: Sendable {
+    private(set) var lastPublishedQuality: HostProtocol.StreamQuality = .best
+
+    static func effectiveQuality<S: Sequence>(
+        for requestedQualities: S
+    ) -> HostProtocol.StreamQuality where S.Element == HostProtocol.StreamQuality {
+        requestedQualities.min { lhs, rhs in
+            lhs.rawValue < rhs.rawValue
+        } ?? .best
+    }
+
+    mutating func qualityToPublish<S: Sequence>(
+        for requestedQualities: S,
+        force: Bool = false
+    ) -> HostProtocol.StreamQuality? where S.Element == HostProtocol.StreamQuality {
+        let quality = Self.effectiveQuality(for: requestedQualities)
+        guard force || quality != lastPublishedQuality else { return nil }
+        lastPublishedQuality = quality
+        return quality
     }
 }
 

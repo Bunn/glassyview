@@ -9,6 +9,7 @@ final class HostController {
     private enum ServerEvent: Sendable {
         case authenticatedClientCount(Int)
         case status(HostServer.Status)
+        case streamQuality(HostProtocol.StreamQuality)
     }
 
     private(set) var runState: HostRunState = .stopped
@@ -74,7 +75,30 @@ final class HostController {
     @ObservationIgnored
     private var isHandlingPipelineFailure = false
 
+    @ObservationIgnored
+    private var pipelineGenerations = HostPipelineGenerationTracker()
+
+    @ObservationIgnored
+    private var desiredStreamQuality: HostProtocol.StreamQuality = .best
+
+    @ObservationIgnored
+    private var activeStreamQuality: HostProtocol.StreamQuality?
+
+    @ObservationIgnored
+    private var pendingStreamQualityUpgrade: HostProtocol.StreamQuality?
+
+    @ObservationIgnored
+    private var streamQualityUpgradeTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var initialOnDemandStartTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var isInitialOnDemandStartDeferred = false
+
     private static let onDemandStopGrace: Duration = .seconds(5)
+    private static let streamQualityUpgradeDebounce: Duration = .milliseconds(400)
+    private static let initialOnDemandStartDelay: Duration = .milliseconds(200)
 
     var displayName: String {
         if let selectedDisplayID,
@@ -100,6 +124,9 @@ final class HostController {
     }
 
     var captureStatusText: String {
+        if isInitialOnDemandStartDeferred && clientCount > 0 {
+            return "Starting capture…"
+        }
         if isTransitioning {
             return streamingDemand.wantsCapture ? "Starting capture…" : "Stopping capture…"
         }
@@ -126,6 +153,8 @@ final class HostController {
     deinit {
         pairingCodeTimer?.invalidate()
         onDemandStopTask?.cancel()
+        streamQualityUpgradeTask?.cancel()
+        initialOnDemandStartTask?.cancel()
         serverEventContinuation?.finish()
         serverEventTask?.cancel()
         remoteInputService.setEnabled(false)
@@ -142,7 +171,6 @@ final class HostController {
         hostServer.setRemoteInputHandler { [remoteInputService] event in
             remoteInputService.handle(event)
         }
-
         do {
             let store = pairingSecretStore
             let pairingSecret = try await Task.detached(priority: .userInitiated) {
@@ -174,6 +202,7 @@ final class HostController {
         guard !isTransitioning else { return }
         let effects = streamingDemand.requestManualStart()
         applyStreamingDemandEffects(effects)
+        updateInitialOnDemandStartCoalescing()
         await reconcileCapturePipeline()
     }
 
@@ -181,6 +210,7 @@ final class HostController {
         guard !isTransitioning else { return }
         let effects = streamingDemand.requestManualStart()
         applyStreamingDemandEffects(effects)
+        updateInitialOnDemandStartCoalescing()
         await reconcileCapturePipeline()
     }
 
@@ -188,15 +218,20 @@ final class HostController {
         guard !isTransitioning else { return }
         let effects = streamingDemand.requestManualStop()
         applyStreamingDemandEffects(effects)
+        updateInitialOnDemandStartCoalescing()
         await reconcileCapturePipeline()
     }
 
-    private func startCapturePipeline() async -> Bool {
+    private func startCapturePipeline(
+        quality: HostProtocol.StreamQuality
+    ) async -> Bool {
         guard !isStreaming else { return true }
         guard isServerReady else {
             lastError = "The authenticated local streaming service is not ready yet."
             return false
         }
+
+        let streamConfiguration = HostStreamQualityConfiguration(quality: quality)
 
         let requestedOwnership = streamingDemand.ownership
         updateScreenRecordingAuthorization()
@@ -218,13 +253,10 @@ final class HostController {
         lastError = nil
         await refreshDisplays()
 
+        let pipelineGeneration = pipelineGenerations.begin()
         let server = hostServer
         let encoder = H264Encoder(
-            configuration: .init(
-                expectedFrameRate: 60,
-                averageBitRate: 12_000_000,
-                keyFrameIntervalSeconds: 2
-            ),
+            configuration: streamConfiguration.encoderConfiguration,
             outputHandler: { output in
                 switch output {
                 case .codecConfiguration(let configuration):
@@ -241,9 +273,12 @@ final class HostController {
                     )
                 }
             },
-            errorHandler: { [weak self] error in
+            errorHandler: { [weak self, pipelineGeneration] error in
                 Task { @MainActor in
-                    await self?.handlePipelineFailure(error)
+                    await self?.handlePipelineFailure(
+                        error,
+                        generation: pipelineGeneration
+                    )
                 }
             }
         )
@@ -255,15 +290,11 @@ final class HostController {
         do {
             let frames = try await captureService.start(
                 displayID: selectedDisplayID,
-                configuration: .init(
-                    framesPerSecond: 60,
-                    maximumWidth: 3_840,
-                    maximumHeight: 2_160,
-                    showsCursor: true
-                )
+                configuration: streamConfiguration.screenCaptureConfiguration,
+                pipelineGeneration: pipelineGeneration
             )
 
-            frameTask = Task { [weak self, encoder] in
+            frameTask = Task { [weak self, encoder, pipelineGeneration] in
                 do {
                     for await frame in frames {
                         try Task.checkCancellation()
@@ -274,19 +305,26 @@ final class HostController {
                 } catch {
                     let failure = HostPipelineError(message: error.localizedDescription)
                     Task { @MainActor [weak self] in
-                        await self?.handlePipelineFailure(failure)
+                        await self?.handlePipelineFailure(
+                            failure,
+                            generation: pipelineGeneration
+                        )
                     }
                 }
             }
 
             isStreaming = true
+            activeStreamQuality = quality
             remoteInputService.setEnabled(true)
             if isServerReady {
                 runState = .ready
             }
-            HostLog.capture.info("Started 60 fps display capture")
+            HostLog.capture.info(
+                "Started \(streamConfiguration.framesPerSecond, privacy: .public) fps display capture at up to \(streamConfiguration.maximumWidth, privacy: .public)x\(streamConfiguration.maximumHeight, privacy: .public)"
+            )
             return true
         } catch {
+            pipelineGenerations.invalidate(pipelineGeneration)
             await encoder.finish()
             self.encoder = nil
             hostServer.setKeyFrameRequestHandler(nil)
@@ -297,6 +335,9 @@ final class HostController {
     }
 
     private func stopCapturePipeline() async {
+        pipelineGenerations.invalidate()
+        streamQualityUpgradeTask?.cancel()
+        streamQualityUpgradeTask = nil
         remoteInputService.setEnabled(false)
         let frameTaskToStop = frameTask
         frameTask = nil
@@ -310,6 +351,12 @@ final class HostController {
         hostServer.setKeyFrameRequestHandler(nil)
         await hostServer.clearVideoState()
         isStreaming = false
+        activeStreamQuality = nil
+        if !streamingDemand.wantsCapture,
+           let pendingStreamQualityUpgrade {
+            desiredStreamQuality = pendingStreamQualityUpgrade
+            self.pendingStreamQualityUpgrade = nil
+        }
         if isServerReady {
             runState = .ready
         } else if case .failed = runState {
@@ -397,6 +444,7 @@ final class HostController {
             clientCount = streamingDemand.authenticatedClientCount
             remoteInputService.releasePressedInput()
             applyStreamingDemandEffects(effects)
+            updateInitialOnDemandStartCoalescing()
             Task {
                 await reconcileCapturePipeline()
             }
@@ -431,7 +479,144 @@ final class HostController {
             remoteInputService.releasePressedInput()
         }
         applyStreamingDemandEffects(effects)
+        updateInitialOnDemandStartCoalescing()
+        if clientCount > 0 {
+            schedulePendingStreamQualityUpgradeIfNeeded()
+        }
         await reconcileCapturePipeline()
+    }
+
+    private func handleStreamQualityChange(
+        _ quality: HostProtocol.StreamQuality
+    ) async {
+        let previousRequestedQuality = pendingStreamQualityUpgrade
+            ?? desiredStreamQuality
+        guard quality != previousRequestedQuality else { return }
+
+        let baselineQuality = activeStreamQuality ?? desiredStreamQuality
+        let decision = HostStreamQualityUpdatePolicy.decision(
+            currentQuality: baselineQuality,
+            requestedQuality: quality,
+            hasPipeline: isStreaming || isTransitioning,
+            authenticatedClientCount: clientCount,
+            isOnDemandGrace: isOnDemandStreaming && clientCount == 0
+        )
+        HostLog.capture.notice(
+            "Stream quality changed to \(String(describing: quality), privacy: .public)"
+        )
+
+        switch decision {
+        case .applyImmediately:
+            cancelPendingStreamQualityUpgrade()
+            desiredStreamQuality = quality
+            if isInitialOnDemandStartDeferred,
+               clientCount > 0,
+               streamingOwnership == .onDemand {
+                // The first viewer supplied an explicit preset during the
+                // coalescing window, so there is no reason to wait for the
+                // legacy-client fallback timer.
+                cancelInitialOnDemandStartDelay()
+            }
+            await reconcileCapturePipeline()
+        case .debounceUpgrade:
+            pendingStreamQualityUpgrade = quality
+            schedulePendingStreamQualityUpgradeIfNeeded()
+        case .holdUpgrade:
+            streamQualityUpgradeTask?.cancel()
+            streamQualityUpgradeTask = nil
+            pendingStreamQualityUpgrade = quality
+        }
+    }
+
+    private func schedulePendingStreamQualityUpgradeIfNeeded() {
+        guard pendingStreamQualityUpgrade != nil,
+              isStreaming,
+              clientCount > 0 || streamingOwnership == .manual else { return }
+
+        streamQualityUpgradeTask?.cancel()
+        streamQualityUpgradeTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: Self.streamQualityUpgradeDebounce)
+            } catch {
+                return
+            }
+            guard let self else { return }
+            self.streamQualityUpgradeTask = nil
+
+            guard self.clientCount > 0 || self.streamingOwnership == .manual,
+                  self.isStreaming,
+                  !self.isTransitioning,
+                  let activeQuality = self.activeStreamQuality,
+                  let pendingQuality = self.pendingStreamQualityUpgrade,
+                  pendingQuality.rawValue > activeQuality.rawValue else { return }
+
+            self.pendingStreamQualityUpgrade = nil
+            self.desiredStreamQuality = pendingQuality
+            await self.reconcileCapturePipeline()
+        }
+    }
+
+    private func cancelPendingStreamQualityUpgrade(
+        settleRequestedQuality: Bool = false
+    ) {
+        streamQualityUpgradeTask?.cancel()
+        streamQualityUpgradeTask = nil
+        if settleRequestedQuality,
+           let pendingStreamQualityUpgrade {
+            desiredStreamQuality = pendingStreamQualityUpgrade
+        }
+        pendingStreamQualityUpgrade = nil
+    }
+
+    private func updateInitialOnDemandStartCoalescing() {
+        let decision = HostInitialOnDemandStartPolicy.decision(
+            ownership: streamingOwnership,
+            hasPipeline: isStreaming || isTransitioning,
+            authenticatedClientCount: clientCount
+        )
+
+        switch decision {
+        case .doNotDelay:
+            cancelInitialOnDemandStartDelay()
+        case .coalesce:
+            scheduleInitialOnDemandStartIfNeeded()
+        case .waitForViewer:
+            initialOnDemandStartTask?.cancel()
+            initialOnDemandStartTask = nil
+            isInitialOnDemandStartDeferred = true
+        }
+    }
+
+    private func scheduleInitialOnDemandStartIfNeeded() {
+        isInitialOnDemandStartDeferred = true
+        guard initialOnDemandStartTask == nil else { return }
+
+        initialOnDemandStartTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: Self.initialOnDemandStartDelay)
+            } catch {
+                return
+            }
+            guard let self else { return }
+            self.initialOnDemandStartTask = nil
+
+            guard self.streamingOwnership == .onDemand,
+                  self.clientCount > 0,
+                  !self.isStreaming else {
+                self.isInitialOnDemandStartDeferred =
+                    self.streamingOwnership == .onDemand && !self.isStreaming
+                return
+            }
+
+            self.isInitialOnDemandStartDeferred = false
+            await self.reconcileCapturePipeline()
+        }
+    }
+
+    private func cancelInitialOnDemandStartDelay() {
+        initialOnDemandStartTask?.cancel()
+        initialOnDemandStartTask = nil
+        isInitialOnDemandStartDeferred = false
     }
 
     private func applyStreamingDemandEffects(
@@ -449,7 +634,7 @@ final class HostController {
                     "Capture requested by \(String(describing: ownership), privacy: .public) demand"
                 )
             case .stopCapture:
-                break
+                cancelInitialOnDemandStartDelay()
             }
         }
     }
@@ -470,24 +655,33 @@ final class HostController {
         }
     }
 
-    /// Reconciles desired ownership with the media pipeline. Authentication,
-    /// manual actions, and the grace timer all run on the main actor, while the
-    /// loop rechecks demand after every suspension to close lifecycle races.
+    /// Reconciles desired ownership and quality with the media pipeline.
+    /// Authentication, quality requests, manual actions, and the grace timer all
+    /// run on the main actor, while the loop rechecks both desired values after
+    /// every suspension to close lifecycle races.
     private func reconcileCapturePipeline() async {
         guard !isTransitioning else { return }
+        guard !(isInitialOnDemandStartDeferred
+            && !isStreaming
+            && streamingOwnership == .onDemand) else { return }
         isTransitioning = true
-        defer { isTransitioning = false }
+        defer {
+            isTransitioning = false
+            schedulePendingStreamQualityUpgradeIfNeeded()
+        }
 
-        while streamingDemand.wantsCapture != isStreaming {
-            if streamingDemand.wantsCapture {
-                let didStart = await startCapturePipeline()
+        while streamingDemand.wantsCapture != isStreaming
+            || (isStreaming && activeStreamQuality != desiredStreamQuality) {
+            if !streamingDemand.wantsCapture || isStreaming {
+                await stopCapturePipeline()
+            } else {
+                let qualityToStart = desiredStreamQuality
+                let didStart = await startCapturePipeline(quality: qualityToStart)
                 if !didStart {
                     let effects = streamingDemand.captureStartFailed()
                     applyStreamingDemandEffects(effects)
                     return
                 }
-            } else {
-                await stopCapturePipeline()
             }
         }
     }
@@ -507,8 +701,14 @@ final class HostController {
                     await handleAuthenticatedClientCountChange(count)
                 case .status(let status):
                     handleServerStatus(status)
+                case .streamQuality(let quality):
+                    await handleStreamQualityChange(quality)
                 }
             }
+        }
+
+        hostServer.setStreamQualityHandler { quality in
+            continuation.yield(.streamQuality(quality))
         }
 
         hostServer.start(
@@ -544,6 +744,8 @@ final class HostController {
             lastError = nil
             refreshPairingCode()
         case .failed(let message):
+            cancelPendingStreamQualityUpgrade(settleRequestedQuality: true)
+            cancelInitialOnDemandStartDelay()
             remoteInputService.setEnabled(false)
             isServerReady = false
             serverPort = nil
@@ -592,22 +794,34 @@ final class HostController {
         switch event {
         case .started:
             break
-        case .stopped:
-            if isStreaming && !isTransitioning {
+        case .stopped(let generation):
+            if pipelineGenerations.isCurrent(generation),
+               isStreaming,
+               !isTransitioning {
+                pipelineGenerations.invalidate(generation)
+                cancelPendingStreamQualityUpgrade(settleRequestedQuality: true)
                 isStreaming = false
+                activeStreamQuality = nil
                 remoteInputService.setEnabled(false)
                 let effects = streamingDemand.forceStop()
                 applyStreamingDemandEffects(effects)
             }
-        case .failed(let message):
+        case .failed(let message, let generation):
             Task {
-                await handlePipelineFailure(HostPipelineError(message: message))
+                await handlePipelineFailure(
+                    HostPipelineError(message: message),
+                    generation: generation
+                )
             }
         }
     }
 
-    private func handlePipelineFailure(_ error: any Error) async {
-        guard !isHandlingPipelineFailure else { return }
+    private func handlePipelineFailure(
+        _ error: any Error,
+        generation: HostPipelineGeneration
+    ) async {
+        guard pipelineGenerations.isCurrent(generation),
+              !isHandlingPipelineFailure else { return }
         isHandlingPipelineFailure = true
         let effects = streamingDemand.forceStop()
         applyStreamingDemandEffects(effects)
@@ -621,6 +835,75 @@ final class HostController {
         lastError = message
         runState = .failed(message)
         HostLog.app.error("Glassy Host failed: \(message, privacy: .public)")
+    }
+}
+
+struct HostStreamQualityUpdatePolicy: Sendable {
+    enum Decision: Equatable, Sendable {
+        case applyImmediately
+        case debounceUpgrade
+        case holdUpgrade
+    }
+
+    static func decision(
+        currentQuality: HostProtocol.StreamQuality,
+        requestedQuality: HostProtocol.StreamQuality,
+        hasPipeline: Bool,
+        authenticatedClientCount: Int,
+        isOnDemandGrace: Bool
+    ) -> Decision {
+        guard hasPipeline else { return .applyImmediately }
+        guard requestedQuality.rawValue > currentQuality.rawValue else {
+            return .applyImmediately
+        }
+        if authenticatedClientCount == 0, isOnDemandGrace {
+            return .holdUpgrade
+        }
+        return .debounceUpgrade
+    }
+}
+
+struct HostInitialOnDemandStartPolicy: Sendable {
+    enum Decision: Equatable, Sendable {
+        case doNotDelay
+        case coalesce
+        case waitForViewer
+    }
+
+    static func decision(
+        ownership: StreamingDemandPolicy.Ownership?,
+        hasPipeline: Bool,
+        authenticatedClientCount: Int
+    ) -> Decision {
+        guard ownership == .onDemand, !hasPipeline else { return .doNotDelay }
+        return authenticatedClientCount > 0 ? .coalesce : .waitForViewer
+    }
+}
+
+struct HostPipelineGeneration: Equatable, Sendable {
+    let id: UUID
+
+    init(id: UUID = UUID()) {
+        self.id = id
+    }
+}
+
+struct HostPipelineGenerationTracker: Sendable {
+    private(set) var current: HostPipelineGeneration?
+
+    mutating func begin() -> HostPipelineGeneration {
+        let generation = HostPipelineGeneration()
+        current = generation
+        return generation
+    }
+
+    mutating func invalidate(_ generation: HostPipelineGeneration? = nil) {
+        if let generation, generation != current { return }
+        current = nil
+    }
+
+    func isCurrent(_ generation: HostPipelineGeneration) -> Bool {
+        generation == current
     }
 }
 

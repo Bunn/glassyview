@@ -17,6 +17,15 @@ enum GlassyStreamWire {
     static let authenticationTagLength = 16
     static let pairingCodeSymbolCount = 12
 
+    struct Capabilities: OptionSet, Sendable {
+        let rawValue: UInt32
+
+        static let h264AVCC = Capabilities(rawValue: 1 << 0)
+        static let encryptedMedia = Capabilities(rawValue: 1 << 1)
+        static let directInput = Capabilities(rawValue: 1 << 2)
+        static let streamQualityControl = Capabilities(rawValue: 1 << 3)
+    }
+
     enum MessageKind: UInt8, Sendable {
         case serverHello = 0x01
         case clientHello = 0x02
@@ -27,6 +36,7 @@ enum GlassyStreamWire {
         case videoConfiguration = 0x10
         case videoAccessUnit = 0x11
         case keyFrameRequest = 0x12
+        case streamQualityRequest = 0x13
         case pointerInput = 0x20
         case scrollInput = 0x21
         case keyInput = 0x22
@@ -348,6 +358,43 @@ enum GlassyStreamWire {
 
     static func encodeKeyFrameRequest() -> Data {
         Data()
+    }
+
+    static func encodeStreamQualityRequest(_ quality: RemoteSessionQuality) -> Data {
+        let preset: UInt8 = switch quality {
+        case .dataSaver:
+            0
+        case .balanced:
+            1
+        case .best:
+            2
+        }
+
+        var writer = GlassyByteWriter(capacity: 4)
+        writer.write(preset)
+        writer.write(Data(repeating: 0, count: 3))
+        return writer.data
+    }
+
+    static func decodeStreamQualityRequest(_ data: Data) throws -> RemoteSessionQuality {
+        var reader = GlassyByteReader(data: data)
+        let preset = try reader.readUInt8()
+        let reserved = try reader.readData(count: 3)
+        guard reserved.allSatisfy({ $0 == 0 }) else {
+            throw violation("stream quality reserved bytes are nonzero")
+        }
+        try reader.requireEnd()
+
+        switch preset {
+        case 0:
+            return .dataSaver
+        case 1:
+            return .balanced
+        case 2:
+            return .best
+        default:
+            throw violation("stream quality preset is unknown")
+        }
     }
 
     static func encodePointerInput(

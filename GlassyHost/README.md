@@ -14,6 +14,8 @@ The script builds and signs `dist/Glassy Host.app`, installs a verified copy at 
 
 Grant Screen Recording and Accessibility access locally, then leave Glassy Host running. Its lightweight `_glassydesk._tcp` listener remains available without recording the screen. Capture starts automatically after a Glassy Desk device completes the authenticated pairing or resume handshake, then stops five seconds after the final device disconnects. **Start Streaming Continuously** is available as an explicit always-on override.
 
+Connected Glassy Desk devices can request Data Saver (720p/15 FPS/~2 Mbps), Balanced (1080p/30 FPS/~5 Mbps), or Best (up to 4K/60 FPS/~12 Mbps). The host accepts only these bounded presets and reconfigures capture and H.264 encoding without dropping the authenticated session. Because one encoder serves every connected device, the most bandwidth-conscious active request determines the shared stream.
+
 ## Verify
 
 ```sh

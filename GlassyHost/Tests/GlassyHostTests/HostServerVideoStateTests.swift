@@ -17,3 +17,28 @@ func codecConfigurationDoesNotSurviveCaptureStop() {
     cache.storeCodecConfiguration(secondConfiguration)
     #expect(cache.codecConfiguration == secondConfiguration)
 }
+
+@Test("Shared stream quality follows the most bandwidth-conscious viewer")
+func conservativeStreamQualityArbitration() {
+    var arbitration = HostStreamQualityArbitration()
+
+    #expect(
+        HostStreamQualityArbitration.effectiveQuality(
+            for: [HostProtocol.StreamQuality]()
+        ) == .best
+    )
+    #expect(arbitration.qualityToPublish(for: [.best]) == nil)
+    #expect(arbitration.qualityToPublish(for: [.best, .balanced]) == .balanced)
+    #expect(arbitration.qualityToPublish(for: [.best, .balanced]) == nil)
+    #expect(arbitration.qualityToPublish(for: [.balanced, .best]) == nil)
+    #expect(
+        arbitration.qualityToPublish(for: [.best, .balanced, .dataSaver])
+            == .dataSaver
+    )
+
+    // Removing the most constrained viewer permits the shared stream to upgrade.
+    #expect(arbitration.qualityToPublish(for: [.best, .balanced]) == .balanced)
+    #expect(arbitration.qualityToPublish(for: [.best]) == .best)
+    #expect(arbitration.qualityToPublish(for: []) == nil)
+    #expect(arbitration.qualityToPublish(for: [], force: true) == .best)
+}

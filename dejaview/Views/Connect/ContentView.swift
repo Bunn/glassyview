@@ -843,6 +843,10 @@ struct ContentView<Session: RemoteSessionControlling,
         glassyConnectTask?.cancel()
         preparedGlassySession = nil
         glassyPairingRequest = nil
+        let preferences = store.contains(machine)
+            ? store.sessionPreferences(for: machine)
+            : SessionPreferences.default
+        glassySession.applyPreferences(preferences)
 
         let expectedHostIdentifier = expectedGlassyHostIdentifier(for: machine)
         guard expectedHostIdentifier != nil else {
@@ -875,7 +879,8 @@ struct ContentView<Session: RemoteSessionControlling,
                         endpoint: host.endpoint,
                         savedMachineID: machine.id,
                         pairingCode: nil,
-                        expectedHostIdentifier: expectedHostIdentifier
+                        expectedHostIdentifier: expectedHostIdentifier,
+                        desiredQuality: preferences.quality
                     )
                     guard !Task.isCancelled else {
                         glassySession.disconnect()
@@ -932,11 +937,16 @@ struct ContentView<Session: RemoteSessionControlling,
         code: GlassyHostPairingCode,
         request: GlassyStreamPairingRequest
     ) async throws {
+        let preferences = store.contains(request.machine)
+            ? store.sessionPreferences(for: request.machine)
+            : SessionPreferences.default
+        glassySession.applyPreferences(preferences)
         let authentication = try await glassySession.connect(
             endpoint: host.endpoint,
             savedMachineID: request.machine.id,
             pairingCode: code.rawValue,
-            expectedHostIdentifier: expectedGlassyHostIdentifier(for: request.machine)
+            expectedHostIdentifier: expectedGlassyHostIdentifier(for: request.machine),
+            desiredQuality: preferences.quality
         )
         let authenticatedMachine = saveGlassyHostBinding(
             for: request.machine,

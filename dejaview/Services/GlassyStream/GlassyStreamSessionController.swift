@@ -122,7 +122,8 @@ final class GlassyStreamSessionController {
         endpoint: NWEndpoint,
         savedMachineID: UUID,
         pairingCode: String?,
-        expectedHostIdentifier: Data? = nil
+        expectedHostIdentifier: Data? = nil,
+        desiredQuality: RemoteSessionQuality = .best
     ) async throws -> GlassyStreamAuthentication {
         disconnectCurrentSession(clearError: true)
 
@@ -139,7 +140,8 @@ final class GlassyStreamSessionController {
             endpoint: endpoint,
             savedMachineID: savedMachineID,
             pairingCode: pairingCode,
-            expectedHostIdentifier: expectedHostIdentifier
+            expectedHostIdentifier: expectedHostIdentifier,
+            desiredQuality: desiredQuality
         )
 
         return try await withTaskCancellationHandler {
@@ -182,6 +184,12 @@ final class GlassyStreamSessionController {
     /// Stops networking, clears the displayed image, and returns to idle.
     func disconnect() {
         disconnectCurrentSession(clearError: true)
+    }
+
+    func setStreamQuality(_ quality: RemoteSessionQuality) {
+        guard state == .connected,
+              authentication?.supportsStreamQuality == true else { return }
+        client.setStreamQuality(quality)
     }
 
     private func receive(_ event: GlassyStreamEvent, generation: UUID) {

@@ -43,12 +43,14 @@ enum HostProtocol {
         static let h264AVCC = Capabilities(rawValue: 1 << 0)
         static let encryptedMedia = Capabilities(rawValue: 1 << 1)
         static let directInput = Capabilities(rawValue: 1 << 2)
+        static let streamQualityControl = Capabilities(rawValue: 1 << 3)
     }
 
     static let advertisedCapabilities: Capabilities = [
         .h264AVCC,
         .encryptedMedia,
-        .directInput
+        .directInput,
+        .streamQualityControl
     ]
 
     enum MessageKind: UInt8, Sendable {
@@ -62,6 +64,7 @@ enum HostProtocol {
         case videoConfiguration = 0x10
         case videoAccessUnit = 0x11
         case keyFrameRequest = 0x12
+        case streamQualityRequest = 0x13
 
         case pointerInput = 0x20
         case scrollInput = 0x21
@@ -84,6 +87,15 @@ enum HostProtocol {
         /// Subsequent connections. The client proves the 256-bit resume secret
         /// issued inside the encrypted authentication-accepted message.
         case resumeSecret = 2
+    }
+
+    /// An allowlisted host capture/encoding preset. Lower raw values are more
+    /// bandwidth-conscious so a shared stream can conservatively satisfy every
+    /// authenticated viewer by selecting the minimum requested value.
+    enum StreamQuality: UInt8, CaseIterable, Sendable {
+        case dataSaver = 0
+        case balanced = 1
+        case best = 2
     }
 
     struct Frame: Sendable {
@@ -525,6 +537,26 @@ enum HostProtocol {
         guard data.isEmpty else {
             throw ProtocolError.malformedPayload("keyframe request payload must be empty")
         }
+    }
+
+    static func encodeStreamQualityRequest(_ quality: StreamQuality) -> Data {
+        Data([quality.rawValue, 0, 0, 0])
+    }
+
+    static func decodeStreamQualityRequest(_ data: Data) throws -> StreamQuality {
+        var reader = ByteReader(data: data)
+        let rawQuality = try reader.readUInt8()
+        guard let quality = StreamQuality(rawValue: rawQuality) else {
+            throw ProtocolError.malformedPayload("unknown stream quality")
+        }
+        let reserved = try reader.readData(count: 3)
+        guard reserved.allSatisfy({ $0 == 0 }) else {
+            throw ProtocolError.malformedPayload(
+                "reserved stream quality request bytes must be zero"
+            )
+        }
+        try reader.requireEnd()
+        return quality
     }
 
     /// The exact transcript authenticated by `ClientHello.proof`. The proof

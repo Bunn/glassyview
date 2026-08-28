@@ -24,21 +24,44 @@ enum RemoteSessionStatus: Equatable {
     }
 }
 
-/// Quality presets for the VNC stream.
-///
-/// RoyalVNCKit stores its display framebuffer as 32bpp BGRA and its optimized
-/// Tight/ZRLE paths are 24-bit/32bpp-oriented. Requesting 16-bit forces
-/// per-pixel expansion back to BGRA and can spike CPU on large remote
-/// framebuffers, so only the optimized 24-bit path is exposed.
-enum RemoteSessionQuality: String, CaseIterable, Identifiable {
-    case best = "Best Quality"
+/// User-facing Glassy Stream bandwidth and image-quality presets.
+enum RemoteSessionQuality: String, CaseIterable, Codable, Equatable, Identifiable, Sendable {
+    case dataSaver
+    case balanced
+    case best
 
-    var id: String { rawValue }
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .dataSaver:
+            "Data Saver"
+        case .balanced:
+            "Balanced"
+        case .best:
+            "Best Quality"
+        }
+    }
 
     var icon: String {
         switch self {
+        case .dataSaver:
+            "leaf.fill"
+        case .balanced:
+            "circle.lefthalf.filled"
         case .best:
             "sparkles"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .dataSaver:
+            "720p · 15 FPS · ~2 Mbps"
+        case .balanced:
+            "1080p · 30 FPS · ~5 Mbps"
+        case .best:
+            "Up to 4K · 60 FPS · ~12 Mbps"
         }
     }
 }

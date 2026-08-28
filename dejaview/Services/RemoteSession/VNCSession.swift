@@ -81,6 +81,10 @@ final class VNCSession: NSObject, ObservableObject, RemoteSessionControlling, @u
     private var heldModifierKeys: Set<RemoteModifierKey> = []
     private static let combinedFramebufferAspectRatioThreshold: CGFloat = 2.4
 
+    var supportedQualities: [RemoteSessionQuality] {
+        [.best]
+    }
+
     // MARK: - Lifecycle
 
     func connect(host: String, port: UInt16, username: String, password: String) {
@@ -178,9 +182,10 @@ final class VNCSession: NSObject, ObservableObject, RemoteSessionControlling, @u
     }
 
     func setQuality(_ newQuality: RemoteSessionQuality) {
+        guard supportedQualities.contains(newQuality) else { return }
         guard newQuality != quality else { return }
 
-        AppLog.session.info("Changing quality from \(self.quality.rawValue, privacy: .public) to \(newQuality.rawValue, privacy: .public)")
+        AppLog.session.info("Changing quality from \(self.quality.title, privacy: .public) to \(newQuality.title, privacy: .public)")
         quality = newQuality
         applySettingsChange()
     }

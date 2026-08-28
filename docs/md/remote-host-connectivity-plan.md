@@ -112,7 +112,7 @@ Connection selection should prefer:
 3. direct WAN traversal;
 4. the regional relay.
 
-Direct connectivity reduces latency and relay bandwidth. At the current 12 Mbps encoder target, one fully relayed outbound video stream is approximately 5.4 GB per hour, making direct-path success economically meaningful as usage grows.
+Direct connectivity reduces latency and relay bandwidth. The current quality presets target roughly 2, 5, or 12 Mbps (about 0.9, 2.25, or 5.4 GB per hour for one fully relayed outbound stream), making both quality selection and direct-path success economically meaningful as usage grows.
 
 ## iCloud and CloudKit
 

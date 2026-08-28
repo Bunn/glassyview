@@ -15,6 +15,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         let hostName: String
         let clientIdentifier: Data
         let resumedSession: Bool
+        let supportsStreamQuality: Bool
     }
 
     private enum State: Sendable {
@@ -39,6 +40,7 @@ final class GlassyStreamClient: @unchecked Sendable {
     private var nextOutboundSequence: UInt64 = 1
     private var maximumInboundPayloadLength = GlassyStreamWire.maximumHandshakePayloadLength
     private var authenticationTimeoutWorkItem: DispatchWorkItem?
+    private var supportsStreamQuality = false
 
     init(credentialStore: any GlassyStreamResumeCredentialStoring = GlassyStreamKeychainCredentialStore()) {
         self.credentialStore = credentialStore
@@ -126,6 +128,29 @@ final class GlassyStreamClient: @unchecked Sendable {
         }
     }
 
+    func setStreamQuality(_ quality: RemoteSessionQuality) {
+        queue.async { [weak self] in
+            guard let self,
+                  supportsStreamQuality,
+                  case let .authenticated(material) = state,
+                  connection != nil else {
+                return
+            }
+
+            do {
+                try sendEncrypted(
+                    GlassyStreamWire.encodeStreamQualityRequest(quality),
+                    kind: .streamQualityRequest,
+                    flags: [],
+                    material: material,
+                    generation: generation
+                )
+            } catch {
+                finish(.failure(clientError(error)), generation: generation)
+            }
+        }
+    }
+
     func sendPointerInput(
         x: UInt16,
         y: UInt16,
@@ -210,6 +235,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         lastInboundSequence = 0
         nextOutboundSequence = 1
         maximumInboundPayloadLength = GlassyStreamWire.maximumHandshakePayloadLength
+        supportsStreamQuality = false
         state = .awaitingServerHello
 
         let parameters = NWParameters.tcp
@@ -322,8 +348,18 @@ final class GlassyStreamClient: @unchecked Sendable {
             throw GlassyStreamClientError.cancelled
         }
         let serverHello = try GlassyStreamWire.decodeServerHello(frame.payload)
-        guard serverHello.capabilities & 0x0000_0007 == 0x0000_0007 else {
-            if serverHello.capabilities & 0x0000_0003 == 0x0000_0003 {
+        let capabilities = GlassyStreamWire.Capabilities(rawValue: serverHello.capabilities)
+        let requiredCapabilities: GlassyStreamWire.Capabilities = [
+            .h264AVCC,
+            .encryptedMedia,
+            .directInput
+        ]
+        let mediaCapabilities: GlassyStreamWire.Capabilities = [
+            .h264AVCC,
+            .encryptedMedia
+        ]
+        guard capabilities.contains(requiredCapabilities) else {
+            if capabilities.contains(mediaCapabilities) {
                 throw GlassyStreamClientError.directInputUnsupported
             }
             throw GlassyStreamClientError.protocolViolation(
@@ -414,7 +450,8 @@ final class GlassyStreamClient: @unchecked Sendable {
                                   hostIdentifier: serverHello.hostIdentifier,
                                   hostName: serverHello.serverName,
                                   clientIdentifier: clientIdentifier,
-                                  resumedSession: resumedSession)
+                                  resumedSession: resumedSession,
+                                  supportsStreamQuality: capabilities.contains(.streamQualityControl))
         )
         try sendPlaintext(GlassyStreamWire.encodeClientHello(hello),
                           kind: .clientHello,
@@ -463,12 +500,23 @@ final class GlassyStreamClient: @unchecked Sendable {
         maximumInboundPayloadLength = Int(accepted.maximumMediaPayloadLength)
         cancelAuthenticationTimeout()
         state = .authenticated(pending.material)
+        supportsStreamQuality = pending.supportsStreamQuality
+        if pending.supportsStreamQuality {
+            try sendEncrypted(
+                GlassyStreamWire.encodeStreamQualityRequest(configuration.desiredQuality),
+                kind: .streamQualityRequest,
+                flags: [],
+                material: pending.material,
+                generation: generation
+            )
+        }
         deliver(.authenticated(
             GlassyStreamAuthentication(
                 hostIdentifier: pending.hostIdentifier,
                 hostName: pending.hostName,
                 maximumMediaPayloadLength: maximumInboundPayloadLength,
-                resumedSession: pending.resumedSession
+                resumedSession: pending.resumedSession,
+                supportsStreamQuality: pending.supportsStreamQuality
             )
         ))
         AppLog.session.info("Authenticated encrypted Glassy Stream session")
@@ -605,6 +653,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         connection.cancel()
         self.connection = nil
         state = .idle
+        supportsStreamQuality = false
         configuration = nil
         receiveBuffer.removeAll(keepingCapacity: true)
 

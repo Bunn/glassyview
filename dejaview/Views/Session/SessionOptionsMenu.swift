@@ -12,11 +12,20 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
 
     var body: some View {
         Menu {
-            if !usesGlassyStream, RemoteSessionQuality.allCases.count > 1 {
-                Picker("Quality", selection: qualityBinding) {
-                    ForEach(RemoteSessionQuality.allCases) { quality in
-                        Label(quality.rawValue, systemImage: quality.icon)
-                            .tag(quality)
+            if session.supportedQualities.count > 1 {
+                Picker("Requested Quality", selection: qualityBinding) {
+                    ForEach(session.supportedQualities) { quality in
+                        Label {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(quality.title)
+                                Text(quality.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: quality.icon)
+                        }
+                        .tag(quality)
                     }
                 }
                 .pickerStyle(.inline)
@@ -62,7 +71,7 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
         .foregroundStyle(.white)
         .padding(5)
         .liquidGlass(in: Circle())
-        .accessibilityHint("Shows display, frame rate, and trackpad options.")
+        .accessibilityHint("Shows available session controls.")
     }
 
     private var qualityBinding: Binding<RemoteSessionQuality> {
