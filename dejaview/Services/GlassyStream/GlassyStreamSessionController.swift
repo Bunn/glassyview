@@ -195,6 +195,13 @@ final class GlassyStreamSessionController {
         client.setStreamQuality(quality)
     }
 
+#if DEBUG
+    func debugSimulateConnectionInterruption() {
+        guard let activeGeneration, state == .connected else { return }
+        fail(.transport(.connectionClosed), generation: activeGeneration)
+    }
+#endif
+
     private func receive(_ event: GlassyStreamEvent, generation: UUID) {
         guard activeGeneration == generation else { return }
 

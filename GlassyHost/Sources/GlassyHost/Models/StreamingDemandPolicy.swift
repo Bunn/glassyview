@@ -84,7 +84,22 @@ struct StreamingDemandPolicy: Equatable, Sendable {
         return [.stopCapture]
     }
 
-    mutating func captureStartFailed() -> [Effect] {
+    /// Keeps retryable demand alive only when it still has an owner that can
+    /// legitimately request recovery. Terminal failures retain the existing
+    /// behavior so permission denial does not cause background retry loops.
+    mutating func captureStartFailed(
+        isRetryable: Bool = false
+    ) -> [Effect] {
+        if isRetryable {
+            switch ownership {
+            case .manual:
+                return [.cancelOnDemandStop]
+            case .onDemand where authenticatedClientCount > 0:
+                return [.cancelOnDemandStop]
+            case .onDemand, nil:
+                break
+            }
+        }
         ownership = nil
         return [.cancelOnDemandStop]
     }

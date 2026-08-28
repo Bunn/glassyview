@@ -5,6 +5,8 @@ struct SessionReconnectPhaseDescription: View {
 
     var body: some View {
         switch phase {
+        case .waitingForForeground:
+            Text("The stream will resume when Glassy Desk is active again.")
         case .waitingForNetwork:
             Text("Waiting for the network to become available.")
         case .waiting(let retryDate):

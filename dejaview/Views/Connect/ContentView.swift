@@ -178,11 +178,16 @@ struct ContentView<Session: RemoteSessionControlling,
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
-                disconnectGlassyForBackground()
+                suspendGlassyForBackground()
                 return
             }
 
             guard newPhase == .active else { return }
+
+            let resumedGlassySession = glassySession.resumeAfterBackground()
+            if resumedGlassySession {
+                AppLog.ui.info("Resuming the presented Glassy Stream after foregrounding")
+            }
 
             guard !shouldSkipNextSceneActiveRefresh else {
                 shouldSkipNextSceneActiveRefresh = false
@@ -199,23 +204,25 @@ struct ContentView<Session: RemoteSessionControlling,
         }
     }
 
-    private func disconnectGlassyForBackground() {
+    private func suspendGlassyForBackground() {
         let hasActiveGlassyWork = glassyConnectTask != nil
             || glassyPairingRequest != nil
             || preparedGlassySession != nil
             || sessionMachine?.connectionMode == .glassyStream
         guard hasActiveGlassyWork else { return }
 
-        AppLog.ui.info("Disconnecting Glassy Stream because the app entered the background")
+        if sessionMachine?.connectionMode == .glassyStream,
+           glassySession.suspendForBackground() {
+            AppLog.ui.info("Suspending the presented Glassy Stream while the app is in the background")
+            return
+        }
+
+        AppLog.ui.info("Cancelling an unfinished Glassy Stream connection because the app entered the background")
         glassyConnectTask?.cancel()
         glassyConnectTask = nil
         glassyPairingRequest = nil
         preparedGlassySession = nil
         glassySession.disconnect()
-
-        if sessionMachine?.connectionMode == .glassyStream {
-            isSessionPresented = false
-        }
     }
 
     // MARK: - Detail
@@ -1321,6 +1328,7 @@ struct ContentView<Session: RemoteSessionControlling,
 
     private func restartNearbyMacDiscovery(keepingCurrentServices: Bool) {
         browser.restart(keepingCurrentServices: keepingCurrentServices)
+        glassyHostBrowser.restart(keepingCurrentHosts: keepingCurrentServices)
     }
 
     private func setSavedMachineReachabilityStatuses(_ status: MachineReachabilityStatus) {

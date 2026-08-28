@@ -25,8 +25,10 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                                   glassyStreamRenderer: glassyStream.renderer)
                     .ignoresSafeArea()
 
-                GlassyStreamStatusOverlay(controller: glassyStream)
-                    .allowsHitTesting(false)
+                if reconnectState == nil {
+                    GlassyStreamStatusOverlay(controller: glassyStream)
+                        .allowsHitTesting(false)
+                }
             } else {
                 RemoteDesktopView(session: session,
                                   selectedFramebufferFrame: session.selectedDisplayFrame,

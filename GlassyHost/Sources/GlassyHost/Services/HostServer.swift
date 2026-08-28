@@ -22,6 +22,7 @@ final class HostServer: @unchecked Sendable {
     typealias StatusHandler = @Sendable (Status) -> Void
     typealias RemoteInputHandler = @Sendable (HostProtocol.RemoteInputEvent) -> Void
     typealias StreamQualityHandler = @Sendable (HostProtocol.StreamQuality) -> Void
+    typealias AuthenticatedClientReplacementHandler = @Sendable () -> Void
 
     struct PairingCode: Equatable, Sendable {
         let value: String
@@ -86,6 +87,14 @@ final class HostServer: @unchecked Sendable {
     /// core never invokes this callback before the encrypted handshake finishes.
     func setRemoteInputHandler(_ handler: RemoteInputHandler?) {
         core.setRemoteInputHandler(handler)
+    }
+
+    /// Installs a callback used to retire any input state owned by a stale
+    /// transport before its authenticated replacement can submit new input.
+    func setAuthenticatedClientReplacementHandler(
+        _ handler: AuthenticatedClientReplacementHandler?
+    ) {
+        core.setAuthenticatedClientReplacementHandler(handler)
     }
 
     /// Installs the sink for the effective host-wide stream quality. One encoder
@@ -194,6 +203,7 @@ private extension HostServer {
         private var listener: NWListener?
         private var generation = UUID()
         private var clients: [UUID: Client] = [:]
+        private var authenticatedClientRegistry = HostAuthenticatedClientRegistry()
         private var rootSecret = SymmetricKey(size: .bits256)
         private var rootSecretData: Data?
         private var hostIdentifier = Data(repeating: 0,
@@ -204,6 +214,8 @@ private extension HostServer {
         private let mediaIngress = MediaIngress()
         private var keyFrameRequestHandler: (@Sendable () -> Void)?
         private var remoteInputHandler: RemoteInputHandler?
+        private var authenticatedClientReplacementHandler:
+            AuthenticatedClientReplacementHandler?
         private var streamQualityHandler: StreamQualityHandler = { _ in }
         private var streamQualityArbitration = HostStreamQualityArbitration()
         private var lastPublishedClientCount = 0
@@ -259,6 +271,14 @@ private extension HostServer {
         func setRemoteInputHandler(_ handler: RemoteInputHandler?) {
             queue.async { [weak self] in
                 self?.remoteInputHandler = handler
+            }
+        }
+
+        func setAuthenticatedClientReplacementHandler(
+            _ handler: AuthenticatedClientReplacementHandler?
+        ) {
+            queue.async { [weak self] in
+                self?.authenticatedClientReplacementHandler = handler
             }
         }
 
@@ -406,7 +426,16 @@ private extension HostServer {
         }
 
         private var authenticatedClients: [Client] {
-            clients.values.filter(\.isAuthenticated)
+            clients.values.filter { client in
+                guard client.isAuthenticated,
+                      let clientIdentifier = client.clientIdentifier else {
+                    return false
+                }
+                return authenticatedClientRegistry.isActive(
+                    clientIdentifier: clientIdentifier,
+                    connectionIdentifier: client.id
+                )
+            }
         }
 
         private func startLocked(pairingSecret: Data) {
@@ -421,7 +450,12 @@ private extension HostServer {
             publishStatus(.starting)
 
             do {
-                let parameters = NWParameters.tcp
+                let tcpOptions = NWProtocolTCP.Options()
+                tcpOptions.enableKeepalive = true
+                tcpOptions.keepaliveIdle = 10
+                tcpOptions.keepaliveInterval = 5
+                tcpOptions.keepaliveCount = 3
+                let parameters = NWParameters(tls: nil, tcp: tcpOptions)
                 parameters.allowLocalEndpointReuse = true
                 parameters.includePeerToPeer = true
 
@@ -457,6 +491,7 @@ private extension HostServer {
 
             let existingClients = Array(clients.values)
             clients.removeAll(keepingCapacity: true)
+            authenticatedClientRegistry.removeAll()
             for client in existingClients {
                 client.authenticationTimeout?.cancel()
                 client.connection.stateUpdateHandler = nil
@@ -519,6 +554,15 @@ private extension HostServer {
                 case let .failed(error):
                     Self.logger.debug("Client connection failed: \(error.localizedDescription, privacy: .public)")
                     remove(client)
+                case let .waiting(error):
+                    // Authenticated viewers have their own bounded reconnect
+                    // policy. Retiring a transport that can no longer make
+                    // progress avoids keeping suspended iOS sessions in the
+                    // host's active-client and capture-demand accounting.
+                    if client.isAuthenticated {
+                        Self.logger.debug("Authenticated viewer connection waiting: \(error.localizedDescription, privacy: .public)")
+                        remove(client)
+                    }
                 case .cancelled:
                     remove(client)
                 default:
@@ -695,9 +739,20 @@ private extension HostServer {
                                                         credential: credential,
                                                         transcript: transcript)
             client.authorizationState = .authenticated(material)
+            client.clientIdentifier = hello.clientIdentifier
             client.needsKeyFrame = true
             client.authenticationTimeout?.cancel()
             client.authenticationTimeout = nil
+
+            if let replacedConnectionIdentifier = authenticatedClientRegistry.activate(
+                clientIdentifier: hello.clientIdentifier,
+                connectionIdentifier: client.id
+            ), replacedConnectionIdentifier != client.id,
+               let replacedClient = clients[replacedConnectionIdentifier] {
+                Self.logger.info("Replacing a stale authenticated Glassy viewer connection")
+                authenticatedClientReplacementHandler?()
+                remove(replacedClient, publishChanges: false)
+            }
 
             let accepted = HostProtocol.AuthenticationAccepted(
                 clientIdentifier: hello.clientIdentifier,
@@ -722,6 +777,7 @@ private extension HostServer {
 
             Self.logger.info("Authenticated a Glassy viewer")
             publishAuthenticatedClientCountIfNeeded()
+            publishEffectiveStreamQualityIfNeeded()
             requestKeyFrameIfNeeded(for: [client])
         }
 
@@ -929,12 +985,21 @@ private extension HostServer {
             }
         }
 
-        private func remove(_ client: Client) {
+        private func remove(_ client: Client, publishChanges: Bool = true) {
             guard clients.removeValue(forKey: client.id) != nil else { return }
+            if let clientIdentifier = client.clientIdentifier {
+                // A resumed session may already own this stable identity. Only
+                // the connection currently registered for it can clear it.
+                _ = authenticatedClientRegistry.deactivate(
+                    clientIdentifier: clientIdentifier,
+                    connectionIdentifier: client.id
+                )
+            }
             client.isClosed = true
             client.authenticationTimeout?.cancel()
             client.connection.stateUpdateHandler = nil
             client.connection.cancel()
+            guard publishChanges else { return }
             publishAuthenticatedClientCountIfNeeded()
             publishEffectiveStreamQualityIfNeeded()
         }
@@ -951,7 +1016,7 @@ private extension HostServer {
         }
 
         private func publishAuthenticatedClientCountIfNeeded(force: Bool = false) {
-            let count = clients.values.filter(\.isAuthenticated).count
+            let count = authenticatedClientRegistry.activeConnectionCount
             guard force || count != lastPublishedClientCount else { return }
             lastPublishedClientCount = count
             clientCountHandler(count)
@@ -1090,6 +1155,7 @@ private extension HostServer.Core {
         let id = UUID()
         let connection: NWConnection
         var authorizationState: AuthorizationState = .connecting
+        var clientIdentifier: Data?
         var receiveBuffer = Data()
         var lastInboundSequence: UInt64 = 0
         var nextOutboundSequence: UInt64 = 1
@@ -1157,6 +1223,47 @@ private extension HostServer.Core {
                 return true
             }
         }
+    }
+}
+
+/// Maintains the one active authenticated connection for each stable viewer
+/// identity. Re-registration is a single dictionary update, and removal is
+/// identity-checked so a delayed callback from a replaced connection cannot
+/// evict its successor.
+struct HostAuthenticatedClientRegistry: Sendable {
+    private var connectionByClientIdentifier: [Data: UUID] = [:]
+
+    var activeConnectionCount: Int {
+        connectionByClientIdentifier.count
+    }
+
+    @discardableResult
+    mutating func activate(clientIdentifier: Data,
+                           connectionIdentifier: UUID) -> UUID? {
+        connectionByClientIdentifier.updateValue(
+            connectionIdentifier,
+            forKey: clientIdentifier
+        )
+    }
+
+    @discardableResult
+    mutating func deactivate(clientIdentifier: Data,
+                             connectionIdentifier: UUID) -> Bool {
+        guard connectionByClientIdentifier[clientIdentifier]
+            == connectionIdentifier else {
+            return false
+        }
+        connectionByClientIdentifier.removeValue(forKey: clientIdentifier)
+        return true
+    }
+
+    func isActive(clientIdentifier: Data,
+                  connectionIdentifier: UUID) -> Bool {
+        connectionByClientIdentifier[clientIdentifier] == connectionIdentifier
+    }
+
+    mutating func removeAll() {
+        connectionByClientIdentifier.removeAll(keepingCapacity: true)
     }
 }
 

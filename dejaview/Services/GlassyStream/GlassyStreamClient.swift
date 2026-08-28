@@ -241,7 +241,12 @@ final class GlassyStreamClient: @unchecked Sendable {
         supportsCursorPositionUpdates = false
         state = .awaitingServerHello
 
-        let parameters = NWParameters.tcp
+        let tcpOptions = NWProtocolTCP.Options()
+        tcpOptions.enableKeepalive = true
+        tcpOptions.keepaliveIdle = 10
+        tcpOptions.keepaliveInterval = 5
+        tcpOptions.keepaliveCount = 3
+        let parameters = NWParameters(tls: nil, tcp: tcpOptions)
         parameters.includePeerToPeer = true
         let connection = NWConnection(to: configuration.endpoint, using: parameters)
         self.connection = connection
@@ -260,6 +265,15 @@ final class GlassyStreamClient: @unchecked Sendable {
             case let .failed(error):
                 finish(.failure(.connectionFailed(error.localizedDescription)),
                        generation: activeGeneration)
+            case let .waiting(error):
+                // A streaming connection that enters `waiting` can otherwise
+                // remain half-open indefinitely after Wi-Fi or app lifecycle
+                // transitions. End this transport and let the session's
+                // bounded reconnect policy establish a fresh one.
+                if case .authenticated = self.state {
+                    finish(.failure(.connectionFailed(error.localizedDescription)),
+                           generation: activeGeneration)
+                }
             case .cancelled:
                 if self.connection != nil {
                     finish(.failure(.connectionClosed), generation: activeGeneration)

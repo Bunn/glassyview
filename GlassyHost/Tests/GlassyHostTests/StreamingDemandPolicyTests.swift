@@ -94,3 +94,46 @@ func failedStartClearsDemand() {
     #expect(policy.captureStartFailed() == [.cancelOnDemandStop])
     #expect(!policy.wantsCapture)
 }
+
+@Test("A retryable capture failure keeps authenticated demand alive")
+func retryableFailurePreservesAuthenticatedDemand() {
+    var policy = StreamingDemandPolicy()
+    _ = policy.authenticatedClientCountChanged(to: 1)
+
+    let effects = policy.captureStartFailed(isRetryable: true)
+    #expect(effects == [.cancelOnDemandStop])
+    #expect(policy.ownership == .onDemand)
+    #expect(policy.wantsCapture)
+}
+
+@Test("A retryable failure keeps manual ownership but not stale on-demand ownership")
+func retryableFailureRequiresCurrentDemand() {
+    var manualPolicy = StreamingDemandPolicy()
+    _ = manualPolicy.requestManualStart()
+    let manualEffects = manualPolicy.captureStartFailed(isRetryable: true)
+    #expect(manualEffects == [.cancelOnDemandStop])
+    #expect(manualPolicy.ownership == .manual)
+
+    var staleOnDemandPolicy = StreamingDemandPolicy()
+    _ = staleOnDemandPolicy.authenticatedClientCountChanged(to: 1)
+    _ = staleOnDemandPolicy.authenticatedClientCountChanged(to: 0)
+    let staleOnDemandEffects = staleOnDemandPolicy.captureStartFailed(
+        isRetryable: true
+    )
+    #expect(staleOnDemandEffects == [.cancelOnDemandStop])
+    #expect(!staleOnDemandPolicy.wantsCapture)
+}
+
+@Test("Manual stop still wins while a failed manual pipeline is retryable")
+func manualStopCancelsRetryableManualDemand() {
+    var policy = StreamingDemandPolicy()
+    _ = policy.authenticatedClientCountChanged(to: 1)
+    _ = policy.requestManualStart()
+    _ = policy.captureStartFailed(isRetryable: true)
+
+    let stopEffects = policy.requestManualStop()
+    #expect(stopEffects == [.cancelOnDemandStop, .stopCapture])
+    #expect(!policy.wantsCapture)
+    let additionalViewerEffects = policy.authenticatedClientCountChanged(to: 2)
+    #expect(additionalViewerEffects.isEmpty)
+}

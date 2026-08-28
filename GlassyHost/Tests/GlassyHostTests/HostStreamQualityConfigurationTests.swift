@@ -124,3 +124,53 @@ func pipelineGenerationTracking() {
     tracker.invalidate(retiringGeneration)
     #expect(tracker.isCurrent(replacementGeneration))
 }
+
+@Test("Reentrant pipeline reconciliation requests stay with one owner")
+func pipelineReconciliationCoalescesReentrantRequests() {
+    var state = HostPipelineReconciliationState()
+
+    let acquiredInitialOwnership = state.request()
+    #expect(acquiredInitialOwnership)
+    #expect(state.hasOwner)
+    state.beginPass()
+
+    // Simulates an authentication or quality callback arriving while the
+    // owner's transition is suspended.
+    let reentrantCallerAcquiredOwnership = state.request()
+    #expect(!reentrantCallerAcquiredOwnership)
+    #expect(state.hasPendingRequest)
+    #expect(state.shouldContinue(isReconciled: true))
+
+    state.beginPass()
+    #expect(!state.hasPendingRequest)
+    #expect(!state.shouldContinue(isReconciled: true))
+
+    state.release()
+    #expect(!state.hasOwner)
+    let reacquiredOwnership = state.request()
+    #expect(reacquiredOwnership)
+}
+
+@Test("Pipeline reconciliation keeps ownership until state matches demand")
+func pipelineReconciliationDrainsStateMismatch() {
+    var state = HostPipelineReconciliationState()
+
+    let acquiredOwnership = state.request()
+    #expect(acquiredOwnership)
+    state.beginPass()
+    #expect(state.shouldContinue(isReconciled: false))
+
+    state.beginPass()
+    #expect(!state.shouldContinue(isReconciled: true))
+    state.release()
+}
+
+@Test("Pipeline recovery uses capped exponential backoff")
+func pipelineRetryBackoff() {
+    #expect(HostPipelineRetryPolicy.delay(forAttempt: 1) == .milliseconds(250))
+    #expect(HostPipelineRetryPolicy.delay(forAttempt: 2) == .milliseconds(500))
+    #expect(HostPipelineRetryPolicy.delay(forAttempt: 3) == .seconds(1))
+    #expect(HostPipelineRetryPolicy.delay(forAttempt: 4) == .seconds(2))
+    #expect(HostPipelineRetryPolicy.delay(forAttempt: 5) == .seconds(4))
+    #expect(HostPipelineRetryPolicy.delay(forAttempt: 50) == .seconds(4))
+}

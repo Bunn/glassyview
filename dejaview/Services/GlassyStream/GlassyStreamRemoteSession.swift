@@ -35,7 +35,14 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     private var retryConfiguration: ConnectionConfiguration?
     private var retryTask: Task<Void, Never>?
     private var retryGeneration = UUID()
+    private var automaticReconnectConnectionGeneration: UUID?
+    private let automaticReconnectPolicy = AutomaticReconnectPolicy()
+    private var automaticReconnectAttempt = 0
+    private var hasConnectedAtLeastOnce = false
     private var disconnectRequested = false
+    private var isSuspendedForBackground = false
+    private var networkPathStatus: NetworkPathStatus?
+    private var lastDisconnectMessage: String?
     private let fallbackSavedMachineID = UUID()
 
     var framebufferUpdatePublisher: AnyPublisher<RemoteFramebufferUpdate, Never> {
@@ -88,6 +95,11 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         desiredQuality: RemoteSessionQuality = .best
     ) async throws -> GlassyStreamAuthentication {
         cancelRetryTask()
+        automaticReconnectAttempt = 0
+        hasConnectedAtLeastOnce = false
+        disconnectRequested = false
+        isSuspendedForBackground = false
+        lastDisconnectMessage = nil
         quality = desiredQuality
         let configuration = ConnectionConfiguration(
             endpoint: endpoint,
@@ -116,12 +128,19 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
             expectedHostIdentifier: nil,
             desiredQuality: quality
         )
+        cancelRetryTask()
+        automaticReconnectAttempt = 0
+        hasConnectedAtLeastOnce = false
+        disconnectRequested = false
+        isSuspendedForBackground = false
+        lastDisconnectMessage = nil
         retryConfiguration = configuration
-        startRetryTask(using: configuration)
+        startOneShotConnectionTask(using: configuration)
     }
 
     func disconnect() {
         disconnectRequested = true
+        isSuspendedForBackground = false
         cancelRetryTask()
         releaseActiveInputState()
         controller.disconnect()
@@ -134,35 +153,123 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 
     func reset() {
         disconnectRequested = true
+        isSuspendedForBackground = false
         cancelRetryTask()
         releaseActiveInputState()
         controller.disconnect()
         retryConfiguration = nil
+        automaticReconnectAttempt = 0
+        hasConnectedAtLeastOnce = false
+        networkPathStatus = nil
+        lastDisconnectMessage = nil
         clearGeometry()
         supportedQualities = [.best]
         status = .idle
         disconnectRequested = false
     }
 
-    func retryConnect() {
-        guard case .disconnected = status,
-              let retryConfiguration else { return }
+    /// iOS suspends ordinary TCP work shortly after the app backgrounds. Retire
+    /// the current transport deliberately, but preserve the authenticated resume
+    /// configuration and the presented session so foregrounding can recover in
+    /// place instead of forcing the user back through discovery.
+    @discardableResult
+    func suspendForBackground() -> Bool {
+        guard retryConfiguration != nil else { return false }
 
-        startRetryTask(using: retryConfiguration)
+        switch status {
+        case .connected, .connecting, .reconnecting:
+            break
+        case .idle, .disconnected:
+            return false
+        }
+
+        AppLog.session.info("Suspending Glassy Stream for app backgrounding")
+        isSuspendedForBackground = true
+        disconnectRequested = false
+        cancelRetryTask()
+        releaseActiveInputState()
+        controller.disconnect()
+        clearGeometry()
+
+        let attempt = max(1, automaticReconnectAttempt + 1)
+        status = .reconnecting(
+            RemoteReconnectState(
+                attempt: min(attempt, automaticReconnectPolicy.maximumAttempts),
+                maximumAttempts: automaticReconnectPolicy.maximumAttempts,
+                phase: .waitingForForeground
+            )
+        )
+        return true
+    }
+
+    /// Resumes a session that was deliberately retired before suspension. The
+    /// first foreground attempt is immediate; later transient failures use the
+    /// normal bounded backoff policy.
+    @discardableResult
+    func resumeAfterBackground() -> Bool {
+        guard isSuspendedForBackground,
+              retryConfiguration != nil else { return false }
+
+        AppLog.session.info("Resuming Glassy Stream after app foregrounding")
+        isSuspendedForBackground = false
+        disconnectRequested = false
+        launchAutomaticReconnect(startingAttempt: 1, firstAttemptIsImmediate: true)
+        return true
+    }
+
+    func retryConnect() {
+        guard retryConfiguration != nil else { return }
+
+        switch status {
+        case .disconnected:
+            automaticReconnectAttempt = 0
+            disconnectRequested = false
+            isSuspendedForBackground = false
+            launchAutomaticReconnect(startingAttempt: 1, firstAttemptIsImmediate: true)
+
+        case .reconnecting(let reconnectState) where reconnectState.canRetryImmediately:
+            disconnectRequested = false
+            isSuspendedForBackground = false
+            launchAutomaticReconnect(
+                startingAttempt: reconnectState.attempt,
+                firstAttemptIsImmediate: true
+            )
+
+        default:
+            AppLog.session.warning(
+                "Glassy Stream retry ignored while status was \(self.status.logDescription, privacy: .public)"
+            )
+        }
     }
 
     func cancelReconnect() {
         cancelRetryTask()
         disconnectRequested = true
+        isSuspendedForBackground = false
         releaseActiveInputState()
         controller.disconnect()
         clearGeometry()
-        status = .disconnected(nil)
+        status = .disconnected(lastDisconnectMessage)
     }
 
     func updateNetworkPathStatus(_ status: NetworkPathStatus) {
-        // NWConnection reports path transitions and terminal failures to the
-        // controller. Manual Retry remains available in SessionView.
+        networkPathStatus = status
+
+        guard case .reconnecting(let reconnectState) = self.status,
+              !isSuspendedForBackground else { return }
+
+        switch status {
+        case .satisfied:
+            break
+        case .unsatisfied, .requiresConnection:
+            self.status = .reconnecting(
+                RemoteReconnectState(
+                    attempt: reconnectState.attempt,
+                    maximumAttempts: reconnectState.maximumAttempts,
+                    phase: .waitingForNetwork
+                )
+            )
+        }
     }
 
     func applyPreferences(_ preferences: SessionPreferences) {
@@ -347,23 +454,26 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 #if DEBUG
     func debugSimulateConnectionInterruption() {
         guard status == .connected else { return }
-        releaseActiveInputState()
-        controller.disconnect()
-        status = .disconnected("The Glassy Stream connection was interrupted for testing.")
+        AppLog.session.warning("DEBUG simulating unexpected Glassy Stream interruption")
+        controller.debugSimulateConnectionInterruption()
     }
 #endif
 
     // MARK: - Connection state
 
     private func connect(
-        using configuration: ConnectionConfiguration
+        using configuration: ConnectionConfiguration,
+        preservingReconnectStatus: Bool = false
     ) async throws -> GlassyStreamAuthentication {
         disconnectRequested = false
+        isSuspendedForBackground = false
         releaseActiveInputState()
         clearGeometry()
         supportedQualities = [.best]
         quality = configuration.desiredQuality
-        status = .connecting
+        if !preservingReconnectStatus {
+            status = .connecting
+        }
 
         do {
             let authentication = try await controller.connect(
@@ -373,6 +483,12 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
                 expectedHostIdentifier: configuration.expectedHostIdentifier,
                 desiredQuality: configuration.desiredQuality
             )
+            try Task.checkCancellation()
+            guard !disconnectRequested,
+                  !isSuspendedForBackground,
+                  controller.state == .connected else {
+                throw GlassyStreamSessionError.cancelled
+            }
             supportedQualities = authentication.supportsStreamQuality
                 ? RemoteSessionQuality.allCases
                 : [.best]
@@ -388,17 +504,22 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
                 expectedHostIdentifier: authentication.hostIdentifier,
                 desiredQuality: configuration.desiredQuality
             )
+            automaticReconnectAttempt = 0
+            hasConnectedAtLeastOnce = true
+            lastDisconnectMessage = nil
             status = .connected
             return authentication
         } catch {
-            if !disconnectRequested {
+            if !disconnectRequested,
+               !isSuspendedForBackground,
+               retryTask == nil {
                 status = .disconnected(error.localizedDescription)
             }
             throw error
         }
     }
 
-    private func startRetryTask(using configuration: ConnectionConfiguration) {
+    private func startOneShotConnectionTask(using configuration: ConnectionConfiguration) {
         cancelRetryTask()
         disconnectRequested = false
         let generation = UUID()
@@ -418,8 +539,143 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         }
     }
 
+    private func launchAutomaticReconnect(
+        startingAttempt: Int,
+        firstAttemptIsImmediate: Bool = false
+    ) {
+        guard retryConfiguration != nil,
+              !disconnectRequested,
+              !isSuspendedForBackground else { return }
+
+        cancelRetryTask()
+        let generation = UUID()
+        retryGeneration = generation
+        retryTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                if self.retryGeneration == generation {
+                    self.retryTask = nil
+                }
+            }
+
+            var attempt = max(1, startingAttempt)
+            var shouldConnectImmediately = firstAttemptIsImmediate
+
+            while !Task.isCancelled,
+                  self.retryGeneration == generation,
+                  !self.disconnectRequested,
+                  !self.isSuspendedForBackground {
+                guard let policyDelay = self.automaticReconnectPolicy.delay(
+                    beforeAttempt: attempt
+                ) else {
+                    self.automaticReconnectAttempt = 0
+                    self.status = .disconnected(
+                        "Glassy Desk couldn't reconnect after \(self.automaticReconnectPolicy.maximumAttempts) attempts."
+                    )
+                    return
+                }
+
+                self.automaticReconnectAttempt = attempt
+
+                var waitedForNetwork = false
+                while !self.isNetworkAvailable {
+                    waitedForNetwork = true
+                    self.status = .reconnecting(
+                        RemoteReconnectState(
+                            attempt: attempt,
+                            maximumAttempts: self.automaticReconnectPolicy.maximumAttempts,
+                            phase: .waitingForNetwork
+                        )
+                    )
+                    try? await Task.sleep(for: .milliseconds(250))
+                    guard !Task.isCancelled,
+                          self.retryGeneration == generation,
+                          !self.disconnectRequested,
+                          !self.isSuspendedForBackground else { return }
+                }
+                if waitedForNetwork {
+                    shouldConnectImmediately = true
+                }
+
+                let delay = shouldConnectImmediately ? 0 : policyDelay
+                shouldConnectImmediately = false
+                if delay > 0 {
+                    let retryDate = Date.now.addingTimeInterval(delay)
+                    self.status = .reconnecting(
+                        RemoteReconnectState(
+                            attempt: attempt,
+                            maximumAttempts: self.automaticReconnectPolicy.maximumAttempts,
+                            phase: .waiting(until: retryDate)
+                        )
+                    )
+                    do {
+                        try await Task.sleep(for: .seconds(delay))
+                    } catch {
+                        return
+                    }
+                }
+
+                guard !Task.isCancelled,
+                      self.retryGeneration == generation,
+                      !self.disconnectRequested,
+                      !self.isSuspendedForBackground else { return }
+
+                guard self.isNetworkAvailable else {
+                    // The path changed during the backoff. Preserve this
+                    // attempt and connect immediately once it is usable again
+                    // instead of applying the same delay a second time.
+                    shouldConnectImmediately = true
+                    continue
+                }
+                guard let configuration = self.retryConfiguration else { return }
+
+                self.status = .reconnecting(
+                    RemoteReconnectState(
+                        attempt: attempt,
+                        maximumAttempts: self.automaticReconnectPolicy.maximumAttempts,
+                        phase: .connecting
+                    )
+                )
+                AppLog.session.info(
+                    "Attempting Glassy Stream automatic reconnect; attempt=\(attempt, privacy: .public)"
+                )
+
+                let connectionGeneration = UUID()
+                self.automaticReconnectConnectionGeneration = connectionGeneration
+                do {
+                    _ = try await self.connect(
+                        using: configuration,
+                        preservingReconnectStatus: true
+                    )
+                    if self.automaticReconnectConnectionGeneration == connectionGeneration {
+                        self.automaticReconnectConnectionGeneration = nil
+                    }
+                    return
+                } catch {
+                    if self.automaticReconnectConnectionGeneration == connectionGeneration {
+                        self.automaticReconnectConnectionGeneration = nil
+                    }
+                    guard !Task.isCancelled,
+                          self.retryGeneration == generation,
+                          !self.disconnectRequested,
+                          !self.isSuspendedForBackground else { return }
+
+                    guard Self.isRetryableConnectionFailure(error) else {
+                        self.automaticReconnectAttempt = 0
+                        self.status = .disconnected(error.localizedDescription)
+                        return
+                    }
+
+                    self.lastDisconnectMessage = error.localizedDescription
+                    attempt += 1
+                }
+            }
+        }
+    }
+
     private func cancelRetryTask() {
         retryGeneration = UUID()
+        automaticReconnectConnectionGeneration = nil
         retryTask?.cancel()
         retryTask = nil
     }
@@ -430,19 +686,84 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     ) {
         switch state {
         case .idle:
-            if disconnectRequested, status != .idle {
-                status = .disconnected(nil)
+            if isSuspendedForBackground {
+                let attempt = max(1, automaticReconnectAttempt + 1)
+                status = .reconnecting(
+                    RemoteReconnectState(
+                        attempt: min(attempt, automaticReconnectPolicy.maximumAttempts),
+                        maximumAttempts: automaticReconnectPolicy.maximumAttempts,
+                        phase: .waitingForForeground
+                    )
+                )
+            } else if disconnectRequested, status != .idle {
+                status = .disconnected(lastDisconnectMessage)
             }
         case .connecting:
+            if case .reconnecting = status {
+                break
+            }
             status = .connecting
         case .connected:
+            hasConnectedAtLeastOnce = true
             status = .connected
         case .failed:
             releaseLocalInputState()
             clearGeometry()
-            status = .disconnected(
-                error?.localizedDescription ?? "The Glassy Stream connection ended."
-            )
+            let message = error?.localizedDescription
+                ?? "The Glassy Stream connection ended."
+            lastDisconnectMessage = message
+
+            if automaticReconnectConnectionGeneration != nil {
+                // The retry loop owns the next state transition and will inspect
+                // the thrown error to decide whether another attempt is safe.
+                return
+            }
+
+            if hasConnectedAtLeastOnce,
+               !disconnectRequested,
+               !isSuspendedForBackground,
+               Self.isRetryableConnectionFailure(error) {
+                launchAutomaticReconnect(startingAttempt: 1)
+            } else {
+                automaticReconnectAttempt = 0
+                status = .disconnected(message)
+            }
+        }
+    }
+
+    private var isNetworkAvailable: Bool {
+        networkPathStatus == nil || networkPathStatus == .satisfied
+    }
+
+    private static func isRetryableConnectionFailure(_ error: Error?) -> Bool {
+        guard let error else { return true }
+        guard let sessionError = error as? GlassyStreamSessionError else {
+            return false
+        }
+
+        switch sessionError {
+        case .connectionEndedBeforeAuthentication, .videoReadinessTimedOut, .video:
+            return true
+        case .cancelled:
+            return false
+        case .transport(let clientError):
+            switch clientError {
+            case .alreadyConnecting,
+                 .connectionFailed,
+                 .connectionClosed,
+                 .authenticationTimedOut:
+                return true
+            case .cancelled,
+                 .pairingCodeRequired,
+                 .invalidPairingCode,
+                 .authenticationRejected,
+                 .hostIdentityMismatch,
+                 .directInputUnsupported,
+                 .unsupportedHostVersion,
+                 .protocolViolation,
+                 .credentialStoreFailed:
+                return false
+            }
         }
     }
 
