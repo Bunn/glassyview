@@ -42,8 +42,23 @@ enum RemoteViewportGeometry {
         return axes
     }
 
-    static func gestureIntent(pannableAxes: PannableAxes) -> GestureIntent {
-        pannableAxes.isEmpty ? .remoteScroll : .viewportPan
+    static func gestureIntent(pannableAxes: PannableAxes,
+                              pansViewportWithTwoFingers: Bool) -> GestureIntent {
+        pansViewportWithTwoFingers && !pannableAxes.isEmpty
+            ? .viewportPan
+            : .remoteScroll
+    }
+
+    static func shouldCommitRemoteScroll(translation: CGPoint,
+                                         threshold: CGFloat = 8) -> Bool {
+        guard translation.x.isFinite,
+              translation.y.isFinite,
+              threshold.isFinite,
+              threshold >= 0 else {
+            return false
+        }
+
+        return max(abs(translation.x), abs(translation.y)) >= threshold
     }
 
     static func centerByPanning(_ center: CGPoint,

@@ -5,6 +5,7 @@ struct SessionPreferences: Codable, Equatable, Sendable {
     var displaySelection: RemoteDisplaySelection = .all
     var zoomScale = 1.0
     var followsCursor = true
+    var pansViewportWithTwoFingers = false
     var frameRate: RemoteFrameRate = .balanced
 
     static let `default` = SessionPreferences()
@@ -20,6 +21,7 @@ struct SessionPreferences: Codable, Equatable, Sendable {
         case displaySelection
         case zoomScale
         case followsCursor
+        case pansViewportWithTwoFingers
         case frameRate
     }
 
@@ -27,11 +29,13 @@ struct SessionPreferences: Codable, Equatable, Sendable {
          displaySelection: RemoteDisplaySelection = .all,
          zoomScale: Double = 1,
          followsCursor: Bool = true,
+         pansViewportWithTwoFingers: Bool = false,
          frameRate: RemoteFrameRate = .balanced) {
         self.touchMode = touchMode
         self.displaySelection = displaySelection
         self.zoomScale = zoomScale
         self.followsCursor = followsCursor
+        self.pansViewportWithTwoFingers = pansViewportWithTwoFingers
         self.frameRate = frameRate
     }
 
@@ -41,6 +45,10 @@ struct SessionPreferences: Codable, Equatable, Sendable {
         displaySelection = try container.decodeIfPresent(RemoteDisplaySelection.self, forKey: .displaySelection) ?? .all
         zoomScale = try container.decodeIfPresent(Double.self, forKey: .zoomScale) ?? 1
         followsCursor = try container.decodeIfPresent(Bool.self, forKey: .followsCursor) ?? true
+        pansViewportWithTwoFingers = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .pansViewportWithTwoFingers
+        ) ?? false
         frameRate = try container.decodeIfPresent(RemoteFrameRate.self, forKey: .frameRate) ?? .balanced
         self = normalized
     }

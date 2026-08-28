@@ -9,6 +9,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     let glassyStream: GlassyStreamSessionController?
     @Environment(SubscriptionStore.self) private var subscriptionStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var isSessionPaywallPresented = false
     @State private var isFreeSessionTimerInfoPresented = false
@@ -21,6 +22,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @State private var textToSend = ""
     @State private var streamZoomScale: CGFloat = 1
     @State private var followsCursorWhenZoomed = true
+    @State private var pansViewportWithTwoFingers = false
     @State private var networkPathObserver = NetworkPathObserver()
     @State private var externalDisplayCoordinator = ExternalDisplayCoordinator.shared
     @State private var inputFocused = false
@@ -40,6 +42,9 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         let preferences = preferences.wrappedValue.normalized
         _streamZoomScale = State(initialValue: CGFloat(preferences.zoomScale))
         _followsCursorWhenZoomed = State(initialValue: preferences.followsCursor)
+        _pansViewportWithTwoFingers = State(
+            initialValue: preferences.pansViewportWithTwoFingers
+        )
     }
 
     var body: some View {
@@ -66,30 +71,13 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                 inputBar
             }
         }
-        .overlay(alignment: .bottomLeading) {
+        .overlay(alignment: .bottom) {
             if session.status == .connected,
                !showsInputBar,
                !isExternalControllerActive {
-                SessionZoomControls(zoomScale: $streamZoomScale,
-                                    followsCursor: $followsCursorWhenZoomed)
+                sessionBottomControls
+                    .padding(.horizontal, horizontalSizeClass == .compact ? 8 : 20)
                     .padding(.bottom, 28)
-                    .padding(.leading, 20)
-            }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if session.status == .connected && !showsInputBar && !isExternalControllerActive {
-                HStack(spacing: 10) {
-                    if glassyStream == nil, session.displayOptions.count > 1 {
-                        SessionDisplayMenu(session: session)
-                    }
-
-                    SessionOptionsMenu(session: session,
-                                       sessionTitle: sessionTitle,
-                                       externalDisplayCoordinator: externalDisplayCoordinator,
-                                       usesGlassyStream: glassyStream != nil)
-                }
-                .padding(.bottom, 28)
-                .padding(.trailing, 20)
             }
         }
         .statusBarHidden(true)
@@ -148,6 +136,9 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .onChange(of: followsCursorWhenZoomed) { _, followsCursor in
             updatePreference(\.followsCursor, to: followsCursor)
         }
+        .onChange(of: pansViewportWithTwoFingers) { _, pansViewport in
+            updatePreference(\.pansViewportWithTwoFingers, to: pansViewport)
+        }
         .onChange(of: showsInputBar) { _, _ in
             logDisplayControlState(reason: "inputBarVisibilityChanged")
             if !showsInputBar {
@@ -199,6 +190,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                      reconnectState: nil,
                                      zoomScale: $streamZoomScale,
                                      followsCursor: followsCursorWhenZoomed,
+                                     pansViewportWithTwoFingers: pansViewportWithTwoFingers,
                                      acceptsHardwareKeyboardInput: acceptsRemoteHardwareKeyboardInput,
                                      glassyStream: glassyStream)
             }
@@ -208,6 +200,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                  reconnectState: reconnectState,
                                  zoomScale: $streamZoomScale,
                                  followsCursor: followsCursorWhenZoomed,
+                                 pansViewportWithTwoFingers: pansViewportWithTwoFingers,
                                  acceptsHardwareKeyboardInput: false,
                                  glassyStream: glassyStream)
 
@@ -247,6 +240,48 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     }
 
     // MARK: - Floating controls
+
+    @ViewBuilder
+    private var sessionBottomControls: some View {
+        if horizontalSizeClass == .compact {
+            VStack(spacing: 10) {
+                HStack {
+                    sessionZoomControls
+                    Spacer(minLength: 0)
+                }
+
+                HStack {
+                    Spacer(minLength: 0)
+                    sessionMenuControls
+                }
+            }
+        } else {
+            HStack(spacing: 12) {
+                sessionZoomControls
+                Spacer(minLength: 12)
+                sessionMenuControls
+            }
+        }
+    }
+
+    private var sessionZoomControls: some View {
+        SessionZoomControls(zoomScale: $streamZoomScale,
+                            followsCursor: $followsCursorWhenZoomed,
+                            pansViewportWithTwoFingers: $pansViewportWithTwoFingers)
+    }
+
+    private var sessionMenuControls: some View {
+        HStack(spacing: 10) {
+            if glassyStream == nil, session.displayOptions.count > 1 {
+                SessionDisplayMenu(session: session)
+            }
+
+            SessionOptionsMenu(session: session,
+                               sessionTitle: sessionTitle,
+                               externalDisplayCoordinator: externalDisplayCoordinator,
+                               usesGlassyStream: glassyStream != nil)
+        }
+    }
 
     private var controlPill: some View {
         HStack(spacing: 2) {

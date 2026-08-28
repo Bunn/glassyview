@@ -5,6 +5,7 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
     let reconnectState: RemoteReconnectState?
     @Binding var zoomScale: CGFloat
     let followsCursor: Bool
+    var pansViewportWithTwoFingers = false
     let acceptsHardwareKeyboardInput: Bool
     var acceptsPointerInput: Bool = true
     var glassyStream: GlassyStreamSessionController?
@@ -16,6 +17,7 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                                   selectedFramebufferFrame: nil,
                                   zoomScale: $zoomScale,
                                   followsCursor: followsCursor,
+                                  pansViewportWithTwoFingers: pansViewportWithTwoFingers,
                                   acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
                                   acceptsPointerInput: acceptsPointerInput,
                                   showsFramebuffer: false,
@@ -30,6 +32,7 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                                   selectedFramebufferFrame: session.selectedDisplayFrame,
                                   zoomScale: $zoomScale,
                                   followsCursor: followsCursor,
+                                  pansViewportWithTwoFingers: pansViewportWithTwoFingers,
                                   acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
                                   acceptsPointerInput: acceptsPointerInput)
                     .id(session.displaySelection.id)

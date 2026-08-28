@@ -3,6 +3,7 @@ import SwiftUI
 struct SessionZoomControls: View {
     @Binding var zoomScale: CGFloat
     @Binding var followsCursor: Bool
+    @Binding var pansViewportWithTwoFingers: Bool
 
     private let minimumZoomScale: CGFloat = 1
     private let maximumZoomScale: CGFloat = 4
@@ -40,17 +41,19 @@ struct SessionZoomControls: View {
                        action: resetZoom)
                 .disabled(zoomScale == minimumZoomScale)
 
-            Button(action: toggleFollowCursor) {
-                Image(systemName: "scope")
-                    .font(.body.weight(.medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(followsCursor ? .green : .white)
-                    .frame(width: 42, height: 42)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Keep Cursor Visible")
-            .accessibilityValue(followsCursor ? "On" : "Off")
+            modeToggle("Keep Cursor Visible",
+                       systemImage: "scope",
+                       isOn: $followsCursor,
+                       hint: followsCursor
+                           ? "Moves the view only when the cursor reaches a visible edge."
+                           : "Leaves the zoomed view fixed as the cursor moves.")
+
+            modeToggle("Pan View with Two Fingers",
+                       systemImage: "hand.draw",
+                       isOn: $pansViewportWithTwoFingers,
+                       hint: pansViewportWithTwoFingers
+                           ? "Two-finger swipes move the zoomed view."
+                           : "Two-finger swipes scroll the remote Mac.")
         }
         .padding(5)
         .liquidGlass(in: Capsule())
@@ -70,6 +73,36 @@ struct SessionZoomControls: View {
         .accessibilityLabel(title)
     }
 
+    private func modeToggle(_ title: String,
+                            systemImage: String,
+                            isOn: Binding<Bool>,
+                            hint: String) -> some View {
+        Toggle(isOn: isOn) {
+            Image(systemName: systemImage)
+                .font(.body.weight(.medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(isOn.wrappedValue ? .green : .white)
+                .frame(width: 42, height: 42)
+                .background {
+                    Circle()
+                        .fill(isOn.wrappedValue ? .white.opacity(0.18) : .clear)
+                }
+                .overlay {
+                    if isOn.wrappedValue {
+                        Circle()
+                            .stroke(.white.opacity(0.28), lineWidth: 1)
+                    }
+                }
+                .contentShape(Circle())
+        }
+        .toggleStyle(.button)
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
+        .accessibilityHint(hint)
+        .help(Text(verbatim: hint))
+    }
+
     private func zoomIn() {
         zoomScale = min(zoomScale + zoomStep, maximumZoomScale)
     }
@@ -82,7 +115,4 @@ struct SessionZoomControls: View {
         zoomScale = minimumZoomScale
     }
 
-    private func toggleFollowCursor() {
-        followsCursor.toggle()
-    }
 }

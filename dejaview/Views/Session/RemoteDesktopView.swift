@@ -15,9 +15,10 @@ private let remoteFramebufferRenderingSignposter = OSSignposter(logger: AppLog.p
 ///
 /// Two fingers (both modes):
 /// - two-finger tap / trackpad secondary tap = right click
-/// - while zoomed, two-finger drag pans the local viewport
-/// - at fit-to-screen, two-finger drag scrolls the remote Mac
+/// - two-finger drag scrolls the remote Mac by default
+/// - in Pan View mode, two-finger drag pans a zoomed local viewport
 /// - pinch = zoom the visible stream
+/// Three-finger touch drag always pans a zoomed local viewport.
 /// A discrete mouse wheel always scrolls the remote Mac.
 ///
 /// When keep-cursor-visible is enabled, zoomed trackpad/hover movement leaves
@@ -31,6 +32,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
     var selectedFramebufferFrame: CGRect?
     @Binding var zoomScale: CGFloat
     var followsCursor: Bool
+    var pansViewportWithTwoFingers: Bool = false
     var acceptsHardwareKeyboardInput: Bool
     var acceptsPointerInput: Bool = true
     var showsFramebuffer: Bool = true
@@ -45,6 +47,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         view.setAcceptsPointerInput(acceptsPointerInput)
         view.setShowsFramebuffer(showsFramebuffer)
         view.setAllowsZoom(allowsZoom)
+        view.setPansViewportWithTwoFingers(pansViewportWithTwoFingers)
         view.setTouchModeOverride(touchModeOverride)
         view.setGlassyStreamRenderer(glassyStreamRenderer)
         view.onZoomScaleChanged = context.coordinator.setZoomScale(_:)
@@ -78,6 +81,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         uiView.setAcceptsPointerInput(acceptsPointerInput)
         uiView.setShowsFramebuffer(showsFramebuffer)
         uiView.setAllowsZoom(allowsZoom)
+        uiView.setPansViewportWithTwoFingers(pansViewportWithTwoFingers)
         uiView.setTouchModeOverride(touchModeOverride)
         uiView.setGlassyStreamRenderer(glassyStreamRenderer)
     }
@@ -120,7 +124,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private weak var pointerScrollPan: UIPanGestureRecognizer?
         private weak var pointerWheelScrollPan: UIPanGestureRecognizer?
         private weak var pinchGesture: UIPinchGestureRecognizer?
-        private weak var twoFingerPanGesture: UIPanGestureRecognizer?
+        private weak var touchPanGesture: UIPanGestureRecognizer?
         private var pendingFramebufferUpdate: RemoteFramebufferUpdate?
         private var framebufferFlushTask: Task<Void, Never>?
         private var lastFramebufferFlushTime: TimeInterval = 0
@@ -130,6 +134,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private var acceptsHardwareKeyboardInput = true
         private var showsFramebuffer = true
         private var allowsZoom = true
+        private var pansViewportWithTwoFingers = false
         private var touchModeOverride: RemoteTouchMode?
 
         private var zoomScale: CGFloat = 1
@@ -137,6 +142,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private var viewportCenter: CGPoint?
         private var pinchStartZoomScale: CGFloat = 1
         private var pinchIsActive = false
+        private var pinchIsSuppressedByThreeFingerPan = false
         private var lastLocalCursorLocation: CGPoint?
 
         // Single-touch state
@@ -157,6 +163,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private var touchScrollAccumulator = CGPoint.zero
         private var pointerScrollAccumulator = CGPoint.zero
         private var pointerWheelScrollAccumulator = CGPoint.zero
+        private var touchPendingTranslation = CGPoint.zero
+        private var pointerPendingTranslation = CGPoint.zero
         private var touchPanIntent: RemoteViewportGeometry.GestureIntent = .undecided
         private var pointerPanIntent: RemoteViewportGeometry.GestureIntent = .undecided
 
@@ -315,6 +323,10 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             }
         }
 
+        func setPansViewportWithTwoFingers(_ enabled: Bool) {
+            pansViewportWithTwoFingers = enabled
+        }
+
         func setTouchModeOverride(_ touchMode: RemoteTouchMode?) {
             touchModeOverride = touchMode
         }
@@ -365,13 +377,18 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             pointerSecondaryTap.buttonMaskRequired = .secondary
             addGestureRecognizer(pointerSecondaryTap)
 
-            let twoFingerPan = UIPanGestureRecognizer(target: self,
-                                                      action: #selector(handleTwoFingerPan(_:)))
-            twoFingerPan.minimumNumberOfTouches = 2
-            twoFingerPan.maximumNumberOfTouches = 2
-            twoFingerPan.delegate = self
-            addGestureRecognizer(twoFingerPan)
-            twoFingerPanGesture = twoFingerPan
+            let touchPan = UIPanGestureRecognizer(
+                target: self,
+                action: #selector(handleTouchPan(_:))
+            )
+            touchPan.minimumNumberOfTouches = 2
+            touchPan.maximumNumberOfTouches = 3
+            touchPan.allowedTouchTypes = [
+                NSNumber(value: UITouch.TouchType.direct.rawValue)
+            ]
+            touchPan.delegate = self
+            addGestureRecognizer(touchPan)
+            touchPanGesture = touchPan
 
             let pointerHover = UIHoverGestureRecognizer(target: self,
                                                         action: #selector(handlePointerHover(_:)))
@@ -798,10 +815,19 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             switch gesture.state {
             case .began:
                 pinchStartZoomScale = zoomScale
-                pinchIsActive = true
+                pinchIsSuppressedByThreeFingerPan =
+                    (touchPanGesture?.numberOfTouches ?? 0) >= 3
+                pinchIsActive = !pinchIsSuppressedByThreeFingerPan
                 enterMultiTouch()
 
             case .changed:
+                if (touchPanGesture?.numberOfTouches ?? 0) >= 3 {
+                    pinchIsSuppressedByThreeFingerPan = true
+                    pinchIsActive = false
+                }
+
+                guard !pinchIsSuppressedByThreeFingerPan else { return }
+
                 setZoomScale(pinchStartZoomScale * gesture.scale,
                              anchorInView: gesture.location(in: self),
                              notify: true)
@@ -809,6 +835,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             default:
                 pinchStartZoomScale = zoomScale
                 pinchIsActive = false
+                pinchIsSuppressedByThreeFingerPan = false
             }
         }
 
@@ -987,7 +1014,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             updateFramebufferViewFrame()
         }
 
-        // MARK: - Two-finger gestures
+        // MARK: - Multi-finger gestures
 
         @objc private func handleTwoFingerTap(_ gesture: UITapGestureRecognizer) {
             rightClick(from: gesture, usesPointerLocation: false)
@@ -1021,24 +1048,38 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             cursorLocationDidChange()
         }
 
-        @objc private func handleTwoFingerPan(_ gesture: UIPanGestureRecognizer) {
+        @objc private func handleTouchPan(_ gesture: UIPanGestureRecognizer) {
             guard session != nil else { return }
 
             switch gesture.state {
             case .began:
                 touchScrollAccumulator = .zero
+                touchPendingTranslation = .zero
                 touchPanIntent = .undecided
+                suppressPinchIfThreeFingerPan(gesture)
                 enterMultiTouch()
 
             case .changed:
                 let delta = gesture.translation(in: self)
                 gesture.setTranslation(.zero, in: self)
-                routeTouchPan(delta)
+                suppressPinchIfThreeFingerPan(gesture)
+                routeTouchPan(delta,
+                              forcesViewportPan: gesture.numberOfTouches >= 3)
 
             default:
                 touchScrollAccumulator = .zero
+                touchPendingTranslation = .zero
                 touchPanIntent = .undecided
             }
+        }
+
+        private func suppressPinchIfThreeFingerPan(
+            _ gesture: UIPanGestureRecognizer
+        ) {
+            guard gesture.numberOfTouches >= 3 else { return }
+
+            pinchIsSuppressedByThreeFingerPan = true
+            pinchIsActive = false
         }
 
         @objc private func handlePointerScroll(_ gesture: UIPanGestureRecognizer) {
@@ -1047,6 +1088,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             switch gesture.state {
             case .began:
                 pointerScrollAccumulator = .zero
+                pointerPendingTranslation = .zero
                 pointerPanIntent = .undecided
                 becomeFirstResponderIfAppropriate()
 
@@ -1058,6 +1100,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             default:
                 pointerScrollAccumulator = .zero
+                pointerPendingTranslation = .zero
                 pointerPanIntent = .undecided
             }
         }
@@ -1087,20 +1130,36 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                                                 effectiveScale: effectiveScale)
         }
 
-        private func routeTouchPan(_ delta: CGPoint) {
-            if pinchIsActive {
+        private func routeTouchPan(_ delta: CGPoint,
+                                   forcesViewportPan: Bool) {
+            touchPendingTranslation.x += delta.x
+            touchPendingTranslation.y += delta.y
+
+            if forcesViewportPan || pinchIsActive {
                 touchPanIntent = .viewportPan
+                touchScrollAccumulator = .zero
             } else if touchPanIntent == .undecided {
-                touchPanIntent = RemoteViewportGeometry.gestureIntent(
-                    pannableAxes: pannableViewportAxes
+                let candidateIntent = RemoteViewportGeometry.gestureIntent(
+                    pannableAxes: pannableViewportAxes,
+                    pansViewportWithTwoFingers: pansViewportWithTwoFingers
                 )
+                if candidateIntent == .remoteScroll,
+                   !RemoteViewportGeometry.shouldCommitRemoteScroll(
+                    translation: touchPendingTranslation
+                   ) {
+                    return
+                }
+                touchPanIntent = candidateIntent
             }
+
+            let routedDelta = touchPendingTranslation
+            touchPendingTranslation = .zero
 
             switch touchPanIntent {
             case .viewportPan:
-                panViewport(by: delta)
+                panViewport(by: routedDelta)
             case .remoteScroll:
-                forwardScroll(delta: delta,
+                forwardScroll(delta: routedDelta,
                               accumulator: &touchScrollAccumulator)
             case .undecided:
                 break
@@ -1108,19 +1167,34 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         private func routePointerPan(_ delta: CGPoint) {
+            pointerPendingTranslation.x += delta.x
+            pointerPendingTranslation.y += delta.y
+
             if pinchIsActive {
                 pointerPanIntent = .viewportPan
+                pointerScrollAccumulator = .zero
             } else if pointerPanIntent == .undecided {
-                pointerPanIntent = RemoteViewportGeometry.gestureIntent(
-                    pannableAxes: pannableViewportAxes
+                let candidateIntent = RemoteViewportGeometry.gestureIntent(
+                    pannableAxes: pannableViewportAxes,
+                    pansViewportWithTwoFingers: pansViewportWithTwoFingers
                 )
+                if candidateIntent == .remoteScroll,
+                   !RemoteViewportGeometry.shouldCommitRemoteScroll(
+                    translation: pointerPendingTranslation
+                   ) {
+                    return
+                }
+                pointerPanIntent = candidateIntent
             }
+
+            let routedDelta = pointerPendingTranslation
+            pointerPendingTranslation = .zero
 
             switch pointerPanIntent {
             case .viewportPan:
-                panViewport(by: delta)
+                panViewport(by: routedDelta)
             case .remoteScroll:
-                forwardScroll(delta: delta,
+                forwardScroll(delta: routedDelta,
                               accumulator: &pointerScrollAccumulator)
             case .undecided:
                 break
@@ -1205,7 +1279,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                                shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
             let pair = [gestureRecognizer, otherGestureRecognizer]
             return pair.contains { $0 === pinchGesture }
-                && pair.contains { $0 === twoFingerPanGesture || $0 === pointerScrollPan }
+                && pair.contains { $0 === touchPanGesture || $0 === pointerScrollPan }
         }
 
         // MARK: - Single-finger touch handling
