@@ -12,17 +12,15 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
     var body: some View {
         ZStack {
             if let glassyStream {
-                GlassyStreamVideoView(renderer: glassyStream.renderer)
-                    .ignoresSafeArea()
-
                 RemoteDesktopView(session: session,
                                   selectedFramebufferFrame: nil,
                                   zoomScale: $zoomScale,
-                                  followsCursor: false,
+                                  followsCursor: followsCursor,
                                   acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
                                   acceptsPointerInput: acceptsPointerInput,
                                   showsFramebuffer: false,
-                                  allowsZoom: false)
+                                  allowsZoom: true,
+                                  glassyStreamRenderer: glassyStream.renderer)
                     .ignoresSafeArea()
 
                 GlassyStreamStatusOverlay(controller: glassyStream)

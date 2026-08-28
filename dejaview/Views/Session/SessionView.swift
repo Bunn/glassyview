@@ -69,8 +69,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .overlay(alignment: .bottomLeading) {
             if session.status == .connected,
                !showsInputBar,
-               !isExternalControllerActive,
-               glassyStream == nil {
+               !isExternalControllerActive {
                 SessionZoomControls(zoomScale: $streamZoomScale,
                                     followsCursor: $followsCursorWhenZoomed)
                     .padding(.bottom, 28)
@@ -108,7 +107,6 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .onAppear {
             networkPathObserver.start()
             if glassyStream != nil {
-                streamZoomScale = 1
                 deactivateExternalControllerIfNeeded()
             }
             logDisplayControlState(reason: "sessionViewAppeared")

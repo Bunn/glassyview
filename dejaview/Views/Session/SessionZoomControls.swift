@@ -49,7 +49,7 @@ struct SessionZoomControls: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Follow Cursor")
+            .accessibilityLabel("Keep Cursor Visible")
             .accessibilityValue(followsCursor ? "On" : "Off")
         }
         .padding(5)

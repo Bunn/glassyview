@@ -15,11 +15,14 @@ private let remoteFramebufferRenderingSignposter = OSSignposter(logger: AppLog.p
 ///
 /// Two fingers (both modes):
 /// - two-finger tap / trackpad secondary tap = right click
-/// - two-finger drag = scroll wheel (natural direction)
+/// - while zoomed, two-finger drag pans the local viewport
+/// - at fit-to-screen, two-finger drag scrolls the remote Mac
 /// - pinch = zoom the visible stream
+/// A discrete mouse wheel always scrolls the remote Mac.
 ///
-/// When follow-cursor is enabled, zoomed trackpad/hover cursor movement
-/// recenters the visible stream around the remote cursor.
+/// When keep-cursor-visible is enabled, zoomed trackpad/hover movement leaves
+/// the viewport still until the remote cursor reaches an edge, then reveals
+/// only the next portion of the desktop.
 struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable {
     // Deliberately NOT @ObservedObject: frames are pushed straight to the
     // view via `framebufferUpdatePublisher` (see makeUIView), so SwiftUI never
@@ -33,6 +36,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
     var showsFramebuffer: Bool = true
     var allowsZoom: Bool = true
     var touchModeOverride: RemoteTouchMode?
+    var glassyStreamRenderer: GlassyStreamVideoRenderer?
 
     func makeUIView(context: Context) -> ScreenView {
         let view = ScreenView()
@@ -42,6 +46,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         view.setShowsFramebuffer(showsFramebuffer)
         view.setAllowsZoom(allowsZoom)
         view.setTouchModeOverride(touchModeOverride)
+        view.setGlassyStreamRenderer(glassyStreamRenderer)
         view.onZoomScaleChanged = context.coordinator.setZoomScale(_:)
         view.setVisibleFramebufferFrame(selectedFramebufferFrame)
         view.setPreferredFrameRate(session.preferredFrameRate)
@@ -74,6 +79,13 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         uiView.setShowsFramebuffer(showsFramebuffer)
         uiView.setAllowsZoom(allowsZoom)
         uiView.setTouchModeOverride(touchModeOverride)
+        uiView.setGlassyStreamRenderer(glassyStreamRenderer)
+    }
+
+    static func dismantleUIView(_ uiView: ScreenView, coordinator: Coordinator) {
+        coordinator.framebufferUpdateSubscription = nil
+        coordinator.cursorSubscription = nil
+        uiView.prepareForDismantle()
     }
 
     func makeCoordinator() -> Coordinator {
@@ -102,9 +114,13 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private var fullImageSize: CGSize = .zero
         private var selectedFramebufferFrame: CGRect?
         private let framebufferView = FramebufferImageView()
+        private var glassyStreamView: GlassyStreamDisplayView?
         private let cursorLayer = CALayer()
         private var remoteCursor: RemoteCursor?
         private weak var pointerScrollPan: UIPanGestureRecognizer?
+        private weak var pointerWheelScrollPan: UIPanGestureRecognizer?
+        private weak var pinchGesture: UIPinchGestureRecognizer?
+        private weak var twoFingerPanGesture: UIPanGestureRecognizer?
         private var pendingFramebufferUpdate: RemoteFramebufferUpdate?
         private var framebufferFlushTask: Task<Void, Never>?
         private var lastFramebufferFlushTime: TimeInterval = 0
@@ -120,6 +136,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private var followsCursor = true
         private var viewportCenter: CGPoint?
         private var pinchStartZoomScale: CGFloat = 1
+        private var pinchIsActive = false
+        private var lastLocalCursorLocation: CGPoint?
 
         // Single-touch state
         private var lastTouchLocation: CGPoint = .zero
@@ -138,6 +156,9 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         // Scroll state
         private var touchScrollAccumulator = CGPoint.zero
         private var pointerScrollAccumulator = CGPoint.zero
+        private var pointerWheelScrollAccumulator = CGPoint.zero
+        private var touchPanIntent: RemoteViewportGeometry.GestureIntent = .undecided
+        private var pointerPanIntent: RemoteViewportGeometry.GestureIntent = .undecided
 
         private let tapMovementThreshold: CGFloat = 8
         private let tapDurationThreshold: TimeInterval = 0.35
@@ -327,7 +348,9 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             let pinch = UIPinchGestureRecognizer(target: self,
                                                  action: #selector(handlePinch(_:)))
+            pinch.delegate = self
             addGestureRecognizer(pinch)
+            pinchGesture = pinch
 
             let twoFingerTap = UITapGestureRecognizer(target: self,
                                                       action: #selector(handleTwoFingerTap(_:)))
@@ -346,7 +369,9 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                                                       action: #selector(handleTwoFingerPan(_:)))
             twoFingerPan.minimumNumberOfTouches = 2
             twoFingerPan.maximumNumberOfTouches = 2
+            twoFingerPan.delegate = self
             addGestureRecognizer(twoFingerPan)
+            twoFingerPanGesture = twoFingerPan
 
             let pointerHover = UIHoverGestureRecognizer(target: self,
                                                         action: #selector(handlePointerHover(_:)))
@@ -354,10 +379,22 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             let pointerScrollPan = UIPanGestureRecognizer(target: self,
                                                           action: #selector(handlePointerScroll(_:)))
-            pointerScrollPan.allowedScrollTypesMask = .all
+            // UIKit identifies trackpads as continuous scroll sources.
+            pointerScrollPan.allowedScrollTypesMask = .continuous
             pointerScrollPan.delegate = self
             addGestureRecognizer(pointerScrollPan)
             self.pointerScrollPan = pointerScrollPan
+
+            let pointerWheelScrollPan = UIPanGestureRecognizer(
+                target: self,
+                action: #selector(handlePointerWheelScroll(_:))
+            )
+            // Keep a physical mouse wheel mapped to the remote machine even
+            // while a two-finger trackpad drag is panning the local viewport.
+            pointerWheelScrollPan.allowedScrollTypesMask = .discrete
+            pointerWheelScrollPan.delegate = self
+            addGestureRecognizer(pointerWheelScrollPan)
+            self.pointerWheelScrollPan = pointerWheelScrollPan
         }
 
         required init?(coder: NSCoder) {
@@ -435,6 +472,32 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         deinit {
             framebufferFlushTask?.cancel()
             keyboardFocusTask?.cancel()
+        }
+
+        func prepareForDismantle() {
+            setGlassyStreamRenderer(nil)
+        }
+
+        func setGlassyStreamRenderer(_ renderer: GlassyStreamVideoRenderer?) {
+            guard let renderer else {
+                glassyStreamView?.detachRenderer()
+                glassyStreamView?.removeFromSuperview()
+                glassyStreamView = nil
+                return
+            }
+
+            let videoView: GlassyStreamDisplayView
+            if let glassyStreamView {
+                videoView = glassyStreamView
+            } else {
+                videoView = GlassyStreamDisplayView()
+                videoView.isUserInteractionEnabled = false
+                insertSubview(videoView, belowSubview: framebufferView)
+                glassyStreamView = videoView
+            }
+
+            videoView.attach(renderer)
+            videoView.frame = framebufferView.frame
         }
 
         func display(framebufferUpdate update: RemoteFramebufferUpdate) {
@@ -517,6 +580,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             if imageSizeChanged || viewportCenter == nil {
                 resetViewportCenter()
+                lastLocalCursorLocation = localCursorLocation()
                 AppLog.ui.info("Remote desktop image size changed; fullImageSize=\(Self.sizeDescription(self.fullImageSize), privacy: .public) selectedFramebufferFrame=\(Self.rectDescription(self.selectedFramebufferFrame), privacy: .public) visibleFramebufferFrame=\(Self.rectDescription(self.visibleFramebufferFrame), privacy: .public)")
             }
 
@@ -544,6 +608,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             if visibleFrame != previousVisibleFrame {
                 resetViewportCenter()
+                lastLocalCursorLocation = localCursorLocation()
                 updateFramebufferViewFrame()
                 framebufferView.setNeedsDisplay()
             } else {
@@ -559,7 +624,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             let clamped = clampedZoomScale(newZoomScale)
             guard clamped != zoomScale else { return }
 
-            let anchor = followsCursor ? nil : CGPoint(x: bounds.midX, y: bounds.midY)
+            let anchor = CGPoint(x: bounds.midX, y: bounds.midY)
             setZoomScale(clamped, anchorInView: anchor, notify: notify)
         }
 
@@ -568,7 +633,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             followsCursor = newValue
 
             if changed {
-                followCursorIfNeeded()
+                lastLocalCursorLocation = localCursorLocation()
+                revealCursorIfNeeded(requiresOutwardMovement: false)
             }
         }
 
@@ -732,6 +798,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             switch gesture.state {
             case .began:
                 pinchStartZoomScale = zoomScale
+                pinchIsActive = true
                 enterMultiTouch()
 
             case .changed:
@@ -741,6 +808,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             default:
                 pinchStartZoomScale = zoomScale
+                pinchIsActive = false
             }
         }
 
@@ -761,9 +829,6 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             if clamped == minimumZoomScale {
                 viewportCenter = CGPoint(x: imageSize.width / 2,
                                          y: imageSize.height / 2)
-            } else if followsCursor, anchorInView == nil,
-                      let localCursor = localCursorLocation() {
-                viewportCenter = localCursor
             } else if let anchorInView, let anchorLocalPoint {
                 let viewportCenterX = anchorLocalPoint.x
                     - (anchorInView.x - bounds.midX) / effectiveScale
@@ -788,6 +853,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             guard imageSize.width > 0, imageSize.height > 0,
                   bounds.width > 0, bounds.height > 0 else {
                 framebufferView.frame = .zero
+                glassyStreamView?.frame = .zero
                 updateCursorLayerFrame()
                 return
             }
@@ -816,7 +882,9 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             }
 
             UIView.performWithoutAnimation {
-                framebufferView.frame = CGRect(origin: origin, size: renderedSize)
+                let contentFrame = CGRect(origin: origin, size: renderedSize)
+                framebufferView.frame = contentFrame
+                glassyStreamView?.frame = contentFrame
             }
 
             updateCursorLayerFrame()
@@ -851,7 +919,10 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         private func cursorLocationDidChange() {
-            followCursorIfNeeded()
+            let previousCursor = lastLocalCursorLocation
+            lastLocalCursorLocation = localCursorLocation()
+            revealCursorIfNeeded(previousCursor: previousCursor,
+                                 requiresOutwardMovement: true)
             updateCursorLayerFrame()
         }
 
@@ -887,11 +958,32 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             return min(max(coordinate, lowerBound), upperBound)
         }
 
-        private func followCursorIfNeeded() {
+        private func revealCursorIfNeeded(previousCursor: CGPoint? = nil,
+                                          requiresOutwardMovement: Bool) {
             guard followsCursor, zoomScale > minimumZoomScale,
                   let localCursor = localCursorLocation() else { return }
 
-            viewportCenter = localCursor
+            let renderedSize = CGSize(width: imageSize.width * effectiveScale,
+                                      height: imageSize.height * effectiveScale)
+            let currentCenter = clampedViewportCenter(
+                viewportCenter ?? CGPoint(x: imageSize.width / 2,
+                                          y: imageSize.height / 2),
+                renderedSize: renderedSize
+            )
+            let candidate = RemoteViewportGeometry.centerRevealingCursor(
+                currentCenter,
+                cursor: localCursor,
+                previousCursor: previousCursor,
+                contentSize: imageSize,
+                viewportSize: bounds.size,
+                effectiveScale: effectiveScale,
+                requiresOutwardMovement: requiresOutwardMovement
+            )
+            let revealedCenter = clampedViewportCenter(candidate,
+                                                       renderedSize: renderedSize)
+            guard revealedCenter != currentCenter else { return }
+
+            viewportCenter = revealedCenter
             updateFramebufferViewFrame()
         }
 
@@ -935,16 +1027,17 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             switch gesture.state {
             case .began:
                 touchScrollAccumulator = .zero
+                touchPanIntent = .undecided
+                enterMultiTouch()
 
             case .changed:
                 let delta = gesture.translation(in: self)
                 gesture.setTranslation(.zero, in: self)
-
-                forwardScroll(delta: delta,
-                              accumulator: &touchScrollAccumulator)
+                routeTouchPan(delta)
 
             default:
                 touchScrollAccumulator = .zero
+                touchPanIntent = .undecided
             }
         }
 
@@ -954,18 +1047,109 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             switch gesture.state {
             case .began:
                 pointerScrollAccumulator = .zero
+                pointerPanIntent = .undecided
                 becomeFirstResponderIfAppropriate()
 
             case .changed:
                 let delta = gesture.translation(in: self)
                 gesture.setTranslation(.zero, in: self)
 
-                forwardScroll(delta: delta,
-                              accumulator: &pointerScrollAccumulator)
+                routePointerPan(delta)
 
             default:
                 pointerScrollAccumulator = .zero
+                pointerPanIntent = .undecided
             }
+        }
+
+        @objc private func handlePointerWheelScroll(_ gesture: UIPanGestureRecognizer) {
+            guard session != nil else { return }
+
+            switch gesture.state {
+            case .began:
+                pointerWheelScrollAccumulator = .zero
+                becomeFirstResponderIfAppropriate()
+
+            case .changed:
+                let delta = gesture.translation(in: self)
+                gesture.setTranslation(.zero, in: self)
+                forwardScroll(delta: delta,
+                              accumulator: &pointerWheelScrollAccumulator)
+
+            default:
+                pointerWheelScrollAccumulator = .zero
+            }
+        }
+
+        private var pannableViewportAxes: RemoteViewportGeometry.PannableAxes {
+            RemoteViewportGeometry.pannableAxes(contentSize: imageSize,
+                                                viewportSize: bounds.size,
+                                                effectiveScale: effectiveScale)
+        }
+
+        private func routeTouchPan(_ delta: CGPoint) {
+            if pinchIsActive {
+                touchPanIntent = .viewportPan
+            } else if touchPanIntent == .undecided {
+                touchPanIntent = RemoteViewportGeometry.gestureIntent(
+                    pannableAxes: pannableViewportAxes
+                )
+            }
+
+            switch touchPanIntent {
+            case .viewportPan:
+                panViewport(by: delta)
+            case .remoteScroll:
+                forwardScroll(delta: delta,
+                              accumulator: &touchScrollAccumulator)
+            case .undecided:
+                break
+            }
+        }
+
+        private func routePointerPan(_ delta: CGPoint) {
+            if pinchIsActive {
+                pointerPanIntent = .viewportPan
+            } else if pointerPanIntent == .undecided {
+                pointerPanIntent = RemoteViewportGeometry.gestureIntent(
+                    pannableAxes: pannableViewportAxes
+                )
+            }
+
+            switch pointerPanIntent {
+            case .viewportPan:
+                panViewport(by: delta)
+            case .remoteScroll:
+                forwardScroll(delta: delta,
+                              accumulator: &pointerScrollAccumulator)
+            case .undecided:
+                break
+            }
+        }
+
+        private func panViewport(by translation: CGPoint) {
+            let axes = pannableViewportAxes
+            guard !axes.isEmpty else { return }
+
+            let renderedSize = CGSize(width: imageSize.width * effectiveScale,
+                                      height: imageSize.height * effectiveScale)
+            let currentCenter = clampedViewportCenter(
+                viewportCenter ?? CGPoint(x: imageSize.width / 2,
+                                          y: imageSize.height / 2),
+                renderedSize: renderedSize
+            )
+            let candidate = RemoteViewportGeometry.centerByPanning(
+                currentCenter,
+                translation: translation,
+                pannableAxes: axes,
+                effectiveScale: effectiveScale
+            )
+            let pannedCenter = clampedViewportCenter(candidate,
+                                                     renderedSize: renderedSize)
+            guard pannedCenter != currentCenter else { return }
+
+            viewportCenter = pannedCenter
+            updateFramebufferViewFrame()
         }
 
         @objc private func handlePointerHover(_ gesture: UIHoverGestureRecognizer) {
@@ -1014,6 +1198,14 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                                shouldReceive touch: UITouch) -> Bool {
             gestureRecognizer !== pointerScrollPan
+                && gestureRecognizer !== pointerWheelScrollPan
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            let pair = [gestureRecognizer, otherGestureRecognizer]
+            return pair.contains { $0 === pinchGesture }
+                && pair.contains { $0 === twoFingerPanGesture || $0 === pointerScrollPan }
         }
 
         // MARK: - Single-finger touch handling
