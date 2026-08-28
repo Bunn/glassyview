@@ -25,7 +25,7 @@ enum GlassyStreamSessionError: Error, LocalizedError, Sendable {
         case .connectionEndedBeforeAuthentication:
             "Glassy Host ended the connection before authentication completed."
         case .videoReadinessTimedOut:
-            "The secure connection succeeded, but no video arrived. Open Glassy Host on your Mac, grant Screen Recording access, and press Start Streaming."
+            "The secure connection succeeded, but Glassy Host could not start video automatically. On the Mac, check Screen Recording access and the selected display, then reconnect."
         case let .transport(error):
             error.localizedDescription
         case let .video(error):
@@ -40,7 +40,7 @@ enum GlassyStreamSessionError: Error, LocalizedError, Sendable {
         case .connectionEndedBeforeAuthentication:
             "Make sure Glassy Host is running, then try again."
         case .videoReadinessTimedOut:
-            "Open Glassy Host, allow Screen Recording, and press Start Streaming before reconnecting."
+            "Open Glassy Host, allow Screen Recording, check the selected display, and reconnect."
         case let .transport(error):
             switch error {
             case .pairingCodeRequired:
@@ -105,7 +105,7 @@ final class GlassyStreamSessionController {
     init(
         client: GlassyStreamClient = GlassyStreamClient(),
         renderer: GlassyStreamVideoRenderer = GlassyStreamVideoRenderer(),
-        videoReadinessTimeout: TimeInterval = 8
+        videoReadinessTimeout: TimeInterval = 15
     ) {
         self.client = client
         self.renderer = renderer

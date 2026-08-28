@@ -177,6 +177,11 @@ struct ContentView<Session: RemoteSessionControlling,
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background {
+                disconnectGlassyForBackground()
+                return
+            }
+
             guard newPhase == .active else { return }
 
             guard !shouldSkipNextSceneActiveRefresh else {
@@ -191,6 +196,25 @@ struct ContentView<Session: RemoteSessionControlling,
         }
         .task(id: machineReachabilitySignature) {
             await monitorSavedMachineReachability()
+        }
+    }
+
+    private func disconnectGlassyForBackground() {
+        let hasActiveGlassyWork = glassyConnectTask != nil
+            || glassyPairingRequest != nil
+            || preparedGlassySession != nil
+            || sessionMachine?.connectionMode == .glassyStream
+        guard hasActiveGlassyWork else { return }
+
+        AppLog.ui.info("Disconnecting Glassy Stream because the app entered the background")
+        glassyConnectTask?.cancel()
+        glassyConnectTask = nil
+        glassyPairingRequest = nil
+        preparedGlassySession = nil
+        glassySession.disconnect()
+
+        if sessionMachine?.connectionMode == .glassyStream {
+            isSessionPresented = false
         }
     }
 

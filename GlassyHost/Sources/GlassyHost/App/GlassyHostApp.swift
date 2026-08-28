@@ -19,6 +19,11 @@ struct GlassyHostApp: App {
             MenuBarContentView(controller: controller)
         } label: {
             Label("Glassy Host", systemImage: controller.menuBarSystemImage)
+                .task {
+                    // The listener lifecycle belongs to the menu-bar host, not
+                    // to whether the dashboard window happens to be open.
+                    await controller.prepare()
+                }
         }
     }
 

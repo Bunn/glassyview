@@ -38,7 +38,7 @@ struct GlassyStreamPairingView: View {
                             "No Glassy Host Found",
                             systemImage: "macbook.slash",
                             description: Text(
-                                "Open Glassy Host on the Mac, press Start Streaming, and keep both devices on the same local network."
+                                "Open Glassy Host on the Mac and keep both devices on the same local network. Streaming starts automatically after authentication."
                             )
                         )
                     } else {

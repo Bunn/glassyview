@@ -6,6 +6,11 @@ import Observation
 @MainActor
 @Observable
 final class HostController {
+    private enum ServerEvent: Sendable {
+        case authenticatedClientCount(Int)
+        case status(HostServer.Status)
+    }
+
     private(set) var runState: HostRunState = .stopped
     private(set) var screenRecordingAuthorization: ScreenRecordingAuthorization = .unknown
     private(set) var accessibilityAuthorization: AccessibilityAuthorization = .unknown
@@ -20,6 +25,8 @@ final class HostController {
     private(set) var loginItemStatus: LoginItemRegistrationStatus = .notRegistered
     private(set) var isUpdatingLoginItem = false
     private(set) var loginItemError: String?
+
+    private var streamingDemand = StreamingDemandPolicy()
 
     var selectedDisplayID: CGDirectDisplayID? {
         didSet {
@@ -46,6 +53,15 @@ final class HostController {
     private var frameTask: Task<Void, Never>?
 
     @ObservationIgnored
+    private var onDemandStopTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var serverEventTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var serverEventContinuation: AsyncStream<ServerEvent>.Continuation?
+
+    @ObservationIgnored
     nonisolated(unsafe)
     private var pairingCodeTimer: Timer?
 
@@ -57,6 +73,8 @@ final class HostController {
 
     @ObservationIgnored
     private var isHandlingPipelineFailure = false
+
+    private static let onDemandStopGrace: Duration = .seconds(5)
 
     var displayName: String {
         if let selectedDisplayID,
@@ -73,12 +91,43 @@ final class HostController {
         return isStreaming ? "bolt.horizontal.circle.fill" : "bolt.horizontal.circle"
     }
 
+    var streamingOwnership: StreamingDemandPolicy.Ownership? {
+        streamingDemand.ownership
+    }
+
+    var isOnDemandStreaming: Bool {
+        isStreaming && streamingOwnership == .onDemand
+    }
+
+    var captureStatusText: String {
+        if isTransitioning {
+            return streamingDemand.wantsCapture ? "Starting capture…" : "Stopping capture…"
+        }
+        if isStreaming {
+            if streamingOwnership == .manual {
+                return "Streaming continuously until you stop it"
+            }
+            return clientCount == 0
+                ? "Waiting five seconds for an authenticated device to reconnect"
+                : "Streaming on demand for an authenticated device"
+        }
+        if clientCount > 0 {
+            return lastError == nil
+                ? "Capture was stopped manually for the current connection"
+                : "Capture could not start for the current connection"
+        }
+        return "Ready — screen capture starts after an authenticated device connects"
+    }
+
     var startsAtLogin: Bool {
         loginItemStatus.isRequested
     }
 
     deinit {
         pairingCodeTimer?.invalidate()
+        onDemandStopTask?.cancel()
+        serverEventContinuation?.finish()
+        serverEventTask?.cancel()
         remoteInputService.setEnabled(false)
         hostServer.stop()
     }
@@ -112,30 +161,56 @@ final class HostController {
     }
 
     func toggleStreaming() async {
-        guard !isTransitioning else { return }
-        isTransitioning = true
-        defer { isTransitioning = false }
-
-        if isStreaming {
+        if streamingDemand.wantsCapture || isStreaming {
             await stopStreaming()
         } else {
             await startStreaming()
         }
     }
 
+    /// Explicit user start. Unlike authenticated on-demand capture, this keeps
+    /// recording active until the user explicitly stops it.
     func startStreaming() async {
-        guard !isStreaming else { return }
+        guard !isTransitioning else { return }
+        let effects = streamingDemand.requestManualStart()
+        applyStreamingDemandEffects(effects)
+        await reconcileCapturePipeline()
+    }
+
+    func keepStreamingAfterDisconnect() async {
+        guard !isTransitioning else { return }
+        let effects = streamingDemand.requestManualStart()
+        applyStreamingDemandEffects(effects)
+        await reconcileCapturePipeline()
+    }
+
+    func stopStreaming() async {
+        guard !isTransitioning else { return }
+        let effects = streamingDemand.requestManualStop()
+        applyStreamingDemandEffects(effects)
+        await reconcileCapturePipeline()
+    }
+
+    private func startCapturePipeline() async -> Bool {
+        guard !isStreaming else { return true }
         guard isServerReady else {
             lastError = "The authenticated local streaming service is not ready yet."
-            return
+            return false
         }
 
+        let requestedOwnership = streamingDemand.ownership
         updateScreenRecordingAuthorization()
         if screenRecordingAuthorization != .granted {
-            requestScreenRecordingPermission()
+            // A remote connection must never cause a macOS consent prompt.
+            // Permission requests remain tied to an explicit local user action.
+            if requestedOwnership == .manual {
+                requestScreenRecordingPermission()
+            }
             guard screenRecordingAuthorization == .granted else {
-                lastError = "Allow Screen Recording in System Settings, then start streaming again."
-                return
+                lastError = requestedOwnership == .onDemand
+                    ? "Screen Recording permission is required for on-demand streaming. Allow it locally, then reconnect."
+                    : "Allow Screen Recording in System Settings, then start streaming again."
+                return false
             }
         }
 
@@ -208,15 +283,17 @@ final class HostController {
                 runState = .ready
             }
             HostLog.capture.info("Started 60 fps display capture")
+            return true
         } catch {
             await encoder.finish()
             self.encoder = nil
             hostServer.setKeyFrameRequestHandler(nil)
             fail(with: error)
+            return false
         }
     }
 
-    func stopStreaming() async {
+    private func stopCapturePipeline() async {
         remoteInputService.setEnabled(false)
         frameTask?.cancel()
         frameTask = nil
@@ -308,7 +385,13 @@ final class HostController {
             let secret = try pairingSecretStore.replace()
             hostServer.replacePairingSecretAndRestart(secret.keyData)
             refreshPairingCode()
-            clientCount = 0
+            let effects = streamingDemand.authenticatedClientCountChanged(to: 0)
+            clientCount = streamingDemand.authenticatedClientCount
+            remoteInputService.releasePressedInput()
+            applyStreamingDemandEffects(effects)
+            Task {
+                await reconcileCapturePipeline()
+            }
             lastError = nil
             HostLog.security.notice("Replaced the host pairing key")
         } catch {
@@ -332,23 +415,101 @@ final class HostController {
         }
     }
 
+    private func handleAuthenticatedClientCountChange(_ count: Int) async {
+        let previousCount = clientCount
+        let effects = streamingDemand.authenticatedClientCountChanged(to: count)
+        clientCount = streamingDemand.authenticatedClientCount
+        if clientCount < previousCount {
+            remoteInputService.releasePressedInput()
+        }
+        applyStreamingDemandEffects(effects)
+        await reconcileCapturePipeline()
+    }
+
+    private func applyStreamingDemandEffects(
+        _ effects: [StreamingDemandPolicy.Effect]
+    ) {
+        for effect in effects {
+            switch effect {
+            case .cancelOnDemandStop:
+                onDemandStopTask?.cancel()
+                onDemandStopTask = nil
+            case .scheduleOnDemandStop:
+                scheduleOnDemandStop()
+            case .startCapture(let ownership):
+                HostLog.capture.notice(
+                    "Capture requested by \(String(describing: ownership), privacy: .public) demand"
+                )
+            case .stopCapture:
+                break
+            }
+        }
+    }
+
+    private func scheduleOnDemandStop() {
+        onDemandStopTask?.cancel()
+        onDemandStopTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: Self.onDemandStopGrace)
+            } catch {
+                return
+            }
+            guard let self else { return }
+            self.onDemandStopTask = nil
+            let effects = self.streamingDemand.onDemandStopGraceExpired()
+            self.applyStreamingDemandEffects(effects)
+            await self.reconcileCapturePipeline()
+        }
+    }
+
+    /// Reconciles desired ownership with the media pipeline. Authentication,
+    /// manual actions, and the grace timer all run on the main actor, while the
+    /// loop rechecks demand after every suspension to close lifecycle races.
+    private func reconcileCapturePipeline() async {
+        guard !isTransitioning else { return }
+        isTransitioning = true
+        defer { isTransitioning = false }
+
+        while streamingDemand.wantsCapture != isStreaming {
+            if streamingDemand.wantsCapture {
+                let didStart = await startCapturePipeline()
+                if !didStart {
+                    let effects = streamingDemand.captureStartFailed()
+                    applyStreamingDemandEffects(effects)
+                    return
+                }
+            } else {
+                await stopCapturePipeline()
+            }
+        }
+    }
+
     private func startServer(pairingSecret: PairingSecret) {
+        serverEventContinuation?.finish()
+        serverEventTask?.cancel()
+
+        let (events, continuation) = AsyncStream<ServerEvent>.makeStream()
+        serverEventContinuation = continuation
+        serverEventTask = Task { @MainActor [weak self] in
+            for await event in events {
+                guard let self else { return }
+
+                switch event {
+                case .authenticatedClientCount(let count):
+                    await handleAuthenticatedClientCountChange(count)
+                case .status(let status):
+                    handleServerStatus(status)
+                }
+            }
+        }
+
         hostServer.start(
             pairingSecret: pairingSecret.keyData,
-            onClientCountChange: { [weak self] count in
-                Task { @MainActor in
-                    guard let self else { return }
-                    let previousCount = self.clientCount
-                    self.clientCount = count
-                    if count < previousCount {
-                        self.remoteInputService.releasePressedInput()
-                    }
-                }
+            onClientCountChange: { count in
+                continuation.yield(.authenticatedClientCount(count))
             },
-            onStatusChange: { [weak self] status in
-                Task { @MainActor in
-                    self?.handleServerStatus(status)
-                }
+            onStatusChange: { status in
+                continuation.yield(.status(status))
             }
         )
     }
@@ -380,10 +541,10 @@ final class HostController {
             serverPort = nil
             runState = .failed(message)
             lastError = message
-            if isStreaming {
-                Task {
-                    await stopStreaming()
-                }
+            let effects = streamingDemand.forceStop()
+            applyStreamingDemandEffects(effects)
+            Task {
+                await reconcileCapturePipeline()
             }
         }
     }
@@ -427,6 +588,8 @@ final class HostController {
             if isStreaming && !isTransitioning {
                 isStreaming = false
                 remoteInputService.setEnabled(false)
+                let effects = streamingDemand.forceStop()
+                applyStreamingDemandEffects(effects)
             }
         case .failed(let message):
             Task {
@@ -438,7 +601,9 @@ final class HostController {
     private func handlePipelineFailure(_ error: any Error) async {
         guard !isHandlingPipelineFailure else { return }
         isHandlingPipelineFailure = true
-        await stopStreaming()
+        let effects = streamingDemand.forceStop()
+        applyStreamingDemandEffects(effects)
+        await stopCapturePipeline()
         isHandlingPipelineFailure = false
         fail(with: error)
     }

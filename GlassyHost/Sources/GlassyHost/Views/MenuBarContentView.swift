@@ -12,9 +12,20 @@ struct MenuBarContentView: View {
             Text("\(controller.clientCount) connected")
         }
 
+        Text(controller.captureStatusText)
+
         Divider()
 
-        Button(controller.isStreaming ? "Stop Streaming" : "Start Streaming") {
+        if controller.isOnDemandStreaming {
+            Button("Keep Streaming After Disconnect") {
+                Task {
+                    await controller.keepStreamingAfterDisconnect()
+                }
+            }
+            .disabled(controller.isTransitioning)
+        }
+
+        Button(controller.isStreaming ? "Stop Streaming" : "Start Streaming Continuously") {
             Task {
                 await controller.toggleStreaming()
             }

@@ -99,6 +99,13 @@ struct HostDashboardView: View {
     private var streamingSection: some View {
         GroupBox("Streaming") {
             VStack(spacing: 0) {
+                statusRow("Host Listener",
+                          value: controller.runState.title,
+                          systemImage: "network",
+                          color: controller.runState == .ready ? .green : .secondary)
+
+                Divider()
+
                 statusRow("Screen Recording",
                           value: controller.screenRecordingAuthorization.title,
                           systemImage: "rectangle.inset.filled.and.person.filled",
@@ -164,11 +171,33 @@ struct HostDashboardView: View {
                     .padding(.top, 12)
                 }
 
+                Label {
+                    Text(controller.captureStatusText)
+                } icon: {
+                    Image(systemName: controller.isStreaming
+                          ? "record.circle.fill"
+                          : "pause.circle")
+                }
+                .font(.callout)
+                .foregroundStyle(controller.isStreaming ? .green : .secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 12)
+
                 HStack(spacing: 12) {
+                    if controller.isOnDemandStreaming {
+                        Button("Keep Streaming") {
+                            Task {
+                                await controller.keepStreamingAfterDisconnect()
+                            }
+                        }
+                        .help("Keep screen capture active after connected devices leave")
+                    }
 
                     Spacer()
 
-                    Button(controller.isStreaming ? "Stop Streaming" : "Start Streaming") {
+                    Button(controller.isStreaming
+                           ? "Stop Streaming"
+                           : "Start Streaming Continuously") {
                         Task {
                             await controller.toggleStreaming()
                         }
@@ -178,6 +207,12 @@ struct HostDashboardView: View {
                     .disabled(controller.runState == .starting || controller.isTransitioning)
                 }
                 .padding(.top, 12)
+
+                Text("The host listener stays available without recording your screen. By default, capture starts only after an authenticated device connects and stops five seconds after the last device leaves. Starting continuously is an explicit always-on override.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 10)
 
                 if let lastError = controller.lastError {
                     Label(lastError, systemImage: "exclamationmark.triangle.fill")

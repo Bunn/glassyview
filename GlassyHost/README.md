@@ -10,9 +10,9 @@ From the repository root:
 ./script/build_and_run.sh
 ```
 
-The script builds and signs `dist/Glassy Host.app`, then opens it. You can also use the repository's Codex **Run** action.
+The script builds and signs `dist/Glassy Host.app`, installs a verified copy at `/Applications/Glassy Host.app`, then opens the installed app. You can also use the repository's Codex **Run** action.
 
-Grant Screen Recording access when macOS asks, choose a display, and select **Start Streaming**. The host advertises `_glassydesk._tcp` while it is running; video is sent only after the versioned pairing handshake succeeds.
+Grant Screen Recording and Accessibility access locally, then leave Glassy Host running. Its lightweight `_glassydesk._tcp` listener remains available without recording the screen. Capture starts automatically after a Glassy Desk device completes the authenticated pairing or resume handshake, then stops five seconds after the final device disconnects. **Start Streaming Continuously** is available as an explicit always-on override.
 
 ## Verify
 
@@ -21,7 +21,7 @@ swift test --package-path GlassyHost
 ./script/build_and_run.sh --verify
 ```
 
-The package is intentionally separate from the iOS Xcode project so both apps remain independently buildable in the same repository. The current iOS app can discover Glassy Host but does not yet implement the matching H.264 client/decoder, so end-to-end Glassy Desk sessions still use VNC until that client work is added.
+The package is intentionally separate from the iOS Xcode project so both apps remain independently buildable in the same repository. Glassy Desk discovers the host over Bonjour, authenticates its encrypted video and input session, and disconnects the Glassy session when the iPad app enters the background so idle capture can shut down.
 
 ## Signing
 
