@@ -33,6 +33,7 @@ protocol RemoteSessionControlling: ObservableObject, RemoteSessionInputControlli
     var framebufferUpdatePublisher: AnyPublisher<RemoteFramebufferUpdate, Never> { get }
     var cursor: RemoteCursor? { get }
     var cursorPublisher: AnyPublisher<RemoteCursor?, Never> { get }
+    var cursorLocationPublisher: AnyPublisher<CGPoint, Never> { get }
     var quality: RemoteSessionQuality { get }
     var supportedQualities: [RemoteSessionQuality] { get }
     var preferredFrameRate: RemoteFrameRate { get }

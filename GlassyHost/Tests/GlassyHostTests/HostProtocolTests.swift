@@ -136,13 +136,16 @@ func pairingCodeRotation() {
     )
 }
 
-@Test("Protocol v1 reserves input, recovery, and quality-control values")
-func directInputWireValues() throws {
+@Test("Protocol v1 reserves input, recovery, quality, and cursor values")
+func protocolWireValues() throws {
     #expect(HostProtocol.Capabilities.directInput.rawValue == 0x0000_0004)
     #expect(HostProtocol.Capabilities.streamQualityControl.rawValue == 0x0000_0008)
-    #expect(HostProtocol.advertisedCapabilities.rawValue == 0x0000_000F)
+    #expect(HostProtocol.Capabilities.cursorPositionTelemetry.rawValue == 0x0000_0010)
+    #expect(HostProtocol.advertisedCapabilities.rawValue == 0x0000_001F)
     #expect(HostProtocol.MessageKind.keyFrameRequest.rawValue == 0x12)
     #expect(HostProtocol.MessageKind.streamQualityRequest.rawValue == 0x13)
+    #expect(HostProtocol.MessageKind.cursorPositionSubscriptionRequest.rawValue == 0x14)
+    #expect(HostProtocol.MessageKind.cursorPosition.rawValue == 0x15)
     #expect(HostProtocol.MessageKind.pointerInput.rawValue == 0x20)
     #expect(HostProtocol.MessageKind.scrollInput.rawValue == 0x21)
     #expect(HostProtocol.MessageKind.keyInput.rawValue == 0x22)
@@ -151,6 +154,43 @@ func directInputWireValues() throws {
     try HostProtocol.decodeKeyFrameRequest(Data())
     #expect(throws: HostProtocol.ProtocolError.self) {
         try HostProtocol.decodeKeyFrameRequest(Data([0]))
+    }
+}
+
+@Test("Cursor subscription request is an exact opt-in payload")
+func cursorPositionSubscriptionRequestCodec() throws {
+    let encoded = HostProtocol.encodeCursorPositionSubscriptionRequest()
+    #expect(encoded == Data([1, 0, 0, 0]))
+    try HostProtocol.decodeCursorPositionSubscriptionRequest(encoded)
+
+    for malformed in [
+        Data([0, 0, 0, 0]),
+        Data([2, 0, 0, 0]),
+        Data([1, 0, 1, 0]),
+        Data([1, 0, 0]),
+        Data([1, 0, 0, 0, 0])
+    ] {
+        #expect(throws: HostProtocol.ProtocolError.self) {
+            try HostProtocol.decodeCursorPositionSubscriptionRequest(malformed)
+        }
+    }
+}
+
+@Test("Cursor positions use exact big-endian normalized coordinates")
+func cursorPositionCodec() throws {
+    let position = HostProtocol.CursorPosition(
+        normalizedX: 0x1234,
+        normalizedY: 0xABCD
+    )
+    let encoded = HostProtocol.encodeCursorPosition(position)
+    #expect(encoded == Data([0x12, 0x34, 0xAB, 0xCD]))
+    #expect(try HostProtocol.decodeCursorPosition(encoded) == position)
+
+    #expect(throws: HostProtocol.ProtocolError.self) {
+        _ = try HostProtocol.decodeCursorPosition(Data([0, 0, 0]))
+    }
+    #expect(throws: HostProtocol.ProtocolError.self) {
+        _ = try HostProtocol.decodeCursorPosition(Data([0, 0, 0, 0, 0]))
     }
 }
 

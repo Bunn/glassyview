@@ -95,9 +95,10 @@ final class HostServer: @unchecked Sendable {
         core.setStreamQualityHandler(handler)
     }
 
-    /// Removes H.264 bootstrap data and queued media from the capture generation
-    /// that just ended. The controller calls this only after the encoder has
-    /// completed its callbacks, so a late callback cannot restore stale state.
+    /// Removes H.264 bootstrap data, cursor telemetry, and queued media from the
+    /// capture generation that just ended. The controller calls this only after
+    /// the encoder has completed its callbacks, so a late callback cannot
+    /// restore stale state.
     func clearVideoState() async {
         await core.clearVideoState()
     }
@@ -153,6 +154,17 @@ final class HostServer: @unchecked Sendable {
                                  isKeyFrame: false)
     }
 
+    /// Publishes the cursor location associated with the current capture frame.
+    /// Only authenticated clients that explicitly opted in receive telemetry.
+    func broadcastCursorPosition(_ position: HostProtocol.CursorPosition) {
+        core.broadcastCursorPosition(position)
+    }
+
+    /// Invalidates telemetry when the cursor leaves the captured display.
+    func clearCursorPosition() {
+        core.clearCursorPosition()
+    }
+
     fileprivate static func makeHostIdentifier(from pairingSecret: Data) -> Data {
         let digest = HMAC<SHA256>.authenticationCode(
             for: Data("Glassy Host identity v1".utf8),
@@ -188,6 +200,7 @@ private extension HostServer {
                                           count: HostProtocol.identifierLength)
         private var failedPairingAttempts: [Date] = []
         private var videoBootstrapCache = HostVideoBootstrapCache()
+        private var latestCursorPosition: HostProtocol.CursorPosition?
         private let mediaIngress = MediaIngress()
         private var keyFrameRequestHandler: (@Sendable () -> Void)?
         private var remoteInputHandler: RemoteInputHandler?
@@ -297,6 +310,7 @@ private extension HostServer {
 
         private func clearVideoStateLocked() {
             videoBootstrapCache.clear()
+            latestCursorPosition = nil
             mediaIngress.reset()
 
             for client in authenticatedClients {
@@ -314,6 +328,34 @@ private extension HostServer {
             guard shouldScheduleDrain else { return }
             queue.async { [weak self] in
                 self?.drainMediaIngress()
+            }
+        }
+
+        func broadcastCursorPosition(_ position: HostProtocol.CursorPosition) {
+            queue.async { [weak self] in
+                guard let self else { return }
+                latestCursorPosition = position
+                let payload = HostProtocol.encodeCursorPosition(position)
+                for client in authenticatedClients
+                    where client.isSubscribedToCursorPosition {
+                    _ = enqueueEncrypted(
+                        payload,
+                        kind: .cursorPosition,
+                        flags: [],
+                        policy: .cursorPosition,
+                        for: client
+                    )
+                }
+            }
+        }
+
+        func clearCursorPosition() {
+            queue.async { [weak self] in
+                guard let self else { return }
+                latestCursorPosition = nil
+                for client in authenticatedClients {
+                    client.removeQueuedCursorPositions()
+                }
             }
         }
 
@@ -716,6 +758,19 @@ private extension HostServer {
                 guard requestedQuality != client.requestedQuality else { return }
                 client.requestedQuality = requestedQuality
                 publishEffectiveStreamQualityIfNeeded()
+            case .cursorPositionSubscriptionRequest:
+                try HostProtocol.decodeCursorPositionSubscriptionRequest(plaintext)
+                guard !client.isSubscribedToCursorPosition else { return }
+                client.isSubscribedToCursorPosition = true
+                if let latestCursorPosition {
+                    _ = enqueueEncrypted(
+                        HostProtocol.encodeCursorPosition(latestCursorPosition),
+                        kind: .cursorPosition,
+                        flags: [],
+                        policy: .cursorPosition,
+                        for: client
+                    )
+                }
             case .pointerInput, .scrollInput, .keyInput, .textInput:
                 let input = try HostProtocol.decodeRemoteInput(
                     kind: frame.kind,
@@ -769,7 +824,7 @@ private extension HostServer {
                                          for: client)
             } catch {
                 Self.logger.error("Could not queue encrypted packet: \(error.localizedDescription, privacy: .public)")
-                if policy != .deltaFrame {
+                if policy != .deltaFrame, policy != .cursorPosition {
                     remove(client)
                 }
                 return false
@@ -781,7 +836,18 @@ private extension HostServer {
                                    for client: Client) throws -> Bool {
             guard !client.isClosed else { return false }
 
-            if client.totalQueuedBytes + packet.count > Self.maximumQueuedBytesPerClient
+            if policy == .cursorPosition {
+                client.removeQueuedCursorPositions()
+                let exceedsByteLimit = client.totalQueuedBytes + packet.count
+                    > Self.maximumQueuedBytesPerClient
+                let exceedsMessageLimit = client.totalQueuedMessageCount + 1
+                    > Self.maximumQueuedMessagesPerClient
+                guard !exceedsByteLimit, !exceedsMessageLimit else {
+                    // Telemetry is opportunistic and must never displace video
+                    // or control traffic on a slow viewer.
+                    return false
+                }
+            } else if client.totalQueuedBytes + packet.count > Self.maximumQueuedBytesPerClient
                 || client.totalQueuedMessageCount + 1 > Self.maximumQueuedMessagesPerClient {
                 if client.removeQueuedDeltaFrames() {
                     client.needsKeyFrame = true
@@ -796,6 +862,9 @@ private extension HostServer {
                 if policy == .deltaFrame {
                     client.needsKeyFrame = true
                     requestKeyFrameIfNeeded(for: [client])
+                    return false
+                }
+                if policy == .cursorPosition {
                     return false
                 }
                 throw HostProtocol.ProtocolError.payloadTooLarge(packet.count)
@@ -930,6 +999,7 @@ private extension HostServer.Core {
         case codecConfiguration
         case keyFrame
         case deltaFrame
+        case cursorPosition
     }
 
     struct PendingPacket: Sendable {
@@ -1032,6 +1102,8 @@ private extension HostServer.Core {
         var keyFrameRequestOutstanding = false
         // A client that never sends the optional request retains legacy quality.
         var requestedQuality: HostProtocol.StreamQuality = .best
+        // Cursor telemetry is opt-in so older clients receive no new messages.
+        var isSubscribedToCursorPosition = false
 
         init(connection: NWConnection) {
             self.connection = connection
@@ -1069,12 +1141,20 @@ private extension HostServer.Core {
         func removeQueuedVideoPackets() {
             pendingPackets.removeAll { packet in
                 switch packet.policy {
-                case .codecConfiguration, .keyFrame, .deltaFrame:
+                case .codecConfiguration, .keyFrame, .deltaFrame, .cursorPosition:
                     pendingByteCount -= packet.data.count
                     return true
                 case .control:
                     return false
                 }
+            }
+        }
+
+        func removeQueuedCursorPositions() {
+            pendingPackets.removeAll { packet in
+                guard packet.policy == .cursorPosition else { return false }
+                pendingByteCount -= packet.data.count
+                return true
             }
         }
     }

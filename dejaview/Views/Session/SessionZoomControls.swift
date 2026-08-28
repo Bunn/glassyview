@@ -45,7 +45,7 @@ struct SessionZoomControls: View {
                        systemImage: "scope",
                        isOn: $followsCursor,
                        hint: followsCursor
-                           ? "Moves the view only when the cursor reaches a visible edge."
+                           ? "Moves the zoomed view when the cursor approaches an edge."
                            : "Leaves the zoomed view fixed as the cursor moves.")
 
             modeToggle("Pan View with Two Fingers",

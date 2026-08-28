@@ -288,16 +288,33 @@ final class HostController {
         }
 
         do {
+            let captureDisplayID = selectedDisplayID
+                ?? displays.first(where: \.isMain)?.id
+                ?? displays.first?.id
+                ?? CGMainDisplayID()
+            let cursorDisplayBounds = CGDisplayBounds(captureDisplayID)
             let frames = try await captureService.start(
-                displayID: selectedDisplayID,
+                displayID: captureDisplayID,
                 configuration: streamConfiguration.screenCaptureConfiguration,
                 pipelineGeneration: pipelineGeneration
             )
 
             frameTask = Task { [weak self, encoder, pipelineGeneration] in
+                var cursorPositionTracker = HostCursorPositionTracker()
                 do {
                     for await frame in frames {
                         try Task.checkCancellation()
+                        switch cursorPositionTracker.update(
+                            for: CGEvent(source: nil)?.location,
+                            in: cursorDisplayBounds
+                        ) {
+                        case .some(.position(let cursorPosition)):
+                            server.broadcastCursorPosition(cursorPosition)
+                        case .some(.unavailable):
+                            server.clearCursorPosition()
+                        case .none:
+                            break
+                        }
                         try await encoder.encode(frame)
                     }
                 } catch is CancellationError {

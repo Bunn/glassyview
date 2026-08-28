@@ -20,6 +20,7 @@ final class VNCSession: NSObject, ObservableObject, RemoteSessionControlling, @u
     /// display-rate updates don't invalidate SwiftUI (see the protocol note).
     private let framebufferUpdateSubject = CurrentValueSubject<RemoteFramebufferUpdate, Never>(.empty)
     private let cursorSubject = CurrentValueSubject<RemoteCursor?, Never>(nil)
+    private let cursorLocationSubject = CurrentValueSubject<CGPoint, Never>(.zero)
     private var currentFramebufferSize: CGSize = .zero
     private let framebufferThrottleLock = NSLock()
     private var pendingFramebuffer: VNCFramebuffer?
@@ -43,6 +44,10 @@ final class VNCSession: NSObject, ObservableObject, RemoteSessionControlling, @u
         cursorSubject.eraseToAnyPublisher()
     }
 
+    var cursorLocationPublisher: AnyPublisher<CGPoint, Never> {
+        cursorLocationSubject.eraseToAnyPublisher()
+    }
+
     var displayOptions: [RemoteDisplayOption] {
         Self.displayOptions(for: displays, framebufferFrame: framebufferFrameForDisplaySelection)
     }
@@ -61,7 +66,11 @@ final class VNCSession: NSObject, ObservableObject, RemoteSessionControlling, @u
     }
 
     /// Last known remote cursor position (framebuffer coordinates).
-    private(set) var cursorLocation: CGPoint = .zero
+    private(set) var cursorLocation: CGPoint = .zero {
+        didSet {
+            cursorLocationSubject.send(cursorLocation)
+        }
+    }
 
     private(set) var connection: VNCConnection?
 

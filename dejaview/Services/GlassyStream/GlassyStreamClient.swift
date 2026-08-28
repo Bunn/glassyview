@@ -16,6 +16,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         let clientIdentifier: Data
         let resumedSession: Bool
         let supportsStreamQuality: Bool
+        let supportsCursorPositionUpdates: Bool
     }
 
     private enum State: Sendable {
@@ -41,6 +42,7 @@ final class GlassyStreamClient: @unchecked Sendable {
     private var maximumInboundPayloadLength = GlassyStreamWire.maximumHandshakePayloadLength
     private var authenticationTimeoutWorkItem: DispatchWorkItem?
     private var supportsStreamQuality = false
+    private var supportsCursorPositionUpdates = false
 
     init(credentialStore: any GlassyStreamResumeCredentialStoring = GlassyStreamKeychainCredentialStore()) {
         self.credentialStore = credentialStore
@@ -236,6 +238,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         nextOutboundSequence = 1
         maximumInboundPayloadLength = GlassyStreamWire.maximumHandshakePayloadLength
         supportsStreamQuality = false
+        supportsCursorPositionUpdates = false
         state = .awaitingServerHello
 
         let parameters = NWParameters.tcp
@@ -451,7 +454,8 @@ final class GlassyStreamClient: @unchecked Sendable {
                                   hostName: serverHello.serverName,
                                   clientIdentifier: clientIdentifier,
                                   resumedSession: resumedSession,
-                                  supportsStreamQuality: capabilities.contains(.streamQualityControl))
+                                  supportsStreamQuality: capabilities.contains(.streamQualityControl),
+                                  supportsCursorPositionUpdates: capabilities.contains(.cursorPositionUpdates))
         )
         try sendPlaintext(GlassyStreamWire.encodeClientHello(hello),
                           kind: .clientHello,
@@ -501,10 +505,20 @@ final class GlassyStreamClient: @unchecked Sendable {
         cancelAuthenticationTimeout()
         state = .authenticated(pending.material)
         supportsStreamQuality = pending.supportsStreamQuality
+        supportsCursorPositionUpdates = pending.supportsCursorPositionUpdates
         if pending.supportsStreamQuality {
             try sendEncrypted(
                 GlassyStreamWire.encodeStreamQualityRequest(configuration.desiredQuality),
                 kind: .streamQualityRequest,
+                flags: [],
+                material: pending.material,
+                generation: generation
+            )
+        }
+        if pending.supportsCursorPositionUpdates {
+            try sendEncrypted(
+                GlassyStreamWire.encodeCursorPositionSubscription(),
+                kind: .cursorPositionSubscription,
                 flags: [],
                 material: pending.material,
                 generation: generation
@@ -516,7 +530,8 @@ final class GlassyStreamClient: @unchecked Sendable {
                 hostName: pending.hostName,
                 maximumMediaPayloadLength: maximumInboundPayloadLength,
                 resumedSession: pending.resumedSession,
-                supportsStreamQuality: pending.supportsStreamQuality
+                supportsStreamQuality: pending.supportsStreamQuality,
+                supportsCursorPositionUpdates: pending.supportsCursorPositionUpdates
             )
         ))
         AppLog.session.info("Authenticated encrypted Glassy Stream session")
@@ -555,6 +570,20 @@ final class GlassyStreamClient: @unchecked Sendable {
                 throw GlassyStreamClientError.protocolViolation("invalid pong")
             }
             deliver(.pong(plaintext))
+        case .cursorPosition:
+            guard supportsCursorPositionUpdates else {
+                throw GlassyStreamClientError.protocolViolation(
+                    "host sent cursor position without advertising support"
+                )
+            }
+            guard !frame.flags.contains(.keyFrame) else {
+                throw GlassyStreamClientError.protocolViolation(
+                    "cursor position incorrectly carries keyframe flag"
+                )
+            }
+            deliver(.cursorPosition(
+                try GlassyStreamWire.decodeCursorPosition(plaintext)
+            ))
         default:
             throw GlassyStreamClientError.protocolViolation(
                 "message type is invalid in the authenticated server direction"
@@ -654,6 +683,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         self.connection = nil
         state = .idle
         supportsStreamQuality = false
+        supportsCursorPositionUpdates = false
         configuration = nil
         receiveBuffer.removeAll(keepingCapacity: true)
 

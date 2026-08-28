@@ -102,6 +102,9 @@ final class GlassyStreamSessionController {
     @ObservationIgnored
     var onVideoDimensionsChanged: (@MainActor @Sendable (CGSize?) -> Void)?
 
+    @ObservationIgnored
+    var onCursorPositionChanged: (@MainActor @Sendable (GlassyStreamCursorPosition) -> Void)?
+
     init(
         client: GlassyStreamClient = GlassyStreamClient(),
         renderer: GlassyStreamVideoRenderer = GlassyStreamVideoRenderer(),
@@ -236,6 +239,11 @@ final class GlassyStreamSessionController {
                     generation: generation
                 )
             }
+
+        case let .cursorPosition(position):
+            guard state == .connected,
+                  authentication?.supportsCursorPositionUpdates == true else { return }
+            onCursorPositionChanged?(position)
 
         case .pong:
             break

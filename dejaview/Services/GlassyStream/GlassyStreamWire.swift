@@ -24,6 +24,7 @@ enum GlassyStreamWire {
         static let encryptedMedia = Capabilities(rawValue: 1 << 1)
         static let directInput = Capabilities(rawValue: 1 << 2)
         static let streamQualityControl = Capabilities(rawValue: 1 << 3)
+        static let cursorPositionUpdates = Capabilities(rawValue: 1 << 4)
     }
 
     enum MessageKind: UInt8, Sendable {
@@ -37,6 +38,8 @@ enum GlassyStreamWire {
         case videoAccessUnit = 0x11
         case keyFrameRequest = 0x12
         case streamQualityRequest = 0x13
+        case cursorPositionSubscription = 0x14
+        case cursorPosition = 0x15
         case pointerInput = 0x20
         case scrollInput = 0x21
         case keyInput = 0x22
@@ -395,6 +398,20 @@ enum GlassyStreamWire {
         default:
             throw violation("stream quality preset is unknown")
         }
+    }
+
+    static func encodeCursorPositionSubscription() -> Data {
+        Data([1, 0, 0, 0])
+    }
+
+    static func decodeCursorPosition(_ data: Data) throws -> GlassyStreamCursorPosition {
+        var reader = GlassyByteReader(data: data)
+        let position = GlassyStreamCursorPosition(
+            x: try reader.readUInt16(),
+            y: try reader.readUInt16()
+        )
+        try reader.requireEnd()
+        return position
     }
 
     static func encodePointerInput(

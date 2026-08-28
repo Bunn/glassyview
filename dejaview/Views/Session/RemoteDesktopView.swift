@@ -21,8 +21,8 @@ private let remoteFramebufferRenderingSignposter = OSSignposter(logger: AppLog.p
 /// Three-finger touch drag always pans a zoomed local viewport.
 /// A discrete mouse wheel always scrolls the remote Mac.
 ///
-/// When keep-cursor-visible is enabled, zoomed trackpad/hover movement leaves
-/// the viewport still until the remote cursor reaches an edge, then reveals
+/// When keep-cursor-visible is enabled, zoomed cursor movement leaves the
+/// viewport still until the remote cursor approaches an edge, then reveals
 /// only the next portion of the desktop.
 struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable {
     // Deliberately NOT @ObservedObject: frames are pushed straight to the
@@ -64,6 +64,12 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             .sink { [weak view] cursor in
                 view?.display(cursor: cursor)
             }
+        context.coordinator.cursorLocationSubscription = session.cursorLocationPublisher
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak view] cursorLocation in
+                view?.display(cursorLocation: cursorLocation)
+            }
 
         // First responder is claimed in didMoveToWindow, once the view is
         // actually in a key window.
@@ -74,8 +80,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         context.coordinator.zoomScale = $zoomScale
         uiView.session = session
         uiView.setVisibleFramebufferFrame(selectedFramebufferFrame)
-        uiView.setZoomScale(zoomScale, notify: false)
         uiView.setFollowsCursor(followsCursor)
+        uiView.setZoomScale(zoomScale, notify: false)
         uiView.setPreferredFrameRate(session.preferredFrameRate)
         uiView.setAcceptsHardwareKeyboardInput(acceptsHardwareKeyboardInput)
         uiView.setAcceptsPointerInput(acceptsPointerInput)
@@ -89,6 +95,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
     static func dismantleUIView(_ uiView: ScreenView, coordinator: Coordinator) {
         coordinator.framebufferUpdateSubscription = nil
         coordinator.cursorSubscription = nil
+        coordinator.cursorLocationSubscription = nil
         uiView.prepareForDismantle()
     }
 
@@ -100,6 +107,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         var zoomScale: Binding<CGFloat>
         var framebufferUpdateSubscription: AnyCancellable?
         var cursorSubscription: AnyCancellable?
+        var cursorLocationSubscription: AnyCancellable?
 
         init(zoomScale: Binding<CGFloat>) {
             self.zoomScale = zoomScale
@@ -144,6 +152,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private var pinchIsActive = false
         private var pinchIsSuppressedByThreeFingerPan = false
         private var lastLocalCursorLocation: CGPoint?
+        private var pendingZeroCursorFollowTask: Task<Void, Never>?
 
         // Single-touch state
         private var lastTouchLocation: CGPoint = .zero
@@ -421,6 +430,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         override func layoutSubviews() {
             super.layoutSubviews()
             updateFramebufferViewFrame()
+            revealCursorIfNeeded(requiresOutwardMovement: false)
         }
 
         override func didMoveToWindow() {
@@ -489,9 +499,12 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         deinit {
             framebufferFlushTask?.cancel()
             keyboardFocusTask?.cancel()
+            pendingZeroCursorFollowTask?.cancel()
         }
 
         func prepareForDismantle() {
+            pendingZeroCursorFollowTask?.cancel()
+            pendingZeroCursorFollowTask = nil
             setGlassyStreamRenderer(nil)
         }
 
@@ -588,6 +601,10 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             let previousImageSize = imageSize
 
             fullImageSize = update.image == nil ? .zero : update.imageSize
+            if fullImageSize == .zero {
+                pendingZeroCursorFollowTask?.cancel()
+                pendingZeroCursorFollowTask = nil
+            }
 
             framebufferView.setFramebuffer(image: update.image,
                                            imageSize: fullImageSize,
@@ -610,6 +627,36 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             remoteCursor = cursor
             cursorLayer.contents = cursor?.image
             updateCursorLayerFrame()
+        }
+
+        func display(cursorLocation: CGPoint) {
+            guard cursorLocation.x.isFinite, cursorLocation.y.isFinite else {
+                return
+            }
+
+            pendingZeroCursorFollowTask?.cancel()
+            pendingZeroCursorFollowTask = nil
+
+            // Both session implementations use `.zero` while clearing their
+            // geometry. Defer that one coordinate by a run-loop turn so the
+            // matching empty framebuffer can cancel it. A genuine cursor at
+            // the top-left is still followed once valid content remains.
+            guard cursorLocation == .zero else {
+                guard session?.cursorLocation == cursorLocation else { return }
+                cursorLocationDidChange()
+                return
+            }
+
+            pendingZeroCursorFollowTask = Task { @MainActor [weak self] in
+                await Task.yield()
+                guard !Task.isCancelled, let self else { return }
+
+                self.pendingZeroCursorFollowTask = nil
+                guard self.session?.cursorLocation == cursorLocation else {
+                    return
+                }
+                self.cursorLocationDidChange()
+            }
         }
 
         func setVisibleFramebufferFrame(_ frame: CGRect?) {
@@ -866,6 +913,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             }
 
             updateFramebufferViewFrame()
+            revealCursorIfNeeded(requiresOutwardMovement: false)
 
             if notify {
                 onZoomScaleChanged?(clamped)
@@ -1224,6 +1272,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             viewportCenter = pannedCenter
             updateFramebufferViewFrame()
+            revealCursorIfNeeded(requiresOutwardMovement: false)
         }
 
         @objc private func handlePointerHover(_ gesture: UIHoverGestureRecognizer) {

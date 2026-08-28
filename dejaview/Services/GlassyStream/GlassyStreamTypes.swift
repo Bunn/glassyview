@@ -15,18 +15,26 @@ struct GlassyStreamVideoAccessUnit: Equatable, Sendable {
     let isKeyFrame: Bool
 }
 
+/// A host cursor location normalized across the complete UInt16 range.
+struct GlassyStreamCursorPosition: Equatable, Sendable {
+    let x: UInt16
+    let y: UInt16
+}
+
 struct GlassyStreamAuthentication: Equatable, Sendable {
     let hostIdentifier: Data
     let hostName: String
     let maximumMediaPayloadLength: Int
     let resumedSession: Bool
     let supportsStreamQuality: Bool
+    let supportsCursorPositionUpdates: Bool
 }
 
 enum GlassyStreamEvent: Equatable, Sendable {
     case authenticated(GlassyStreamAuthentication)
     case videoConfiguration(GlassyStreamVideoConfiguration)
     case videoAccessUnit(GlassyStreamVideoAccessUnit)
+    case cursorPosition(GlassyStreamCursorPosition)
     case pong(Data)
 }
 

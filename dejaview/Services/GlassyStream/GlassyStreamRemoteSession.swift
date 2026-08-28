@@ -22,8 +22,14 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 
     private let framebufferUpdateSubject = CurrentValueSubject<RemoteFramebufferUpdate, Never>(.empty)
     private let cursorSubject = CurrentValueSubject<RemoteCursor?, Never>(nil)
+    private let cursorLocationSubject = CurrentValueSubject<CGPoint, Never>(.zero)
     private var framebufferSize: CGSize = .zero
-    private(set) var cursorLocation: CGPoint = .zero
+    private(set) var cursorLocation: CGPoint = .zero {
+        didSet {
+            cursorLocationSubject.send(cursorLocation)
+        }
+    }
+    private var remoteCursorPosition: GlassyStreamCursorPosition?
     private var pointerButtons: GlassyStreamPointerButtons = []
     private var heldModifierKeys: Set<RemoteModifierKey> = []
     private var retryConfiguration: ConnectionConfiguration?
@@ -44,6 +50,10 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         cursorSubject.eraseToAnyPublisher()
     }
 
+    var cursorLocationPublisher: AnyPublisher<CGPoint, Never> {
+        cursorLocationSubject.eraseToAnyPublisher()
+    }
+
     var displayOptions: [RemoteDisplayOption] {
         []
     }
@@ -60,6 +70,9 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         }
         controller.onVideoDimensionsChanged = { [weak self] dimensions in
             self?.updateVideoDimensions(dimensions)
+        }
+        controller.onCursorPositionChanged = { [weak self] position in
+            self?.updateRemoteCursorPosition(position)
         }
     }
 
@@ -458,7 +471,9 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 
         let previousSize = framebufferSize
         framebufferSize = dimensions
-        if previousSize == .zero {
+        if let remoteCursorPosition {
+            cursorLocation = framebufferPoint(for: remoteCursorPosition)
+        } else if previousSize == .zero {
             cursorLocation = CGPoint(x: dimensions.width / 2,
                                      y: dimensions.height / 2)
         } else {
@@ -483,6 +498,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     private func clearGeometry() {
         framebufferSize = .zero
         cursorLocation = .zero
+        remoteCursorPosition = nil
         displays = []
         cursorSubject.send(nil)
         framebufferUpdateSubject.send(.empty)
@@ -497,6 +513,27 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
             x: min(max(point.x, 0), max(framebufferSize.width - 1, 0)),
             y: min(max(point.y, 0), max(framebufferSize.height - 1, 0))
         )
+    }
+
+    private func updateRemoteCursorPosition(_ position: GlassyStreamCursorPosition) {
+        remoteCursorPosition = position
+        guard framebufferSize.width > 0,
+              framebufferSize.height > 0 else { return }
+        cursorLocation = framebufferPoint(for: position)
+    }
+
+    private func framebufferPoint(
+        for position: GlassyStreamCursorPosition
+    ) -> CGPoint {
+        CGPoint(
+            x: framebufferCoordinate(position.x, length: framebufferSize.width),
+            y: framebufferCoordinate(position.y, length: framebufferSize.height)
+        )
+    }
+
+    private func framebufferCoordinate(_ value: UInt16, length: CGFloat) -> CGFloat {
+        guard length > 1 else { return 0 }
+        return CGFloat(value) / CGFloat(UInt16.max) * (length - 1)
     }
 
     private func sendCurrentPointer() {

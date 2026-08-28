@@ -4,7 +4,8 @@ import CoreGraphics
 ///
 /// Keeping this separate from UIKit makes the two important policies explicit:
 /// dragging moves the canvas with the fingers, and cursor following reveals an
-/// edge only after the cursor reaches it instead of continuously re-centering.
+/// edge when the cursor enters a small activation band instead of continuously
+/// re-centering.
 enum RemoteViewportGeometry {
     struct PannableAxes: OptionSet {
         let rawValue: UInt8
@@ -77,16 +78,16 @@ enum RemoteViewportGeometry {
         return result
     }
 
-    /// Returns the smallest center change that brings a cursor which has
-    /// reached a visible edge back inside it. The inset is where the cursor
-    /// lands after triggering; it is deliberately not the trigger itself.
+    /// Returns the smallest center change that keeps the cursor outside an
+    /// activation band at the visible edge. `edgeInset` is measured in screen
+    /// points, so the interaction feels consistent at every zoom level.
     static func centerRevealingCursor(_ center: CGPoint,
                                       cursor: CGPoint,
                                       previousCursor: CGPoint? = nil,
                                       contentSize: CGSize,
                                       viewportSize: CGSize,
                                       effectiveScale: CGFloat,
-                                      edgeInset: CGFloat = 24,
+                                      edgeInset: CGFloat = 48,
                                       requiresOutwardMovement: Bool = false) -> CGPoint {
         let axes = pannableAxes(contentSize: contentSize,
                                 viewportSize: viewportSize,
@@ -106,14 +107,16 @@ enum RemoteViewportGeometry {
             let inset = min(edgeInset / effectiveScale, visibleHalfWidth)
             let visibleMinX = center.x - visibleHalfWidth
             let visibleMaxX = center.x + visibleHalfWidth
+            let activationMinX = visibleMinX + inset
+            let activationMaxX = visibleMaxX - inset
 
-            if cursor.x <= visibleMinX,
+            if cursor.x <= activationMinX,
                isMovingOutward(current: cursor.x,
                                previous: previousCursor?.x,
                                towardMinimum: true,
                                required: requiresOutwardMovement) {
                 result.x = cursor.x + visibleHalfWidth - inset
-            } else if cursor.x >= visibleMaxX,
+            } else if cursor.x >= activationMaxX,
                       isMovingOutward(current: cursor.x,
                                       previous: previousCursor?.x,
                                       towardMinimum: false,
@@ -127,14 +130,16 @@ enum RemoteViewportGeometry {
             let inset = min(edgeInset / effectiveScale, visibleHalfHeight)
             let visibleMinY = center.y - visibleHalfHeight
             let visibleMaxY = center.y + visibleHalfHeight
+            let activationMinY = visibleMinY + inset
+            let activationMaxY = visibleMaxY - inset
 
-            if cursor.y <= visibleMinY,
+            if cursor.y <= activationMinY,
                isMovingOutward(current: cursor.y,
                                previous: previousCursor?.y,
                                towardMinimum: true,
                                required: requiresOutwardMovement) {
                 result.y = cursor.y + visibleHalfHeight - inset
-            } else if cursor.y >= visibleMaxY,
+            } else if cursor.y >= activationMaxY,
                       isMovingOutward(current: cursor.y,
                                       previous: previousCursor?.y,
                                       towardMinimum: false,

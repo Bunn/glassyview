@@ -128,7 +128,7 @@ final class GlassyStreamVideoRenderer {
             try enqueue(accessUnit)
             return true
 
-        case .authenticated, .pong:
+        case .authenticated, .cursorPosition, .pong:
             return false
         }
     }

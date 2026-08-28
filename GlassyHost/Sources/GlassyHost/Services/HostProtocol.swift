@@ -44,13 +44,15 @@ enum HostProtocol {
         static let encryptedMedia = Capabilities(rawValue: 1 << 1)
         static let directInput = Capabilities(rawValue: 1 << 2)
         static let streamQualityControl = Capabilities(rawValue: 1 << 3)
+        static let cursorPositionTelemetry = Capabilities(rawValue: 1 << 4)
     }
 
     static let advertisedCapabilities: Capabilities = [
         .h264AVCC,
         .encryptedMedia,
         .directInput,
-        .streamQualityControl
+        .streamQualityControl,
+        .cursorPositionTelemetry
     ]
 
     enum MessageKind: UInt8, Sendable {
@@ -65,6 +67,8 @@ enum HostProtocol {
         case videoAccessUnit = 0x11
         case keyFrameRequest = 0x12
         case streamQualityRequest = 0x13
+        case cursorPositionSubscriptionRequest = 0x14
+        case cursorPosition = 0x15
 
         case pointerInput = 0x20
         case scrollInput = 0x21
@@ -143,6 +147,11 @@ enum HostProtocol {
         let normalizedX: UInt16
         let normalizedY: UInt16
         let buttonMask: PointerButtonMask
+    }
+
+    struct CursorPosition: Equatable, Sendable {
+        let normalizedX: UInt16
+        let normalizedY: UInt16
     }
 
     enum ScrollDirection: UInt8, Equatable, Sendable {
@@ -557,6 +566,43 @@ enum HostProtocol {
         }
         try reader.requireEnd()
         return quality
+    }
+
+    static func encodeCursorPositionSubscriptionRequest() -> Data {
+        Data([1, 0, 0, 0])
+    }
+
+    static func decodeCursorPositionSubscriptionRequest(_ data: Data) throws {
+        var reader = ByteReader(data: data)
+        guard try reader.readUInt8() == 1 else {
+            throw ProtocolError.malformedPayload(
+                "cursor position subscription state must be one"
+            )
+        }
+        let reserved = try reader.readData(count: 3)
+        guard reserved.allSatisfy({ $0 == 0 }) else {
+            throw ProtocolError.malformedPayload(
+                "reserved cursor position subscription bytes must be zero"
+            )
+        }
+        try reader.requireEnd()
+    }
+
+    static func encodeCursorPosition(_ position: CursorPosition) -> Data {
+        var writer = ByteWriter(capacity: 4)
+        writer.write(position.normalizedX)
+        writer.write(position.normalizedY)
+        return writer.data
+    }
+
+    static func decodeCursorPosition(_ data: Data) throws -> CursorPosition {
+        var reader = ByteReader(data: data)
+        let position = CursorPosition(
+            normalizedX: try reader.readUInt16(),
+            normalizedY: try reader.readUInt16()
+        )
+        try reader.requireEnd()
+        return position
     }
 
     /// The exact transcript authenticated by `ClientHello.proof`. The proof
