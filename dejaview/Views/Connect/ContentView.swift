@@ -8,6 +8,7 @@ struct ContentView<Session: RemoteSessionControlling,
     @Environment(\.scenePhase) private var scenePhase
 
     @StateObject private var session: Session
+    @StateObject private var glassySession: GlassyStreamRemoteSession
     @State private var browser: Browser
     @State private var store: Store
     @State private var intentRouter: Router
@@ -19,8 +20,6 @@ struct ContentView<Session: RemoteSessionControlling,
     @State private var searchText = ""
 
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @AppStorage(RemoteConnectionMode.storageKey)
-    private var connectionMode = RemoteConnectionMode.default
     @State private var isOnboardingPresented = false
     @State private var isSessionPresented = false
     @State private var isSettingsPresented = false
@@ -29,6 +28,9 @@ struct ContentView<Session: RemoteSessionControlling,
     @State private var editingPassword = ""
     @State private var pendingConnectionMachine: SavedMachine?
     @State private var pendingConnectionPassword = ""
+    @State private var glassyPairingRequest: GlassyStreamPairingRequest?
+    @State private var preparedGlassySession: PreparedGlassySession?
+    @State private var glassyConnectTask: Task<Void, Never>?
     @State private var pendingDeletionMachine: SavedMachine?
     @State private var isDeleteConfirmationPresented = false
     @State private var isClearRecentConnectionsConfirmationPresented = false
@@ -52,6 +54,7 @@ struct ContentView<Session: RemoteSessionControlling,
 
     init(dependencies: AppDependencies<Session, Browser, Store, Router>) {
         _session = StateObject(wrappedValue: dependencies.makeSession())
+        _glassySession = StateObject(wrappedValue: GlassyStreamRemoteSession())
         _browser = State(initialValue: dependencies.makeBrowser())
         _store = State(initialValue: dependencies.makeStore())
         _intentRouter = State(initialValue: dependencies.makeIntentRouter())
@@ -69,9 +72,16 @@ struct ContentView<Session: RemoteSessionControlling,
         }
         .navigationSplitViewStyle(.balanced)
         .fullScreenCover(isPresented: $isSessionPresented, onDismiss: handleSessionDismissed) {
-            SessionView(session: session,
-                        preferences: $sessionPreferences,
-                        sessionTitle: sessionMachine?.displayName ?? "Remote Mac")
+            if sessionMachine?.connectionMode == .glassyStream {
+                SessionView(session: glassySession,
+                            preferences: $sessionPreferences,
+                            sessionTitle: sessionMachine?.displayName ?? "Remote Mac",
+                            glassyStream: glassySession.controller)
+            } else {
+                SessionView(session: session,
+                            preferences: $sessionPreferences,
+                            sessionTitle: sessionMachine?.displayName ?? "Remote Mac")
+            }
         }
         .fullScreenCover(isPresented: $isOnboardingPresented) {
             NavigationStack {
@@ -98,6 +108,19 @@ struct ContentView<Session: RemoteSessionControlling,
                             password: editingPassword,
                             connectAfterDismiss: queueConnectionAfterEditor)
         }
+        .sheet(item: $glassyPairingRequest, onDismiss: finishGlassyPairing) { request in
+            GlassyStreamPairingView(
+                machine: request.machine,
+                initialErrorMessage: request.initialErrorMessage
+            ) { host, code in
+                try await pairGlassyStream(
+                    host: host,
+                    code: code,
+                    request: request
+                )
+            }
+            .environment(glassyHostBrowser)
+        }
         .alert("Delete Machine?",
                isPresented: $isDeleteConfirmationPresented,
                presenting: pendingDeletionMachine) { machine in
@@ -118,7 +141,7 @@ struct ContentView<Session: RemoteSessionControlling,
         .onAppear {
             AppLog.ui.info("Connect view appeared; starting nearby Mac discovery")
             browser.start()
-            updateGlassyHostDiscovery()
+            glassyHostBrowser.start()
             networkPathObserver.start()
             presentOnboardingIfNeeded()
             handlePendingIntentRequest()
@@ -131,14 +154,16 @@ struct ContentView<Session: RemoteSessionControlling,
             glassyHostBrowser.stop()
             networkPathObserver.stop()
         }
-        .onChange(of: connectionMode) { _, _ in
-            updateGlassyHostDiscovery()
-        }
         .onChange(of: intentRouter.request) { _, request in
             guard let request else { return }
             handleIntentRequest(request)
         }
         .onChange(of: session.status) { _, status in
+            guard sessionMachine?.connectionMode == .vnc else { return }
+            handleSessionStatusChanged(status)
+        }
+        .onChange(of: glassySession.status) { _, status in
+            guard sessionMachine?.connectionMode == .glassyStream else { return }
             handleSessionStatusChanged(status)
         }
         .onChange(of: selectedSection) { _, section in
@@ -166,15 +191,6 @@ struct ContentView<Session: RemoteSessionControlling,
         }
         .task(id: machineReachabilitySignature) {
             await monitorSavedMachineReachability()
-        }
-    }
-
-    private func updateGlassyHostDiscovery() {
-        switch connectionMode {
-        case .automatic:
-            glassyHostBrowser.start()
-        case .vncOnly:
-            glassyHostBrowser.stop()
         }
     }
 
@@ -642,11 +658,17 @@ struct ContentView<Session: RemoteSessionControlling,
 
     private func disconnectFromIntent() {
         AppLog.ui.info("Disconnecting session from App Intent")
+        glassyConnectTask?.cancel()
+        glassyConnectTask = nil
+        glassyPairingRequest = nil
+        preparedGlassySession = nil
+        glassySession.disconnect()
         session.disconnect()
 
         if isSessionPresented {
             isSessionPresented = false
         } else {
+            glassySession.reset()
             session.reset()
         }
     }
@@ -676,7 +698,10 @@ struct ContentView<Session: RemoteSessionControlling,
     private func handleSessionDismissed() {
         persistSessionPreferences()
         finishSessionHistory(outcome: .completed)
+        glassyConnectTask?.cancel()
+        glassyConnectTask = nil
         sessionMachine = nil
+        glassySession.reset()
         session.reset()
     }
 
@@ -731,9 +756,9 @@ struct ContentView<Session: RemoteSessionControlling,
         }
     }
 
-    private func presentSession(for machine: SavedMachine, password: String) {
+    private func presentVNCSession(for machine: SavedMachine, password: String) {
         cancelWakeAttempt(logCancellation: false)
-        AppLog.ui.info("Presenting session for \(machine.host, privacy: .public):\(machine.port, privacy: .public)")
+        AppLog.ui.info("Presenting VNC session for \(machine.host, privacy: .public):\(machine.port, privacy: .public)")
         let preferences = store.contains(machine)
             ? store.sessionPreferences(for: machine)
             : SessionPreferences.default
@@ -750,17 +775,226 @@ struct ContentView<Session: RemoteSessionControlling,
         isSessionPresented = true
     }
 
+    private func presentGlassySession(for machine: SavedMachine) {
+        cancelWakeAttempt(logCancellation: false)
+        AppLog.ui.info("Presenting authenticated Glassy Stream session for '\(machine.displayName, privacy: .public)'")
+        let preferences = store.contains(machine)
+            ? store.sessionPreferences(for: machine)
+            : SessionPreferences.default
+
+        sessionMachine = machine
+        sessionPreferences = preferences
+        sessionHistoryContext = nil
+        glassySession.applyPreferences(preferences)
+        isSessionPresented = true
+
+        // Authentication completes before presentation, so the normal status
+        // observer may already have seen `.connected` while no machine was active.
+        handleSessionStatusChanged(glassySession.status)
+    }
+
+    private func connectUsingConfiguredMethod(
+        to machine: SavedMachine,
+        password: String
+    ) {
+        switch machine.connectionMode {
+        case .vnc:
+            glassyConnectTask?.cancel()
+            glassyConnectTask = nil
+            glassyPairingRequest = nil
+            preparedGlassySession = nil
+            glassySession.reset()
+            presentVNCSession(for: machine, password: password)
+
+        case .glassyStream:
+            session.reset()
+            beginGlassyStreamConnection(to: machine, password: password)
+        }
+    }
+
+    private func beginGlassyStreamConnection(
+        to machine: SavedMachine,
+        password: String
+    ) {
+        glassyConnectTask?.cancel()
+        preparedGlassySession = nil
+        glassyPairingRequest = nil
+
+        let expectedHostIdentifier = expectedGlassyHostIdentifier(for: machine)
+        guard expectedHostIdentifier != nil else {
+            glassySession.reset()
+            glassyPairingRequest = GlassyStreamPairingRequest(
+                machine: machine,
+                password: password
+            )
+            return
+        }
+
+        let hosts = preferredGlassyHosts(for: machine)
+        guard !hosts.isEmpty else {
+            glassySession.reset()
+            glassyPairingRequest = GlassyStreamPairingRequest(
+                machine: machine,
+                password: password
+            )
+            return
+        }
+
+        glassyConnectTask = Task { @MainActor in
+            var lastError: Error?
+
+            for host in hosts {
+                guard !Task.isCancelled else { return }
+
+                do {
+                    let authentication = try await glassySession.connect(
+                        endpoint: host.endpoint,
+                        savedMachineID: machine.id,
+                        pairingCode: nil,
+                        expectedHostIdentifier: expectedHostIdentifier
+                    )
+                    guard !Task.isCancelled else {
+                        glassySession.disconnect()
+                        return
+                    }
+
+                    let authenticatedMachine = saveGlassyHostBinding(
+                        for: machine,
+                        authentication: authentication,
+                        discoveredHostName: host.name,
+                        password: password
+                    )
+                    glassyConnectTask = nil
+                    presentGlassySession(for: authenticatedMachine)
+                    return
+                } catch is CancellationError {
+                    return
+                } catch {
+                    lastError = error
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+            glassyConnectTask = nil
+            glassySession.disconnect()
+            glassyPairingRequest = GlassyStreamPairingRequest(
+                machine: machine,
+                password: password,
+                initialErrorMessage: pairingPromptMessage(for: lastError)
+            )
+        }
+    }
+
+    private func preferredGlassyHosts(for machine: SavedMachine) -> [DiscoveredGlassyHost] {
+        let preferredNames = [machine.glassyHostName, machine.name, machine.host]
+            .compactMap { $0 }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        return glassyHostBrowser.hosts.sorted { lhs, rhs in
+            let lhsMatches = preferredNames.contains {
+                lhs.name.caseInsensitiveCompare($0) == .orderedSame
+            }
+            let rhsMatches = preferredNames.contains {
+                rhs.name.caseInsensitiveCompare($0) == .orderedSame
+            }
+            if lhsMatches != rhsMatches { return lhsMatches }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private func pairGlassyStream(
+        host: DiscoveredGlassyHost,
+        code: GlassyHostPairingCode,
+        request: GlassyStreamPairingRequest
+    ) async throws {
+        let authentication = try await glassySession.connect(
+            endpoint: host.endpoint,
+            savedMachineID: request.machine.id,
+            pairingCode: code.rawValue,
+            expectedHostIdentifier: expectedGlassyHostIdentifier(for: request.machine)
+        )
+        let authenticatedMachine = saveGlassyHostBinding(
+            for: request.machine,
+            authentication: authentication,
+            discoveredHostName: host.name,
+            password: request.password
+        )
+
+        preparedGlassySession = PreparedGlassySession(
+            machine: authenticatedMachine
+        )
+    }
+
+    private func finishGlassyPairing() {
+        glassyPairingRequest = nil
+
+        guard let preparedGlassySession else {
+            glassySession.disconnect()
+            return
+        }
+
+        self.preparedGlassySession = nil
+        presentGlassySession(for: preparedGlassySession.machine)
+    }
+
+    private func expectedGlassyHostIdentifier(for machine: SavedMachine) -> Data? {
+        guard let encodedIdentifier = machine.glassyHostIdentifier,
+              let identifier = Data(base64Encoded: encodedIdentifier),
+              identifier.count == GlassyStreamWire.identifierLength else {
+            return nil
+        }
+        return identifier
+    }
+
+    private func saveGlassyHostBinding(
+        for machine: SavedMachine,
+        authentication: GlassyStreamAuthentication,
+        discoveredHostName: String,
+        password: String
+    ) -> SavedMachine {
+        var authenticatedMachine = machine
+        authenticatedMachine.glassyHostIdentifier = authentication.hostIdentifier.base64EncodedString()
+
+        let authenticatedName = authentication.hostName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        authenticatedMachine.glassyHostName = authenticatedName.isEmpty
+            ? discoveredHostName
+            : authenticatedName
+
+        if store.contains(machine) {
+            store.update(authenticatedMachine, password: password)
+        }
+        return authenticatedMachine
+    }
+
+    private func pairingPromptMessage(for error: Error?) -> String? {
+        guard let error else { return nil }
+
+        if let sessionError = error as? GlassyStreamSessionError,
+           case .transport(.pairingCodeRequired) = sessionError {
+            return nil
+        }
+        return error.localizedDescription
+    }
+
     // MARK: - Wake on LAN
 
     private func wakeAction(for machine: SavedMachine) -> (() -> Void)? {
-        guard machine.wakeOnLANAddress != nil else { return nil }
+        guard machine.connectionMode == .vnc,
+              machine.wakeOnLANAddress != nil else { return nil }
         return { wakeAndConnect(to: machine) }
     }
 
     private func connectOrWake(to machine: SavedMachine, password: String) {
+        guard machine.connectionMode == .vnc else {
+            connectUsingConfiguredMethod(to: machine, password: password)
+            return
+        }
+
         guard machine.wakeOnLANAddress != nil,
               reachabilityStatus(for: machine) != .reachable else {
-            presentSession(for: machine, password: password)
+            connectUsingConfiguredMethod(to: machine, password: password)
             return
         }
 
@@ -773,7 +1007,7 @@ struct ContentView<Session: RemoteSessionControlling,
 
     private func startWakeAndConnect(to machine: SavedMachine, password: String) {
         guard let macAddress = machine.wakeOnLANAddress else {
-            presentSession(for: machine, password: password)
+            connectUsingConfiguredMethod(to: machine, password: password)
             return
         }
 
@@ -843,7 +1077,7 @@ struct ContentView<Session: RemoteSessionControlling,
             }
 
             AppLog.wakeOnLAN.info("Machine became reachable after Wake-on-LAN; id=\(machine.id.uuidString, privacy: .public) attempt=\(attempt, privacy: .public)")
-            presentSession(for: machine, password: password)
+            connectUsingConfiguredMethod(to: machine, password: password)
             return
         }
 
@@ -885,6 +1119,19 @@ struct ContentView<Session: RemoteSessionControlling,
     private func reachabilityStatus(for machine: SavedMachine) -> MachineReachabilityStatus {
         if wakingMachineID == machine.id {
             return .waking
+        }
+
+        if machine.connectionMode == .glassyStream {
+            let savedName = machine.glassyHostName?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let savedName, !savedName.isEmpty else { return .checking }
+
+            if glassyHostBrowser.hosts.contains(where: {
+                $0.name.caseInsensitiveCompare(savedName) == .orderedSame
+            }) {
+                return .reachable
+            }
+            return glassyHostBrowser.state == .searching ? .checking : .unreachable
         }
 
         return machineReachabilityStatuses[machine.id] ?? .checking
@@ -1059,6 +1306,18 @@ struct ContentView<Session: RemoteSessionControlling,
     private func reachabilityEndpointKey(host: String, port: UInt16) -> String {
         "\(host.trimmingCharacters(in: .whitespacesAndNewlines)):\(port)"
     }
+}
+
+private struct GlassyStreamPairingRequest: Identifiable {
+    let machine: SavedMachine
+    let password: String
+    var initialErrorMessage: String? = nil
+
+    var id: UUID { machine.id }
+}
+
+private struct PreparedGlassySession {
+    let machine: SavedMachine
 }
 
 extension ContentView where Session == VNCSession,

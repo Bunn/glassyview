@@ -36,3 +36,20 @@ enum ScreenRecordingAuthorization: Equatable, Sendable {
         }
     }
 }
+
+enum AccessibilityAuthorization: Equatable, Sendable {
+    case unknown
+    case granted
+    case denied
+
+    var title: String {
+        switch self {
+        case .unknown:
+            "Not Checked"
+        case .granted:
+            "Allowed"
+        case .denied:
+            "Permission Required"
+        }
+    }
+}

@@ -12,6 +12,9 @@ struct EditMachineView<Store: MachineStoring>: View {
     @State private var host: String
     @State private var username: String
     @State private var password: String
+    @State private var connectionMode: RemoteConnectionMode
+    @State private var glassyHostIdentifier: String?
+    @State private var glassyHostName: String?
     @State private var portText: String
     @State private var macAddress: String
 
@@ -29,12 +32,20 @@ struct EditMachineView<Store: MachineStoring>: View {
         _host = State(initialValue: machine.host)
         _username = State(initialValue: machine.username)
         _password = State(initialValue: password)
+        _connectionMode = State(initialValue: machine.connectionMode)
+        _glassyHostIdentifier = State(initialValue: machine.glassyHostIdentifier)
+        _glassyHostName = State(initialValue: machine.glassyHostName)
         _portText = State(initialValue: String(machine.port))
         _macAddress = State(initialValue: machine.macAddress ?? "")
     }
 
     private var canSubmit: Bool {
-        !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && isMACAddressValid
+        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasIdentity = connectionMode == .vnc
+            ? !trimmedHost.isEmpty
+            : !trimmedName.isEmpty || !trimmedHost.isEmpty
+        return hasIdentity && isMACAddressValid
     }
 
     private var isMACAddressValid: Bool {
@@ -45,22 +56,67 @@ struct EditMachineView<Store: MachineStoring>: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Machine") {
-                    TextField("Name (optional)", text: $name)
+                Section {
+                    Picker("Connection Method", selection: $connectionMode) {
+                        ForEach(RemoteConnectionMode.allCases) { mode in
+                            Label(mode.title, systemImage: mode.systemImage)
+                                .tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityHint("Choose standard VNC or the faster Glassy Host stream for this Mac.")
+                } header: {
+                    Text("Connection")
+                } footer: {
+                    Text(connectionMode.description)
+                }
 
-                    TextField("Host or IP address", text: $host)
+                Section("Machine") {
+                    TextField(connectionMode == .vnc ? "Name (optional)" : "Name", text: $name)
+
+                    TextField(
+                        connectionMode == .vnc
+                            ? "Host or IP address"
+                            : "Mac name or IP address (optional)",
+                        text: $host
+                    )
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
 
-                    TextField("Port", text: $portText)
-                        .keyboardType(.numberPad)
+                    if connectionMode == .vnc {
+                        TextField("Port", text: $portText)
+                            .keyboardType(.numberPad)
+                    }
                 }
 
-                Section("Login") {
-                    CredentialTextField("Username (macOS login)", text: $username)
+                if connectionMode == .vnc {
+                    Section {
+                        CredentialTextField("Username (macOS login)", text: $username)
 
-                    CredentialTextField("Password", text: $password, isSecure: true)
+                        CredentialTextField("Password", text: $password, isSecure: true)
+                    } header: {
+                        Text("VNC Credentials")
+                    } footer: {
+                        Text("Use a macOS account allowed to share the screen. Legacy VNC servers may only require a password.")
+                    }
+                }
+
+                if connectionMode == .glassyStream, let glassyHostIdentifier {
+                    Section {
+                        LabeledContent("Paired Mac") {
+                            Text(glassyHostName ?? "Glassy Host")
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Button("Pair a Different Mac", role: .destructive) {
+                            self.glassyHostIdentifier = nil
+                            glassyHostName = nil
+                        }
+                    } footer: {
+                        Text("Changing this forgets the saved host identity. A new pairing code will be required on the next connection.")
+                    }
+                    .id(glassyHostIdentifier)
                 }
 
                 Section {
@@ -164,6 +220,9 @@ struct EditMachineView<Store: MachineStoring>: View {
         prepared.host = host.trimmingCharacters(in: .whitespacesAndNewlines)
         prepared.port = UInt16(portText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 5900
         prepared.username = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        prepared.connectionMode = connectionMode
+        prepared.glassyHostIdentifier = glassyHostIdentifier
+        prepared.glassyHostName = glassyHostName
 
         let trimmedMACAddress = macAddress.trimmingCharacters(in: .whitespacesAndNewlines)
         prepared.macAddress = trimmedMACAddress.isEmpty

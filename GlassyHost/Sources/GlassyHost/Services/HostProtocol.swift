@@ -35,6 +35,21 @@ enum HostProtocol {
     static let proofLength = 32
     static let resumeSecretLength = 32
     static let authenticationTagLength = 16
+    static let pairingCodeSymbolCount = 12
+
+    struct Capabilities: OptionSet, Sendable {
+        let rawValue: UInt32
+
+        static let h264AVCC = Capabilities(rawValue: 1 << 0)
+        static let encryptedMedia = Capabilities(rawValue: 1 << 1)
+        static let directInput = Capabilities(rawValue: 1 << 2)
+    }
+
+    static let advertisedCapabilities: Capabilities = [
+        .h264AVCC,
+        .encryptedMedia,
+        .directInput
+    ]
 
     enum MessageKind: UInt8, Sendable {
         case serverHello = 0x01
@@ -46,6 +61,12 @@ enum HostProtocol {
 
         case videoConfiguration = 0x10
         case videoAccessUnit = 0x11
+        case keyFrameRequest = 0x12
+
+        case pointerInput = 0x20
+        case scrollInput = 0x21
+        case keyInput = 0x22
+        case textInput = 0x23
     }
 
     struct Flags: OptionSet, Sendable {
@@ -97,6 +118,57 @@ enum HostProtocol {
         let resumeSecret: Data
         let serverTimeMilliseconds: UInt64
         let maximumMediaPayloadLength: UInt32
+    }
+
+    struct PointerButtonMask: OptionSet, Equatable, Sendable {
+        let rawValue: UInt8
+
+        static let left = PointerButtonMask(rawValue: 1 << 0)
+        static let right = PointerButtonMask(rawValue: 1 << 1)
+    }
+
+    struct PointerInput: Equatable, Sendable {
+        let normalizedX: UInt16
+        let normalizedY: UInt16
+        let buttonMask: PointerButtonMask
+    }
+
+    enum ScrollDirection: UInt8, Equatable, Sendable {
+        case up = 0
+        case down = 1
+        case left = 2
+        case right = 3
+    }
+
+    struct ScrollInput: Equatable, Sendable {
+        let direction: ScrollDirection
+        let steps: UInt16
+    }
+
+    struct KeyInput: Equatable, Sendable {
+        let keysym: UInt32
+        let isDown: Bool
+    }
+
+    struct TextModifierMask: OptionSet, Equatable, Sendable {
+        let rawValue: UInt8
+
+        static let command = TextModifierMask(rawValue: 1 << 0)
+        static let shift = TextModifierMask(rawValue: 1 << 1)
+        static let option = TextModifierMask(rawValue: 1 << 2)
+        static let control = TextModifierMask(rawValue: 1 << 3)
+    }
+
+    struct TextInput: Equatable, Sendable {
+        let modifierMask: TextModifierMask
+        let text: String
+    }
+
+    enum RemoteInputEvent: Equatable, Sendable {
+        case pointer(PointerInput)
+        case scroll(ScrollInput)
+        case key(KeyInput)
+        case text(TextInput)
     }
 
     struct SessionMaterial: Sendable {
@@ -300,6 +372,161 @@ enum HostProtocol {
         return writer.data
     }
 
+    // MARK: - Direct input payloads
+
+    static func encodePointerInput(_ input: PointerInput) throws -> Data {
+        let knownButtons = PointerButtonMask.left.rawValue | PointerButtonMask.right.rawValue
+        guard input.buttonMask.rawValue & ~knownButtons == 0 else {
+            throw ProtocolError.malformedPayload("pointer button mask contains unknown bits")
+        }
+
+        var writer = ByteWriter(capacity: 6)
+        writer.write(input.normalizedX)
+        writer.write(input.normalizedY)
+        writer.write(input.buttonMask.rawValue)
+        writer.write(UInt8(0))
+        return writer.data
+    }
+
+    static func decodePointerInput(_ data: Data) throws -> PointerInput {
+        var reader = ByteReader(data: data)
+        let normalizedX = try reader.readUInt16()
+        let normalizedY = try reader.readUInt16()
+        let rawButtons = try reader.readUInt8()
+        let knownButtons = PointerButtonMask.left.rawValue | PointerButtonMask.right.rawValue
+        guard rawButtons & ~knownButtons == 0 else {
+            throw ProtocolError.malformedPayload("pointer button mask contains unknown bits")
+        }
+        guard try reader.readUInt8() == 0 else {
+            throw ProtocolError.malformedPayload("reserved PointerInput byte must be zero")
+        }
+        try reader.requireEnd()
+        return PointerInput(normalizedX: normalizedX,
+                            normalizedY: normalizedY,
+                            buttonMask: PointerButtonMask(rawValue: rawButtons))
+    }
+
+    static func encodeScrollInput(_ input: ScrollInput) throws -> Data {
+        guard (1...64).contains(input.steps) else {
+            throw ProtocolError.malformedPayload("scroll steps must be 1...64")
+        }
+
+        var writer = ByteWriter(capacity: 4)
+        writer.write(input.direction.rawValue)
+        writer.write(UInt8(0))
+        writer.write(input.steps)
+        return writer.data
+    }
+
+    static func decodeScrollInput(_ data: Data) throws -> ScrollInput {
+        var reader = ByteReader(data: data)
+        let rawDirection = try reader.readUInt8()
+        guard let direction = ScrollDirection(rawValue: rawDirection) else {
+            throw ProtocolError.malformedPayload("unknown scroll direction")
+        }
+        guard try reader.readUInt8() == 0 else {
+            throw ProtocolError.malformedPayload("reserved ScrollInput byte must be zero")
+        }
+        let steps = try reader.readUInt16()
+        guard (1...64).contains(steps) else {
+            throw ProtocolError.malformedPayload("scroll steps must be 1...64")
+        }
+        try reader.requireEnd()
+        return ScrollInput(direction: direction, steps: steps)
+    }
+
+    static func encodeKeyInput(_ input: KeyInput) -> Data {
+        var writer = ByteWriter(capacity: 8)
+        writer.write(input.keysym)
+        writer.write(input.isDown ? UInt8(1) : UInt8(0))
+        writer.write(Data(repeating: 0, count: 3))
+        return writer.data
+    }
+
+    static func decodeKeyInput(_ data: Data) throws -> KeyInput {
+        var reader = ByteReader(data: data)
+        let keysym = try reader.readUInt32()
+        let rawIsDown = try reader.readUInt8()
+        guard rawIsDown <= 1 else {
+            throw ProtocolError.malformedPayload("key state must be zero or one")
+        }
+        let reserved = try reader.readData(count: 3)
+        guard reserved.allSatisfy({ $0 == 0 }) else {
+            throw ProtocolError.malformedPayload("reserved KeyInput bytes must be zero")
+        }
+        try reader.requireEnd()
+        return KeyInput(keysym: keysym, isDown: rawIsDown == 1)
+    }
+
+    static func encodeTextInput(_ input: TextInput) throws -> Data {
+        let knownModifiers = TextModifierMask.command.rawValue
+            | TextModifierMask.shift.rawValue
+            | TextModifierMask.option.rawValue
+            | TextModifierMask.control.rawValue
+        guard input.modifierMask.rawValue & ~knownModifiers == 0 else {
+            throw ProtocolError.malformedPayload("text modifier mask contains unknown bits")
+        }
+
+        let bytes = Data(input.text.utf8)
+        guard (1...4096).contains(bytes.count) else {
+            throw ProtocolError.malformedPayload("text must contain 1...4096 UTF-8 bytes")
+        }
+
+        var writer = ByteWriter(capacity: 4 + bytes.count)
+        writer.write(input.modifierMask.rawValue)
+        writer.write(UInt8(0))
+        writer.write(UInt16(bytes.count))
+        writer.write(bytes)
+        return writer.data
+    }
+
+    static func decodeTextInput(_ data: Data) throws -> TextInput {
+        var reader = ByteReader(data: data)
+        let rawModifiers = try reader.readUInt8()
+        let knownModifiers = TextModifierMask.command.rawValue
+            | TextModifierMask.shift.rawValue
+            | TextModifierMask.option.rawValue
+            | TextModifierMask.control.rawValue
+        guard rawModifiers & ~knownModifiers == 0 else {
+            throw ProtocolError.malformedPayload("text modifier mask contains unknown bits")
+        }
+        guard try reader.readUInt8() == 0 else {
+            throw ProtocolError.malformedPayload("reserved TextInput byte must be zero")
+        }
+        let byteLength = Int(try reader.readUInt16())
+        guard (1...4096).contains(byteLength) else {
+            throw ProtocolError.malformedPayload("text must contain 1...4096 UTF-8 bytes")
+        }
+        let bytes = try reader.readData(count: byteLength)
+        guard let text = String(data: bytes, encoding: .utf8) else {
+            throw ProtocolError.malformedPayload("text is not UTF-8")
+        }
+        try reader.requireEnd()
+        return TextInput(modifierMask: TextModifierMask(rawValue: rawModifiers),
+                         text: text)
+    }
+
+    static func decodeRemoteInput(kind: MessageKind, payload: Data) throws -> RemoteInputEvent {
+        switch kind {
+        case .pointerInput:
+            .pointer(try decodePointerInput(payload))
+        case .scrollInput:
+            .scroll(try decodeScrollInput(payload))
+        case .keyInput:
+            .key(try decodeKeyInput(payload))
+        case .textInput:
+            .text(try decodeTextInput(payload))
+        default:
+            throw ProtocolError.malformedPayload("message is not a direct input event")
+        }
+    }
+
+    static func decodeKeyFrameRequest(_ data: Data) throws {
+        guard data.isEmpty else {
+            throw ProtocolError.malformedPayload("keyframe request payload must be empty")
+        }
+    }
+
     /// The exact transcript authenticated by `ClientHello.proof`. The proof
     /// itself is deliberately excluded.
     static func authenticationTranscript(serverHello: ServerHello,
@@ -347,10 +574,16 @@ enum HostProtocol {
         // to type, while resisting offline guessing if an active LAN attacker
         // substitutes an ephemeral key during first-use pairing.
         let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
-        let symbols = (0..<12).map { index -> Character in
+        let symbols = (0..<pairingCodeSymbolCount).map { index -> Character in
             let shift = UInt64(59 - (index * 5))
             return alphabet[Int((integer >> shift) & 0x1F)]
         }
+        return String(symbols)
+    }
+
+    static func pairingCodeDisplayValue(_ value: String) -> String {
+        guard value.count == pairingCodeSymbolCount else { return value }
+        let symbols = Array(value)
         return stride(from: 0, to: symbols.count, by: 4)
             .map { String(symbols[$0..<min($0 + 4, symbols.count)]) }
             .joined(separator: "-")

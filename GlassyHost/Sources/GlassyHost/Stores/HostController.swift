@@ -8,6 +8,7 @@ import Observation
 final class HostController {
     private(set) var runState: HostRunState = .stopped
     private(set) var screenRecordingAuthorization: ScreenRecordingAuthorization = .unknown
+    private(set) var accessibilityAuthorization: AccessibilityAuthorization = .unknown
     private(set) var displays: [CaptureDisplay] = []
     private(set) var isStreaming = false
     private(set) var isTransitioning = false
@@ -16,11 +17,20 @@ final class HostController {
     private(set) var pairingCodeRemainingSeconds = 0
     private(set) var serverPort: UInt16?
     private(set) var lastError: String?
+    private(set) var loginItemStatus: LoginItemRegistrationStatus = .notRegistered
+    private(set) var isUpdatingLoginItem = false
+    private(set) var loginItemError: String?
 
-    var selectedDisplayID: CGDirectDisplayID?
+    var selectedDisplayID: CGDirectDisplayID? {
+        didSet {
+            remoteInputService.setDisplayID(selectedDisplayID)
+        }
+    }
 
     private let pairingSecretStore = PairingSecretStore()
     private let hostServer = HostServer()
+    private let loginItemService = LoginItemService()
+    private let remoteInputService = RemoteInputService()
 
     @ObservationIgnored
     private lazy var captureService = ScreenCaptureService { [weak self] event in
@@ -63,8 +73,13 @@ final class HostController {
         return isStreaming ? "bolt.horizontal.circle.fill" : "bolt.horizontal.circle"
     }
 
+    var startsAtLogin: Bool {
+        loginItemStatus.isRequested
+    }
+
     deinit {
         pairingCodeTimer?.invalidate()
+        remoteInputService.setEnabled(false)
         hostServer.stop()
     }
 
@@ -72,7 +87,12 @@ final class HostController {
         guard !isPrepared else { return }
         isPrepared = true
         runState = .starting
-        updateScreenRecordingAuthorization()
+        refreshAuthorizationStatuses()
+        refreshLoginItemStatus()
+        remoteInputService.setDisplayID(selectedDisplayID)
+        hostServer.setRemoteInputHandler { [remoteInputService] event in
+            remoteInputService.handle(event)
+        }
 
         do {
             let store = pairingSecretStore
@@ -183,6 +203,7 @@ final class HostController {
             }
 
             isStreaming = true
+            remoteInputService.setEnabled(true)
             if isServerReady {
                 runState = .ready
             }
@@ -196,6 +217,7 @@ final class HostController {
     }
 
     func stopStreaming() async {
+        remoteInputService.setEnabled(false)
         frameTask?.cancel()
         frameTask = nil
         await captureService.stop()
@@ -223,11 +245,62 @@ final class HostController {
         }
     }
 
+    func requestAccessibilityPermission() {
+        accessibilityAuthorization = RemoteInputService.requestAccessibilityAccess()
+            ? .granted
+            : .denied
+    }
+
     func openScreenRecordingSettings() {
         guard let url = URL(
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
         ) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    func openAccessibilitySettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    func refreshAuthorizationStatuses() {
+        updateScreenRecordingAuthorization()
+        accessibilityAuthorization = RemoteInputService.isAccessibilityGranted
+            ? .granted
+            : .denied
+    }
+
+    func setStartsAtLogin(_ enabled: Bool) {
+        guard !isUpdatingLoginItem else { return }
+        isUpdatingLoginItem = true
+        defer { isUpdatingLoginItem = false }
+
+        do {
+            try loginItemService.setEnabled(enabled)
+            loginItemStatus = loginItemService.status
+            loginItemError = nil
+            HostLog.app.notice("Start at login changed to \(enabled, privacy: .public)")
+        } catch {
+            loginItemStatus = loginItemService.status
+            loginItemError = error.localizedDescription
+            HostLog.app.error(
+                "Could not change start at login: \(error.localizedDescription, privacy: .public)"
+            )
+        }
+    }
+
+    func refreshLoginItemStatus() {
+        let previousStatus = loginItemStatus
+        loginItemStatus = loginItemService.status
+        if loginItemStatus != previousStatus, loginItemStatus != .notFound {
+            loginItemError = nil
+        }
+    }
+
+    func openLoginItemSettings() {
+        loginItemService.openSystemSettings()
     }
 
     func replacePairingKey() {
@@ -264,7 +337,12 @@ final class HostController {
             pairingSecret: pairingSecret.keyData,
             onClientCountChange: { [weak self] count in
                 Task { @MainActor in
-                    self?.clientCount = count
+                    guard let self else { return }
+                    let previousCount = self.clientCount
+                    self.clientCount = count
+                    if count < previousCount {
+                        self.remoteInputService.releasePressedInput()
+                    }
                 }
             },
             onStatusChange: { [weak self] status in
@@ -278,22 +356,26 @@ final class HostController {
     private func handleServerStatus(_ status: HostServer.Status) {
         switch status {
         case .stopped:
+            remoteInputService.setEnabled(false)
             isServerReady = false
             serverPort = nil
             if !isStreaming {
                 runState = .stopped
             }
         case .starting:
+            remoteInputService.setEnabled(false)
             isServerReady = false
             serverPort = nil
             runState = .starting
         case .listening(let port):
+            remoteInputService.setEnabled(isStreaming)
             isServerReady = true
             serverPort = port
             runState = .ready
             lastError = nil
             refreshPairingCode()
         case .failed(let message):
+            remoteInputService.setEnabled(false)
             isServerReady = false
             serverPort = nil
             runState = .failed(message)
@@ -344,6 +426,7 @@ final class HostController {
         case .stopped:
             if isStreaming && !isTransitioning {
                 isStreaming = false
+                remoteInputService.setEnabled(false)
             }
         case .failed(let message):
             Task {

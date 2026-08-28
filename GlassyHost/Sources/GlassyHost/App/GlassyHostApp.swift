@@ -4,7 +4,6 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
     }
 }
 
@@ -14,6 +13,16 @@ struct GlassyHostApp: App {
     @State private var controller = HostController()
 
     var body: some Scene {
+        dashboardWindow
+
+        MenuBarExtra {
+            MenuBarContentView(controller: controller)
+        } label: {
+            Label("Glassy Host", systemImage: controller.menuBarSystemImage)
+        }
+    }
+
+    private var dashboardWindow: some Scene {
         WindowGroup("Glassy Host", id: "main") {
             HostDashboardView(controller: controller)
                 .frame(minWidth: 560, minHeight: 500)
@@ -22,11 +31,5 @@ struct GlassyHostApp: App {
                 }
         }
         .defaultSize(width: 620, height: 600)
-
-        MenuBarExtra {
-            MenuBarContentView(controller: controller)
-        } label: {
-            Label("Glassy Host", systemImage: controller.menuBarSystemImage)
-        }
     }
 }

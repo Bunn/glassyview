@@ -6,6 +6,8 @@
 	<string>Glassy Host</string>
 	<key>CFBundleExecutable</key>
 	<string>GlassyHost</string>
+	<key>CFBundleIconFile</key>
+	<string>GlassyHostAppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>dev.bunn.glassydesk.host</string>
 	<key>CFBundleInfoDictionaryVersion</key>

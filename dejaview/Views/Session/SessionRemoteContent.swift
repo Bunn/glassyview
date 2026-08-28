@@ -7,17 +7,36 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
     let followsCursor: Bool
     let acceptsHardwareKeyboardInput: Bool
     var acceptsPointerInput: Bool = true
+    var glassyStream: GlassyStreamSessionController?
 
     var body: some View {
         ZStack {
-            RemoteDesktopView(session: session,
-                              selectedFramebufferFrame: session.selectedDisplayFrame,
-                              zoomScale: $zoomScale,
-                              followsCursor: followsCursor,
-                              acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
-                              acceptsPointerInput: acceptsPointerInput)
-                .id(session.displaySelection.id)
-                .ignoresSafeArea()
+            if let glassyStream {
+                GlassyStreamVideoView(renderer: glassyStream.renderer)
+                    .ignoresSafeArea()
+
+                RemoteDesktopView(session: session,
+                                  selectedFramebufferFrame: nil,
+                                  zoomScale: $zoomScale,
+                                  followsCursor: false,
+                                  acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
+                                  acceptsPointerInput: acceptsPointerInput,
+                                  showsFramebuffer: false,
+                                  allowsZoom: false)
+                    .ignoresSafeArea()
+
+                GlassyStreamStatusOverlay(controller: glassyStream)
+                    .allowsHitTesting(false)
+            } else {
+                RemoteDesktopView(session: session,
+                                  selectedFramebufferFrame: session.selectedDisplayFrame,
+                                  zoomScale: $zoomScale,
+                                  followsCursor: followsCursor,
+                                  acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
+                                  acceptsPointerInput: acceptsPointerInput)
+                    .id(session.displaySelection.id)
+                    .ignoresSafeArea()
+            }
 
             if let reconnectState {
                 Color.black.opacity(0.35)
@@ -28,6 +47,59 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                                         retryNow: session.retryConnect,
                                         cancel: session.cancelReconnect)
             }
+        }
+    }
+}
+
+private struct GlassyStreamStatusOverlay: View {
+    let controller: GlassyStreamSessionController
+
+    var body: some View {
+        if let failureMessage {
+            VStack(spacing: 12) {
+                Image(systemName: "bolt.slash.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(.orange)
+
+                Text("Glassy Stream Stopped")
+                    .font(.headline)
+
+                Text(failureMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(22)
+            .frame(maxWidth: 420)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+            .padding(28)
+        } else if isWaitingForVideo {
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.large)
+                Text("Waiting for Glassy Stream video…")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(18)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        }
+    }
+
+    private var failureMessage: String? {
+        guard controller.state == .failed else { return nil }
+        return controller.error?.localizedDescription
+            ?? "The fast video connection ended. Close this session and reconnect."
+    }
+
+    private var isWaitingForVideo: Bool {
+        guard controller.state != .failed else { return false }
+
+        return switch controller.renderer.state {
+        case .waitingForConfiguration, .waitingForKeyFrame:
+            true
+        case .rendering, .failed:
+            false
         }
     }
 }

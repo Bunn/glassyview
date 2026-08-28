@@ -3,10 +3,6 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(SubscriptionStore.self) private var subscriptionStore
-    @Environment(GlassyHostBrowser.self) private var glassyHostBrowser
-
-    @AppStorage(RemoteConnectionMode.storageKey)
-    private var connectionMode = RemoteConnectionMode.default
 
     @State private var isPaywallPresented = false
 
@@ -43,32 +39,16 @@ struct SettingsView: View {
             }
 
             Section {
-                Picker("Connection Mode", selection: $connectionMode) {
-                    ForEach(RemoteConnectionMode.allCases) { mode in
-                        Label(mode.title, systemImage: mode.systemImage)
-                            .tag(mode)
-                    }
-                }
-
-                if connectionMode == .automatic {
-                    LabeledContent {
-                        HStack(spacing: 8) {
-                            if glassyHostBrowser.state == .searching {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-
-                            Text(glassyHostStatusText)
-                                .foregroundStyle(glassyHostStatusColor)
-                        }
-                    } label: {
-                        Label("Nearby Glassy Host", systemImage: "macbook.and.iphone")
-                    }
+                LabeledContent {
+                    Text("Per Machine")
+                        .foregroundStyle(.secondary)
+                } label: {
+                    Label("Connection Method", systemImage: "arrow.triangle.branch")
                 }
             } header: {
-                Text("Streaming")
+                Text("Connections")
             } footer: {
-                Text(connectionMode.description)
+                Text("Choose VNC or the faster Glassy Stream when you add or edit a machine. VNC remains the default; Glassy Stream requires Glassy Host on the Mac and its pairing code the first time.")
             }
 
             Section("Getting Started") {
@@ -127,28 +107,6 @@ struct SettingsView: View {
         } else {
             "Free"
         }
-    }
-
-    private var glassyHostStatusText: String {
-        if !glassyHostBrowser.hosts.isEmpty {
-            let count = glassyHostBrowser.hosts.count
-            return count == 1 ? "1 Found" : "\(count) Found"
-        }
-
-        return switch glassyHostBrowser.state {
-        case .stopped:
-            "Not Started"
-        case .searching:
-            "Looking"
-        case .ready:
-            "Not Found"
-        case .failed:
-            "Unavailable"
-        }
-    }
-
-    private var glassyHostStatusColor: Color {
-        glassyHostBrowser.hosts.isEmpty ? .secondary : .green
     }
 
     private var proStatusColor: Color {

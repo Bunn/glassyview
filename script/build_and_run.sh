@@ -12,6 +12,7 @@ DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$DISPLAY_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
+APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
@@ -20,9 +21,10 @@ swift build --package-path "$PACKAGE_DIR" --product "$APP_NAME"
 BUILD_DIR="$(swift build --package-path "$PACKAGE_DIR" --show-bin-path)"
 
 rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_MACOS"
+mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_DIR/$APP_NAME" "$APP_BINARY"
 cp "$PACKAGE_DIR/Support/Info.plist" "$APP_CONTENTS/Info.plist"
+cp "$PACKAGE_DIR/Resources/GlassyHostAppIcon.icns" "$APP_RESOURCES/GlassyHostAppIcon.icns"
 chmod +x "$APP_BINARY"
 
 CODESIGN_IDENTITY="${GLASSY_HOST_CODESIGN_IDENTITY:-}"

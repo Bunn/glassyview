@@ -1,38 +1,37 @@
 import Foundation
 
 enum RemoteConnectionMode: String, CaseIterable, Codable, Identifiable, Sendable {
-    case automatic
-    case vncOnly
+    case vnc
+    case glassyStream
 
-    static let storageKey = "remoteConnectionMode"
-    static let `default`: Self = .automatic
+    static let `default`: Self = .vnc
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .automatic:
-            "Automatic"
-        case .vncOnly:
-            "VNC Only"
+        case .vnc:
+            "VNC"
+        case .glassyStream:
+            "Glassy Stream"
         }
     }
 
     var description: String {
         switch self {
-        case .automatic:
-            "Uses Glassy Host for low-latency streaming when available and automatically falls back to VNC."
-        case .vncOnly:
-            "Always uses standard VNC, even when Glassy Host is available."
+        case .vnc:
+            "Uses standard Screen Sharing. This is the default and does not require the Glassy Host companion app."
+        case .glassyStream:
+            "Uses the faster encrypted Glassy Host video and input stream. It requires the macOS companion app and asks for its pairing code the first time."
         }
     }
 
     var systemImage: String {
         switch self {
-        case .automatic:
-            "bolt.fill"
-        case .vncOnly:
+        case .vnc:
             "network"
+        case .glassyStream:
+            "bolt.fill"
         }
     }
 }

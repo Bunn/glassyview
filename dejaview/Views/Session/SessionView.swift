@@ -6,6 +6,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @ObservedObject var session: Session
     @Binding private var preferences: SessionPreferences
     let sessionTitle: String
+    let glassyStream: GlassyStreamSessionController?
     @Environment(SubscriptionStore.self) private var subscriptionStore
     @Environment(\.dismiss) private var dismiss
 
@@ -29,10 +30,12 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
     init(session: Session,
          preferences: Binding<SessionPreferences>,
-         sessionTitle: String) {
+         sessionTitle: String,
+         glassyStream: GlassyStreamSessionController? = nil) {
         self.session = session
         _preferences = preferences
         self.sessionTitle = sessionTitle
+        self.glassyStream = glassyStream
 
         let preferences = preferences.wrappedValue.normalized
         _streamZoomScale = State(initialValue: CGFloat(preferences.zoomScale))
@@ -64,7 +67,10 @@ struct SessionView<Session: RemoteSessionControlling>: View {
             }
         }
         .overlay(alignment: .bottomLeading) {
-            if session.status == .connected && !showsInputBar && !isExternalControllerActive {
+            if session.status == .connected,
+               !showsInputBar,
+               !isExternalControllerActive,
+               glassyStream == nil {
                 SessionZoomControls(zoomScale: $streamZoomScale,
                                     followsCursor: $followsCursorWhenZoomed)
                     .padding(.bottom, 28)
@@ -74,13 +80,14 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .overlay(alignment: .bottomTrailing) {
             if session.status == .connected && !showsInputBar && !isExternalControllerActive {
                 HStack(spacing: 10) {
-                    if session.displayOptions.count > 1 {
+                    if glassyStream == nil, session.displayOptions.count > 1 {
                         SessionDisplayMenu(session: session)
                     }
 
                     SessionOptionsMenu(session: session,
                                        sessionTitle: sessionTitle,
-                                       externalDisplayCoordinator: externalDisplayCoordinator)
+                                       externalDisplayCoordinator: externalDisplayCoordinator,
+                                       usesGlassyStream: glassyStream != nil)
                 }
                 .padding(.bottom, 28)
                 .padding(.trailing, 20)
@@ -100,6 +107,10 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
         .onAppear {
             networkPathObserver.start()
+            if glassyStream != nil {
+                streamZoomScale = 1
+                deactivateExternalControllerIfNeeded()
+            }
             logDisplayControlState(reason: "sessionViewAppeared")
         }
         .onDisappear {
@@ -190,7 +201,8 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                      reconnectState: nil,
                                      zoomScale: $streamZoomScale,
                                      followsCursor: followsCursorWhenZoomed,
-                                     acceptsHardwareKeyboardInput: acceptsRemoteHardwareKeyboardInput)
+                                     acceptsHardwareKeyboardInput: acceptsRemoteHardwareKeyboardInput,
+                                     glassyStream: glassyStream)
             }
 
         case .reconnecting(let reconnectState):
@@ -198,7 +210,8 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                  reconnectState: reconnectState,
                                  zoomScale: $streamZoomScale,
                                  followsCursor: followsCursorWhenZoomed,
-                                 acceptsHardwareKeyboardInput: false)
+                                 acceptsHardwareKeyboardInput: false,
+                                 glassyStream: glassyStream)
 
         case .disconnected(let message):
             VStack(spacing: 14) {
@@ -295,6 +308,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     }
 
     private var isExternalControllerActive: Bool {
+        guard glassyStream == nil else { return false }
         guard let vncSession = session as? VNCSession else { return false }
         return externalDisplayCoordinator.isControllerModeEnabled(for: vncSession)
     }

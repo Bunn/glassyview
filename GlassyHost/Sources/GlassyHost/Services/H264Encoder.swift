@@ -49,11 +49,29 @@ struct H264EncoderError: LocalizedError, Sendable {
     }
 }
 
+enum H264CompressionPropertyRequirement: Sendable {
+    case required
+    case optional
+}
+
+enum H264CompressionPropertyPolicy {
+    /// VideoToolbox exposes some encoder tuning keys on every supported SDK even
+    /// though a particular hardware encoder or operating mode may not implement
+    /// them. Only that documented optional-property case is safe to ignore.
+    static func shouldIgnoreFailure(
+        status: OSStatus,
+        requirement: H264CompressionPropertyRequirement
+    ) -> Bool {
+        requirement == .optional && status == kVTPropertyNotSupportedErr
+    }
+}
+
 /// Low-latency, real-time H.264 encoder backed by VideoToolbox.
 ///
-/// Calls are serialized on a dedicated queue and VideoToolbox is limited to one delayed
-/// frame with reordering disabled. Consume `ScreenCaptureService.frames` sequentially to
-/// preserve its newest-frame-only backpressure behavior.
+/// Calls are serialized on a dedicated queue and VideoToolbox is asked to limit itself
+/// to one delayed frame, with reordering disabled as the required fallback when that
+/// optional delay hint is unavailable. Consume `ScreenCaptureService.frames`
+/// sequentially to preserve its newest-frame-only backpressure behavior.
 final class H264Encoder: @unchecked Sendable {
     typealias OutputHandler = @Sendable (H264EncoderOutput) -> Void
     typealias ErrorHandler = @Sendable (H264EncoderError) -> Void
@@ -194,7 +212,8 @@ final class H264Encoder: @unchecked Sendable {
             try setProperty(
                 kVTCompressionPropertyKey_MaxFrameDelayCount,
                 value: NSNumber(value: 1),
-                on: newSession
+                on: newSession,
+                requirement: .optional
             )
             try setProperty(
                 kVTCompressionPropertyKey_ProfileLevel,
@@ -238,7 +257,8 @@ final class H264Encoder: @unchecked Sendable {
                 try setProperty(
                     kVTCompressionPropertyKey_PrioritizeEncodingSpeedOverQuality,
                     value: kCFBooleanTrue,
-                    on: newSession
+                    on: newSession,
+                    requirement: .optional
                 )
             }
 
@@ -264,15 +284,27 @@ final class H264Encoder: @unchecked Sendable {
     private func setProperty(
         _ key: CFString,
         value: CFTypeRef,
-        on session: VTCompressionSession
+        on session: VTCompressionSession,
+        requirement: H264CompressionPropertyRequirement = .required
     ) throws {
         let status = VTSessionSetProperty(session, key: key, value: value)
-        guard status == noErr else {
-            throw H264EncoderError(
-                operation: "Set \(key) compression property",
-                status: status
+        guard status != noErr else { return }
+
+        if H264CompressionPropertyPolicy.shouldIgnoreFailure(
+            status: status,
+            requirement: requirement
+        ) {
+            let propertyName = String(describing: key)
+            HostLog.encoding.info(
+                "Optional VideoToolbox property \(propertyName, privacy: .public) is unsupported; using the encoder default"
             )
+            return
         }
+
+        throw H264EncoderError(
+            operation: "Set \(key) compression property",
+            status: status
+        )
     }
 
     private func invalidateSessionOnQueue(completeFrames: Bool) {

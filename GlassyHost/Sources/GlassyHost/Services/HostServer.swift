@@ -20,6 +20,7 @@ final class HostServer: @unchecked Sendable {
 
     typealias ClientCountHandler = @Sendable (Int) -> Void
     typealias StatusHandler = @Sendable (Status) -> Void
+    typealias RemoteInputHandler = @Sendable (HostProtocol.RemoteInputEvent) -> Void
 
     struct PairingCode: Equatable, Sendable {
         let value: String
@@ -78,6 +79,12 @@ final class HostServer: @unchecked Sendable {
     /// a newly authenticated viewer joins or the codec configuration changes.
     func setKeyFrameRequestHandler(_ handler: (@Sendable () -> Void)?) {
         core.setKeyFrameRequestHandler(handler)
+    }
+
+    /// Installs the sink for authenticated direct-input messages. The network
+    /// core never invokes this callback before the encrypted handshake finishes.
+    func setRemoteInputHandler(_ handler: RemoteInputHandler?) {
+        core.setRemoteInputHandler(handler)
     }
 
     /// Broadcasts H.264 SPS/PPS configuration to authenticated clients and
@@ -168,6 +175,7 @@ private extension HostServer {
         private var cachedCodecConfiguration: Data?
         private let mediaIngress = MediaIngress()
         private var keyFrameRequestHandler: (@Sendable () -> Void)?
+        private var remoteInputHandler: RemoteInputHandler?
         private var lastPublishedClientCount = 0
         private var lastStatus: Status = .stopped
         private var clientCountHandler: ClientCountHandler = { _ in }
@@ -215,6 +223,12 @@ private extension HostServer {
                     client.keyFrameRequestOutstanding = true
                 }
                 handler()
+            }
+        }
+
+        func setRemoteInputHandler(_ handler: RemoteInputHandler?) {
+            queue.async { [weak self] in
+                self?.remoteInputHandler = handler
             }
         }
 
@@ -446,7 +460,7 @@ private extension HostServer {
                     serverPublicKey: privateKey.publicKey.rawRepresentation,
                     pairingWindow: window,
                     pairingCodeLifetimeSeconds: UInt16(HostProtocol.pairingCodeLifetime),
-                    capabilities: 0x0000_0003, // H.264/AVCC + encrypted media.
+                    capabilities: HostProtocol.advertisedCapabilities.rawValue,
                     serverName: serviceName
                 )
                 client.authorizationState = .awaitingProof(
@@ -645,6 +659,16 @@ private extension HostServer {
                                      flags: [],
                                      policy: .control,
                                      for: client)
+            case .keyFrameRequest:
+                try HostProtocol.decodeKeyFrameRequest(plaintext)
+                client.needsKeyFrame = true
+                requestKeyFrameIfNeeded(for: [client])
+            case .pointerInput, .scrollInput, .keyInput, .textInput:
+                let input = try HostProtocol.decodeRemoteInput(
+                    kind: frame.kind,
+                    payload: plaintext
+                )
+                remoteInputHandler?(input)
             default:
                 throw HostProtocol.ProtocolError.malformedPayload(
                     "message is not valid in the authenticated client direction"

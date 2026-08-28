@@ -8,6 +8,9 @@ final class SavedMachineRecord {
     var host: String = ""
     var port: Int = 5900
     var username: String = ""
+    var connectionModeRawValue: String = RemoteConnectionMode.default.rawValue
+    var glassyHostIdentifier: String?
+    var glassyHostName: String?
     var macAddress: String?
     @Attribute(.allowsCloudEncryption) var password: String?
     var createdAt: Date = Date.now
@@ -21,6 +24,9 @@ final class SavedMachineRecord {
          host: String = "",
          port: Int = 5900,
          username: String = "",
+         connectionModeRawValue: String = RemoteConnectionMode.default.rawValue,
+         glassyHostIdentifier: String? = nil,
+         glassyHostName: String? = nil,
          macAddress: String? = nil,
          password: String? = nil,
          createdAt: Date = .now,
@@ -33,6 +39,9 @@ final class SavedMachineRecord {
         self.host = host
         self.port = port
         self.username = username
+        self.connectionModeRawValue = connectionModeRawValue
+        self.glassyHostIdentifier = glassyHostIdentifier
+        self.glassyHostName = glassyHostName
         self.macAddress = macAddress
         self.password = password
         self.createdAt = createdAt
@@ -48,6 +57,9 @@ final class SavedMachineRecord {
                   host: machine.host,
                   port: Int(machine.port),
                   username: machine.username,
+                  connectionModeRawValue: machine.connectionMode.rawValue,
+                  glassyHostIdentifier: machine.glassyHostIdentifier,
+                  glassyHostName: machine.glassyHostName,
                   macAddress: machine.macAddress,
                   password: password,
                   lastConnectedAt: machine.lastConnectedAt,
@@ -60,6 +72,9 @@ final class SavedMachineRecord {
                      host: host,
                      port: UInt16(clamping: port),
                      username: username,
+                     connectionMode: RemoteConnectionMode(rawValue: connectionModeRawValue) ?? .default,
+                     glassyHostIdentifier: glassyHostIdentifier,
+                     glassyHostName: glassyHostName,
                      macAddress: macAddress,
                      lastConnectedAt: lastConnectedAt)
     }
@@ -69,6 +84,9 @@ final class SavedMachineRecord {
         host = machine.host
         port = Int(machine.port)
         username = machine.username
+        connectionModeRawValue = machine.connectionMode.rawValue
+        glassyHostIdentifier = machine.glassyHostIdentifier
+        glassyHostName = machine.glassyHostName
         macAddress = machine.macAddress
         lastConnectedAt = machine.lastConnectedAt ?? lastConnectedAt
         updatedAt = .now

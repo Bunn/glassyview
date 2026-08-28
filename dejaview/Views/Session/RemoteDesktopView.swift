@@ -31,6 +31,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
     var acceptsHardwareKeyboardInput: Bool
     var acceptsPointerInput: Bool = true
     var showsFramebuffer: Bool = true
+    var allowsZoom: Bool = true
     var touchModeOverride: RemoteTouchMode?
 
     func makeUIView(context: Context) -> ScreenView {
@@ -39,6 +40,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         view.setAcceptsHardwareKeyboardInput(acceptsHardwareKeyboardInput)
         view.setAcceptsPointerInput(acceptsPointerInput)
         view.setShowsFramebuffer(showsFramebuffer)
+        view.setAllowsZoom(allowsZoom)
         view.setTouchModeOverride(touchModeOverride)
         view.onZoomScaleChanged = context.coordinator.setZoomScale(_:)
         view.setVisibleFramebufferFrame(selectedFramebufferFrame)
@@ -70,6 +72,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         uiView.setAcceptsHardwareKeyboardInput(acceptsHardwareKeyboardInput)
         uiView.setAcceptsPointerInput(acceptsPointerInput)
         uiView.setShowsFramebuffer(showsFramebuffer)
+        uiView.setAllowsZoom(allowsZoom)
         uiView.setTouchModeOverride(touchModeOverride)
     }
 
@@ -110,6 +113,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private let hardwareKeyboardInputView = UIView(frame: .zero)
         private var acceptsHardwareKeyboardInput = true
         private var showsFramebuffer = true
+        private var allowsZoom = true
         private var touchModeOverride: RemoteTouchMode?
 
         private var zoomScale: CGFloat = 1
@@ -279,6 +283,15 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             backgroundColor = showsFramebuffer ? .black : .clear
             framebufferView.isHidden = !showsFramebuffer
             updateCursorLayerFrame()
+        }
+
+        func setAllowsZoom(_ allowsZoom: Bool) {
+            guard self.allowsZoom != allowsZoom else { return }
+
+            self.allowsZoom = allowsZoom
+            if !allowsZoom {
+                setZoomScale(minimumZoomScale, anchorInView: nil, notify: true)
+            }
         }
 
         func setTouchModeOverride(_ touchMode: RemoteTouchMode?) {
@@ -714,6 +727,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         // MARK: - Zoom
 
         @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+            guard allowsZoom else { return }
+
             switch gesture.state {
             case .began:
                 pinchStartZoomScale = zoomScale

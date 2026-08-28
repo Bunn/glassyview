@@ -8,10 +8,11 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
     @ObservedObject var session: Session
     let sessionTitle: String
     @Bindable var externalDisplayCoordinator: ExternalDisplayCoordinator
+    var usesGlassyStream = false
 
     var body: some View {
         Menu {
-            if RemoteSessionQuality.allCases.count > 1 {
+            if !usesGlassyStream, RemoteSessionQuality.allCases.count > 1 {
                 Picker("Quality", selection: qualityBinding) {
                     ForEach(RemoteSessionQuality.allCases) { quality in
                         Label(quality.rawValue, systemImage: quality.icon)
@@ -24,16 +25,18 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
             Toggle("Trackpad Mode", systemImage: "cursorarrow.motionlines",
                    isOn: trackpadBinding)
 
-            Picker("Frame Rate", selection: frameRateBinding) {
-                ForEach(RemoteFrameRate.allCases) { frameRate in
-                    Label("\(frameRate.title) (\(frameRate.rawValue) FPS)",
-                          systemImage: frameRate.systemImage)
-                        .tag(frameRate)
+            if !usesGlassyStream {
+                Picker("Frame Rate", selection: frameRateBinding) {
+                    ForEach(RemoteFrameRate.allCases) { frameRate in
+                        Label("\(frameRate.title) (\(frameRate.rawValue) FPS)",
+                              systemImage: frameRate.systemImage)
+                            .tag(frameRate)
+                    }
                 }
+                .pickerStyle(.inline)
             }
-            .pickerStyle(.inline)
 
-            if let vncSession = session as? VNCSession {
+            if !usesGlassyStream, let vncSession = session as? VNCSession {
                 Section("External Display") {
                     ExternalDisplayControllerToggle(session: vncSession,
                                                     sessionTitle: sessionTitle,
