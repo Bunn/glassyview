@@ -68,24 +68,19 @@ enum ScreenCaptureEvent: Sendable {
 
 /// Owns one ScreenCaptureKit display stream.
 ///
-/// The public frame stream has a single-element newest-only buffer. If encoding or the
-/// network stalls, an old unencoded frame is discarded rather than increasing latency.
+/// Every capture generation receives its own frame stream with a single-element
+/// newest-only buffer. If encoding or the network stalls, an old unencoded frame is
+/// discarded rather than increasing latency. A generation-local stream is important:
+/// cancelling an `AsyncStream` consumer terminates that stream, so reusing it would
+/// prevent a later capture from delivering frames.
 actor ScreenCaptureService {
     typealias EventHandler = @Sendable (ScreenCaptureEvent) -> Void
 
-    nonisolated let frames: AsyncStream<CapturedScreenFrame>
-
-    private let frameContinuation: AsyncStream<CapturedScreenFrame>.Continuation
     private let eventHandler: EventHandler
     private var activeCapture: ActiveCapture?
     private var operationGeneration: UInt64 = 0
 
     init(eventHandler: @escaping EventHandler = { _ in }) {
-        var continuation: AsyncStream<CapturedScreenFrame>.Continuation?
-        frames = AsyncStream(bufferingPolicy: .bufferingNewest(1)) {
-            continuation = $0
-        }
-        frameContinuation = continuation!
         self.eventHandler = eventHandler
     }
 
@@ -115,14 +110,15 @@ actor ScreenCaptureService {
     }
 
     deinit {
-        frameContinuation.finish()
+        activeCapture?.frameRelay.finish()
     }
 
-    /// Begins capturing the requested display, or the current main display when omitted.
+    /// Begins capturing the requested display, or the current main display when omitted,
+    /// and returns the frame stream owned by this capture generation.
     func start(
         displayID requestedDisplayID: CGDirectDisplayID? = nil,
         configuration: ScreenCaptureConfiguration = .init()
-    ) async throws {
+    ) async throws -> AsyncStream<CapturedScreenFrame> {
         operationGeneration &+= 1
         let generation = operationGeneration
 
@@ -164,7 +160,8 @@ actor ScreenCaptureService {
         streamConfiguration.showsCursor = configuration.showsCursor
         streamConfiguration.capturesAudio = false
 
-        let frameOutput = CaptureOutput(continuation: frameContinuation)
+        let frameRelay = CaptureFrameRelay<CapturedScreenFrame>()
+        let frameOutput = CaptureOutput(frameRelay: frameRelay)
         let streamDelegate = CaptureStreamDelegate { [weak self] message in
             Task {
                 await self?.captureDidStop(generation: generation, message: message)
@@ -175,16 +172,22 @@ actor ScreenCaptureService {
             configuration: streamConfiguration,
             delegate: streamDelegate
         )
-        try stream.addStreamOutput(
-            frameOutput,
-            type: .screen,
-            sampleHandlerQueue: frameOutput.queue
-        )
-
-        try await stream.startCapture()
+        do {
+            try stream.addStreamOutput(
+                frameOutput,
+                type: .screen,
+                sampleHandlerQueue: frameOutput.queue
+            )
+            try await stream.startCapture()
+        } catch {
+            try? stream.removeStreamOutput(frameOutput, type: .screen)
+            frameRelay.finish()
+            throw error
+        }
         guard generation == operationGeneration else {
             try? await stream.stopCapture()
             try? stream.removeStreamOutput(frameOutput, type: .screen)
+            frameRelay.finish()
             throw ScreenCaptureServiceError.startWasSuperseded
         }
 
@@ -193,7 +196,8 @@ actor ScreenCaptureService {
             displayID: display.displayID,
             stream: stream,
             output: frameOutput,
-            delegate: streamDelegate
+            delegate: streamDelegate,
+            frameRelay: frameRelay
         )
         eventHandler(
             .started(
@@ -202,6 +206,7 @@ actor ScreenCaptureService {
                 height: outputSize.height
             )
         )
+        return frameRelay.stream
     }
 
     func stop() async {
@@ -215,14 +220,17 @@ actor ScreenCaptureService {
 
         try? await activeCapture.stream.stopCapture()
         try? activeCapture.stream.removeStreamOutput(activeCapture.output, type: .screen)
+        activeCapture.frameRelay.finish()
         if notify {
             eventHandler(.stopped)
         }
     }
 
     private func captureDidStop(generation: UInt64, message: String) {
-        guard activeCapture?.generation == generation else { return }
-        activeCapture = nil
+        guard let activeCapture, activeCapture.generation == generation else { return }
+        self.activeCapture = nil
+        try? activeCapture.stream.removeStreamOutput(activeCapture.output, type: .screen)
+        activeCapture.frameRelay.finish()
         eventHandler(.failed(message: message))
     }
 
@@ -287,6 +295,32 @@ private extension ScreenCaptureService {
         let output: CaptureOutput
         // SCStream's delegate is weak, so the service must retain it explicitly.
         let delegate: CaptureStreamDelegate
+        let frameRelay: CaptureFrameRelay<CapturedScreenFrame>
+    }
+}
+
+/// A small, permission-free relay extracted from ScreenCaptureKit so capture generation
+/// semantics can be tested deterministically. Continuation operations are thread-safe;
+/// ScreenCaptureKit may yield on its output queue while the service finishes on its actor.
+struct CaptureFrameRelay<Element: Sendable>: Sendable {
+    let stream: AsyncStream<Element>
+    private let continuation: AsyncStream<Element>.Continuation
+
+    init() {
+        let pair = AsyncStream<Element>.makeStream(
+            bufferingPolicy: .bufferingNewest(1)
+        )
+        stream = pair.stream
+        continuation = pair.continuation
+    }
+
+    @discardableResult
+    func yield(_ element: Element) -> AsyncStream<Element>.Continuation.YieldResult {
+        continuation.yield(element)
+    }
+
+    func finish() {
+        continuation.finish()
     }
 }
 
@@ -296,10 +330,10 @@ private final class CaptureOutput: NSObject, SCStreamOutput, @unchecked Sendable
         qos: .userInteractive
     )
 
-    private let continuation: AsyncStream<CapturedScreenFrame>.Continuation
+    private let frameRelay: CaptureFrameRelay<CapturedScreenFrame>
 
-    init(continuation: AsyncStream<CapturedScreenFrame>.Continuation) {
-        self.continuation = continuation
+    init(frameRelay: CaptureFrameRelay<CapturedScreenFrame>) {
+        self.frameRelay = frameRelay
     }
 
     func stream(
@@ -317,7 +351,7 @@ private final class CaptureOutput: NSObject, SCStreamOutput, @unchecked Sendable
         let duration = sampleBuffer.duration.isValid
             ? sampleBuffer.duration
             : .invalid
-        continuation.yield(
+        frameRelay.yield(
             CapturedScreenFrame(
                 pixelBuffer: pixelBuffer,
                 presentationTimeStamp: sampleBuffer.presentationTimeStamp,

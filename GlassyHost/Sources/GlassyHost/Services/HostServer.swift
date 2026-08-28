@@ -87,6 +87,13 @@ final class HostServer: @unchecked Sendable {
         core.setRemoteInputHandler(handler)
     }
 
+    /// Removes H.264 bootstrap data and queued media from the capture generation
+    /// that just ended. The controller calls this only after the encoder has
+    /// completed its callbacks, so a late callback cannot restore stale state.
+    func clearVideoState() async {
+        await core.clearVideoState()
+    }
+
     /// Broadcasts H.264 SPS/PPS configuration to authenticated clients and
     /// caches it for the next viewer.
     func broadcastCodecConfiguration(parameterSets: [Data],
@@ -172,7 +179,7 @@ private extension HostServer {
         private var hostIdentifier = Data(repeating: 0,
                                           count: HostProtocol.identifierLength)
         private var failedPairingAttempts: [Date] = []
-        private var cachedCodecConfiguration: Data?
+        private var videoBootstrapCache = HostVideoBootstrapCache()
         private let mediaIngress = MediaIngress()
         private var keyFrameRequestHandler: (@Sendable () -> Void)?
         private var remoteInputHandler: RemoteInputHandler?
@@ -232,6 +239,15 @@ private extension HostServer {
             }
         }
 
+        func clearVideoState() async {
+            await withCheckedContinuation { continuation in
+                queue.async { [weak self] in
+                    self?.clearVideoStateLocked()
+                    continuation.resume()
+                }
+            }
+        }
+
         func replacePairingSecretAndRestart(_ pairingSecret: Data) {
             queue.async { [weak self] in
                 self?.startLocked(pairingSecret: pairingSecret)
@@ -247,7 +263,7 @@ private extension HostServer {
         func broadcastCodecConfiguration(_ payload: Data) {
             queue.async { [weak self] in
                 guard let self else { return }
-                cachedCodecConfiguration = payload
+                videoBootstrapCache.storeCodecConfiguration(payload)
                 for client in authenticatedClients {
                     client.needsKeyFrame = true
                     _ = enqueueEncrypted(payload,
@@ -257,6 +273,18 @@ private extension HostServer {
                                          for: client)
                 }
                 requestKeyFrameIfNeeded(for: authenticatedClients)
+            }
+        }
+
+        private func clearVideoStateLocked() {
+            videoBootstrapCache.clear()
+            mediaIngress.reset()
+
+            for client in authenticatedClients {
+                client.removeQueuedVideoPackets()
+                client.needsKeyFrame = true
+                client.keyFrameRequestOutstanding = false
+                sendNextPacket(for: client)
             }
         }
 
@@ -622,7 +650,7 @@ private extension HostServer {
                                  policy: .control,
                                  for: client)
 
-            if let cachedCodecConfiguration {
+            if let cachedCodecConfiguration = videoBootstrapCache.codecConfiguration {
                 _ = enqueueEncrypted(cachedCodecConfiguration,
                                      kind: .videoConfiguration,
                                      flags: [],
@@ -942,6 +970,15 @@ private extension HostServer.Core {
                 return nil
             }
         }
+
+        func reset() {
+            lock.withLock {
+                pending = nil
+                drainIsScheduled = false
+                awaitingKeyFrame = false
+                keyFrameRequestWasReported = false
+            }
+        }
     }
 
     final class Client: @unchecked Sendable {
@@ -992,6 +1029,29 @@ private extension HostServer.Core {
             }
             return removedAny
         }
+        func removeQueuedVideoPackets() {
+            pendingPackets.removeAll { packet in
+                switch packet.policy {
+                case .codecConfiguration, .keyFrame, .deltaFrame:
+                    pendingByteCount -= packet.data.count
+                    return true
+                case .control:
+                    return false
+                }
+            }
+        }
+    }
+}
+
+struct HostVideoBootstrapCache: Sendable {
+    private(set) var codecConfiguration: Data?
+
+    mutating func storeCodecConfiguration(_ payload: Data) {
+        codecConfiguration = payload
+    }
+
+    mutating func clear() {
+        codecConfiguration = nil
     }
 }
 

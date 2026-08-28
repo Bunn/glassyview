@@ -253,7 +253,7 @@ final class HostController {
         }
 
         do {
-            try await captureService.start(
+            let frames = try await captureService.start(
                 displayID: selectedDisplayID,
                 configuration: .init(
                     framesPerSecond: 60,
@@ -263,7 +263,6 @@ final class HostController {
                 )
             )
 
-            let frames = captureService.frames
             frameTask = Task { [weak self, encoder] in
                 do {
                     for await frame in frames {
@@ -273,7 +272,10 @@ final class HostController {
                 } catch is CancellationError {
                     // Normal shutdown.
                 } catch {
-                    await self?.handlePipelineFailure(error)
+                    let failure = HostPipelineError(message: error.localizedDescription)
+                    Task { @MainActor [weak self] in
+                        await self?.handlePipelineFailure(failure)
+                    }
                 }
             }
 
@@ -288,6 +290,7 @@ final class HostController {
             await encoder.finish()
             self.encoder = nil
             hostServer.setKeyFrameRequestHandler(nil)
+            await hostServer.clearVideoState()
             fail(with: error)
             return false
         }
@@ -295,12 +298,17 @@ final class HostController {
 
     private func stopCapturePipeline() async {
         remoteInputService.setEnabled(false)
-        frameTask?.cancel()
+        let frameTaskToStop = frameTask
         frameTask = nil
+        frameTaskToStop?.cancel()
         await captureService.stop()
+        if let frameTaskToStop {
+            await frameTaskToStop.value
+        }
         await encoder?.finish()
         encoder = nil
         hostServer.setKeyFrameRequestHandler(nil)
+        await hostServer.clearVideoState()
         isStreaming = false
         if isServerReady {
             runState = .ready
