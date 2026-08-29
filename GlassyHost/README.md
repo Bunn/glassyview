@@ -14,6 +14,14 @@ The script builds and signs `dist/Glassy Host.app`, installs a verified copy at 
 
 Grant Screen Recording and Accessibility access locally, then leave Glassy Host running. Its lightweight `_glassydesk._tcp` listener remains available without recording the screen. Capture starts automatically after a Glassy Desk device completes the authenticated pairing or resume handshake, then stops five seconds after the final device disconnects. **Start Streaming Continuously** is available as an explicit always-on override.
 
+### Pair new devices with a code or password
+
+The rotating 12-symbol code shown by Glassy Host is the default and is always available. If copying that code is inconvenient for a remote Tailscale Mac, choose **Set Password…** in the pairing section. A new Glassy Desk device can then explicitly choose Password while using the Mac's Tailscale `100.64.0.0/10` address, Tailscale IPv6 address, or full `.ts.net` MagicDNS name. Before pairing, confirm Tailscale is connected on both devices and the selected tailnet peer is the intended Mac. Glassy Desk checks for a recognizable Tailscale address and an active VPN route, and intentionally requires the one-time code for Nearby, ordinary LAN, and other raw TCP routes. This is an operational trust requirement: the password handshake is not a PAKE, so the rotating code remains the safer choice whenever the route or peer is uncertain. Devices that are already paired continue using their device- and host-bound resume credential, so they do not need the code or password again.
+
+Pairing passwords must contain 15–128 characters. Spaces are allowed and significant; line breaks and control characters are not. Use a long, unique passphrase for a remotely reachable Mac. Glassy Host applies NFC normalization and 600,000 rounds of PBKDF2-HMAC-SHA256, then saves only the resulting 32-byte, host-bound credential in the encrypted macOS login Keychain without enabling iCloud synchronization. The plaintext password is never stored, logged, or displayed.
+
+Changing or removing the password does not disconnect authenticated viewers and does not unpair existing devices. Replacing the host pairing key intentionally unpairs every device and removes the password because the password credential is bound to that host identity.
+
 Connected Glassy Desk devices can request Data Saver (720p/15 FPS/~2 Mbps), Balanced (1080p/30 FPS/~5 Mbps), or Best (up to 4K/60 FPS/~12 Mbps). The host accepts only these bounded presets and reconfigures capture and H.264 encoding without dropping the authenticated session. Because one encoder serves every connected device, the most bandwidth-conscious active request determines the shared stream.
 
 ## Connect remotely with Tailscale
@@ -24,7 +32,7 @@ Tailscale provides a private route to a remote Mac without exposing Glassy Host 
 2. Install and run the same current Glassy Desk/Glassy Host version on both devices. Leave Glassy Host running and grant its Screen Recording and Accessibility permissions.
 3. In Tailscale on the Mac, copy the Mac's MagicDNS name or `100.x.y.z` address.
 4. In Glassy Desk, edit the saved Mac, select **Glassy Stream**, enter that Tailscale name or address, and use TCP port `51515`.
-5. Connect and enter the pairing code currently shown by Glassy Host on that remote Mac. The code must come from the Mac whose Tailscale address you entered.
+5. Connect and enter either the pairing code currently shown by Glassy Host on that remote Mac or its configured pairing password. The credential must belong to the Mac whose Tailscale address you entered.
 
 The nearby-host picker uses Bonjour, which normally discovers only Macs on the iPad's local network. A remote Tailscale Mac is therefore not expected to appear in that list; connect with its saved address instead. Do not configure router port forwarding or expose port `51515` publicly.
 
@@ -41,4 +49,4 @@ The package is intentionally separate from the iOS Xcode project so both apps re
 
 ## Signing
 
-The build script prefers an Apple Development identity and uses Keychain for the long-lived pairing credential in that case. If no development identity is installed, it creates an ad-hoc signed app and keeps the 256-bit credential in an owner-only Application Support file. Ad-hoc rebuilds can require Screen Recording permission to be granted again because their signing identity is not stable.
+The build script prefers an Apple Development identity and uses Keychain for the long-lived pairing credential in that case. If no development identity is installed, it creates an ad-hoc signed app and keeps the 256-bit host credential in an owner-only Application Support file. The optional reusable password credential never uses that fallback: it is stored only in the macOS login Keychain, and an access failure leaves rotating-code pairing available. Ad-hoc rebuilds can require Screen Recording permission to be granted again and may not retain Keychain access because their signing identity is not stable.

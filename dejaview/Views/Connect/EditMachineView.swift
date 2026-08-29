@@ -160,7 +160,7 @@ struct EditMachineView<Store: MachineStoring>: View {
                             glassyHostName = nil
                         }
                     } footer: {
-                        Text("Changing this forgets the saved host identity. A new pairing code will be required on the next connection.")
+                        Text("Changing this forgets the saved host identity. New pairing approval will be required on the next connection.")
                     }
                     .id(glassyHostIdentifier)
                 }

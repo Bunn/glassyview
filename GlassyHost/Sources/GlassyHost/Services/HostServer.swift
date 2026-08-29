@@ -45,14 +45,21 @@ final class HostServer: @unchecked Sendable {
     /// this call with the same secret is idempotent; a different secret safely
     /// replaces the listener and all sessions.
     func start(pairingSecret: Data,
+               pairingPasswordCredential: Data? = nil,
                onClientCountChange: @escaping ClientCountHandler = { _ in },
                onStatusChange: @escaping StatusHandler = { _ in }) {
         guard pairingSecret.count >= 32 else {
             onStatusChange(.failed("The pairing secret must contain at least 32 random bytes."))
             return
         }
+        guard pairingPasswordCredential == nil
+                || pairingPasswordCredential?.count == PairingPasswordPolicy.derivedCredentialLength else {
+            onStatusChange(.failed("The pairing password credential must contain exactly 32 bytes."))
+            return
+        }
         pairingCodeSource.replaceSecret(pairingSecret)
         core.start(pairingSecret: pairingSecret,
+                   pairingPasswordCredential: pairingPasswordCredential,
                    onClientCountChange: onClientCountChange,
                    onStatusChange: onStatusChange)
     }
@@ -70,6 +77,18 @@ final class HostServer: @unchecked Sendable {
         }
         pairingCodeSource.replaceSecret(pairingSecret)
         core.replacePairingSecretAndRestart(pairingSecret)
+    }
+
+    /// Updates the optional first-use password without disturbing the listener
+    /// or authenticated viewers. Incomplete handshakes are retired so they
+    /// cannot finish against a credential that changed underneath them.
+    func setPairingPasswordCredential(_ credential: Data?) {
+        guard credential == nil
+                || credential?.count == PairingPasswordPolicy.derivedCredentialLength else {
+            core.reportInvalidPairingPasswordCredential()
+            return
+        }
+        core.setPairingPasswordCredential(credential)
     }
 
     /// A thread-safe snapshot for UI. The root secret is never returned or
@@ -175,7 +194,7 @@ final class HostServer: @unchecked Sendable {
         core.clearCursorPosition()
     }
 
-    fileprivate static func makeHostIdentifier(from pairingSecret: Data) -> Data {
+    static func makeHostIdentifier(from pairingSecret: Data) -> Data {
         let digest = HMAC<SHA256>.authenticationCode(
             for: Data("Glassy Host identity v1".utf8),
             using: SymmetricKey(data: pairingSecret)
@@ -221,7 +240,6 @@ private extension HostServer {
         private static let maximumConnections = 12
         private static let maximumUnauthenticatedConnections = 4
         private static let authenticationTimeout: TimeInterval = 15
-        private static let maximumPairingFailuresPerMinute = 8
         private static let maximumQueuedBytesPerClient = 24 * 1024 * 1024
         private static let maximumQueuedMessagesPerClient = 10
 
@@ -239,9 +257,10 @@ private extension HostServer {
         private var authenticatedClientRegistry = HostAuthenticatedClientRegistry()
         private var rootSecret = SymmetricKey(size: .bits256)
         private var rootSecretData: Data?
+        private var pairingPasswordCredential: Data?
         private var hostIdentifier = Data(repeating: 0,
                                           count: HostProtocol.identifierLength)
-        private var failedPairingAttempts: [Date] = []
+        private var pairingAttemptLimiter = HostPairingAttemptLimiter()
         private var videoBootstrapCache = HostVideoBootstrapCache()
         private var latestCursorPosition: HostProtocol.CursorPosition?
         private let mediaIngress = MediaIngress()
@@ -262,6 +281,7 @@ private extension HostServer {
         }
 
         func start(pairingSecret: Data,
+                   pairingPasswordCredential: Data?,
                    onClientCountChange: @escaping ClientCountHandler,
                    onStatusChange: @escaping StatusHandler) {
             queue.async { [weak self] in
@@ -270,6 +290,9 @@ private extension HostServer {
                 statusHandler = onStatusChange
 
                 if rootSecretData == pairingSecret, listener != nil {
+                    if self.pairingPasswordCredential != pairingPasswordCredential {
+                        setPairingPasswordCredentialLocked(pairingPasswordCredential)
+                    }
                     switch lastStatus {
                     case .starting, .listening:
                         onClientCountChange(lastPublishedClientCount)
@@ -279,7 +302,10 @@ private extension HostServer {
                         break
                     }
                 }
-                startLocked(pairingSecret: pairingSecret)
+                startLocked(
+                    pairingSecret: pairingSecret,
+                    pairingPasswordCredential: pairingPasswordCredential
+                )
             }
         }
 
@@ -336,13 +362,30 @@ private extension HostServer {
 
         func replacePairingSecretAndRestart(_ pairingSecret: Data) {
             queue.async { [weak self] in
-                self?.startLocked(pairingSecret: pairingSecret)
+                self?.startLocked(
+                    pairingSecret: pairingSecret,
+                    pairingPasswordCredential: nil
+                )
+            }
+        }
+
+        func setPairingPasswordCredential(_ credential: Data?) {
+            queue.async { [weak self] in
+                self?.setPairingPasswordCredentialLocked(credential)
             }
         }
 
         func reportInvalidPairingSecret() {
             queue.async { [weak self] in
                 self?.publishStatus(.failed("The pairing secret must contain at least 32 random bytes."))
+            }
+        }
+
+        func reportInvalidPairingPasswordCredential() {
+            queue.async { [weak self] in
+                self?.publishStatus(.failed(
+                    "The pairing password credential must contain exactly 32 bytes."
+                ))
             }
         }
 
@@ -472,7 +515,10 @@ private extension HostServer {
             }
         }
 
-        private func startLocked(pairingSecret: Data) {
+        private func startLocked(
+            pairingSecret: Data,
+            pairingPasswordCredential: Data?
+        ) {
             stopLocked(publishStopped: false)
 
             generation = UUID()
@@ -480,9 +526,27 @@ private extension HostServer {
             rootSecretData = pairingSecret
             rootSecret = SymmetricKey(data: pairingSecret)
             hostIdentifier = HostServer.makeHostIdentifier(from: pairingSecret)
-            failedPairingAttempts.removeAll(keepingCapacity: true)
+            self.pairingPasswordCredential = pairingPasswordCredential
+            pairingAttemptLimiter.reset()
             publishStatus(.starting)
             startListenerLocked(activeGeneration: activeGeneration)
+        }
+
+        private func setPairingPasswordCredentialLocked(_ credential: Data?) {
+            guard pairingPasswordCredential != credential else { return }
+            pairingPasswordCredential = credential
+            pairingAttemptLimiter.reset()
+
+            // Authentication proofs are bound to the capability and credential
+            // snapshot in ServerHello. Retire incomplete handshakes so every
+            // attempt observes one coherent password configuration.
+            let incompleteClients = clients.values.filter { !$0.isAuthenticated }
+            for client in incompleteClients {
+                remove(client, publishChanges: false)
+            }
+            Self.logger.notice(
+                "Pairing password \(credential == nil ? "disabled" : "updated", privacy: .public)"
+            )
         }
 
         private func startListenerLocked(activeGeneration: UUID) {
@@ -736,7 +800,9 @@ private extension HostServer {
                     serverPublicKey: privateKey.publicKey.rawRepresentation,
                     pairingWindow: window,
                     pairingCodeLifetimeSeconds: UInt16(HostProtocol.pairingCodeLifetime),
-                    capabilities: HostProtocol.advertisedCapabilities.rawValue,
+                    capabilities: HostProtocol.advertisedCapabilities(
+                        pairingPasswordEnabled: pairingPasswordCredential != nil
+                    ).rawValue,
                     serverName: serviceName
                 )
                 client.authorizationState = .awaitingProof(
@@ -773,9 +839,20 @@ private extension HostServer {
                             // response to an integrity/protocol violation.
                             remove(client)
                         } else {
-                            sendErrorAndClose(code: 1,
-                                              message: "Invalid protocol message.",
-                                              client: client)
+                            let isAuthenticationFailure: Bool
+                            if let protocolError = error as? HostProtocol.ProtocolError,
+                               case .invalidAuthentication = protocolError {
+                                isAuthenticationFailure = true
+                            } else {
+                                isAuthenticationFailure = false
+                            }
+                            sendErrorAndClose(
+                                code: isAuthenticationFailure ? 2 : 1,
+                                message: isAuthenticationFailure
+                                    ? "Authentication failed."
+                                    : "Invalid protocol message.",
+                                client: client
+                            )
                         }
                         return
                     }
@@ -828,58 +905,87 @@ private extension HostServer {
             guard frame.sequence == 1,
                   frame.kind == .clientHello,
                   frame.flags.isEmpty,
-                  frame.payload.count <= HostProtocol.maximumHandshakePayloadLength,
-                  pairingAttemptIsAllowed() else {
-                recordFailedPairingAttempt()
+                  frame.payload.count <= HostProtocol.maximumHandshakePayloadLength else {
                 throw HostProtocol.ProtocolError.invalidAuthentication
             }
 
             let hello = try HostProtocol.decodeClientHello(frame.payload)
-            let publicKey = try Curve25519.KeyAgreement.PublicKey(
-                rawRepresentation: hello.clientPublicKey
-            )
-            let sharedSecret = try context.privateKey.sharedSecretFromKeyAgreement(with: publicKey)
-            let transcript = try HostProtocol.authenticationTranscript(
-                serverHello: context.hello,
-                clientHello: hello
-            )
-
-            let resumeSecret = try HostProtocol.resumeSecret(
-                rootSecret: rootSecret,
-                clientIdentifier: hello.clientIdentifier
-            )
-            let credential: Data
-            switch hello.authenticationMethod {
-            case .pairingCode:
-                let currentWindow = HostProtocol.pairingWindow(at: Date())
-                let lowerWindow = min(hello.pairingWindow, currentWindow)
-                let upperWindow = max(hello.pairingWindow, currentWindow)
-                guard upperWindow - lowerWindow <= 1 else {
-                    recordFailedPairingAttempt()
-                    throw HostProtocol.ProtocolError.invalidAuthentication
-                }
-                let code = HostProtocol.pairingCode(rootSecret: rootSecret,
-                                                    window: hello.pairingWindow)
-                credential = Data(code.utf8)
-            case .resumeSecret:
-                credential = resumeSecret
-            }
-
-            let authenticationKey = HostProtocol.authenticationKey(
-                sharedSecret: sharedSecret,
-                credential: credential,
-                transcript: transcript
-            )
-            guard HostProtocol.isValidProof(hello.proof,
-                                            authenticationKey: authenticationKey,
-                                            transcript: transcript) else {
-                recordFailedPairingAttempt()
+            let isBootstrapPairing = hello.authenticationMethod.isBootstrapPairing
+            guard !isBootstrapPairing || pairingAttemptLimiter.isAllowed() else {
                 throw HostProtocol.ProtocolError.invalidAuthentication
             }
 
-            let material = HostProtocol.sessionMaterial(sharedSecret: sharedSecret,
-                                                        credential: credential,
-                                                        transcript: transcript)
+            let authentication: (
+                credential: Data,
+                resumeSecret: Data,
+                sharedSecret: SharedSecret,
+                transcript: Data
+            )
+            do {
+                let publicKey = try Curve25519.KeyAgreement.PublicKey(
+                    rawRepresentation: hello.clientPublicKey
+                )
+                let sharedSecret = try context.privateKey.sharedSecretFromKeyAgreement(
+                    with: publicKey
+                )
+                let transcript = try HostProtocol.authenticationTranscript(
+                    serverHello: context.hello,
+                    clientHello: hello
+                )
+                let resumeSecret = try HostProtocol.resumeSecret(
+                    rootSecret: rootSecret,
+                    clientIdentifier: hello.clientIdentifier
+                )
+
+                let credential: Data
+                switch hello.authenticationMethod {
+                case .pairingCode:
+                    let currentWindow = HostProtocol.pairingWindow(at: Date())
+                    let lowerWindow = min(hello.pairingWindow, currentWindow)
+                    let upperWindow = max(hello.pairingWindow, currentWindow)
+                    guard upperWindow - lowerWindow <= 1 else {
+                        throw HostProtocol.ProtocolError.invalidAuthentication
+                    }
+                    let code = HostProtocol.pairingCode(
+                        rootSecret: rootSecret,
+                        window: hello.pairingWindow
+                    )
+                    credential = Data(code.utf8)
+                case .pairingPasswordV1:
+                    guard hello.pairingWindow == context.hello.pairingWindow,
+                          let pairingPasswordCredential else {
+                        throw HostProtocol.ProtocolError.invalidAuthentication
+                    }
+                    credential = pairingPasswordCredential
+                case .resumeSecret:
+                    credential = resumeSecret
+                }
+
+                let authenticationKey = HostProtocol.authenticationKey(
+                    sharedSecret: sharedSecret,
+                    credential: credential,
+                    transcript: transcript
+                )
+                guard HostProtocol.isValidProof(
+                    hello.proof,
+                    authenticationKey: authenticationKey,
+                    transcript: transcript
+                ) else {
+                    throw HostProtocol.ProtocolError.invalidAuthentication
+                }
+                authentication = (credential, resumeSecret, sharedSecret, transcript)
+            } catch {
+                if isBootstrapPairing {
+                    pairingAttemptLimiter.recordFailureIfAllowed()
+                }
+                throw error
+            }
+
+            let material = HostProtocol.sessionMaterial(
+                sharedSecret: authentication.sharedSecret,
+                credential: authentication.credential,
+                transcript: authentication.transcript
+            )
             client.authorizationState = .authenticated(material)
             client.clientIdentifier = hello.clientIdentifier
             client.needsKeyFrame = true
@@ -898,7 +1004,7 @@ private extension HostServer {
 
             let accepted = HostProtocol.AuthenticationAccepted(
                 clientIdentifier: hello.clientIdentifier,
-                resumeSecret: resumeSecret,
+                resumeSecret: authentication.resumeSecret,
                 serverTimeMilliseconds: UInt64(Date().timeIntervalSince1970 * 1_000),
                 maximumMediaPayloadLength: UInt32(HostProtocol.maximumPayloadLength)
             )
@@ -1144,17 +1250,6 @@ private extension HostServer {
             guard publishChanges else { return }
             publishAuthenticatedClientCountIfNeeded()
             publishEffectiveStreamQualityIfNeeded()
-        }
-
-        private func pairingAttemptIsAllowed(at date: Date = Date()) -> Bool {
-            failedPairingAttempts.removeAll {
-                date.timeIntervalSince($0) >= 60
-            }
-            return failedPairingAttempts.count < Self.maximumPairingFailuresPerMinute
-        }
-
-        private func recordFailedPairingAttempt() {
-            failedPairingAttempts.append(Date())
         }
 
         private func publishAuthenticatedClientCountIfNeeded(force: Bool = false) {
@@ -1440,6 +1535,38 @@ struct HostStreamQualityArbitration: Sendable {
         guard force || quality != lastPublishedQuality else { return nil }
         lastPublishedQuality = quality
         return quality
+    }
+}
+
+struct HostPairingAttemptLimiter: Sendable {
+    static let maximumFailures = 8
+    static let window: TimeInterval = 60
+
+    private(set) var failureDates: [Date] = []
+
+    mutating func isAllowed(at date: Date = Date()) -> Bool {
+        discardExpiredFailures(at: date)
+        return failureDates.count < Self.maximumFailures
+    }
+
+    /// Records only a still-allowed attempt. Requests received while blocked do
+    /// not move the window forward, so repeated traffic cannot extend a block.
+    @discardableResult
+    mutating func recordFailureIfAllowed(at date: Date = Date()) -> Bool {
+        discardExpiredFailures(at: date)
+        guard failureDates.count < Self.maximumFailures else { return false }
+        failureDates.append(date)
+        return true
+    }
+
+    mutating func reset() {
+        failureDates.removeAll(keepingCapacity: true)
+    }
+
+    private mutating func discardExpiredFailures(at date: Date) {
+        failureDates.removeAll {
+            date.timeIntervalSince($0) >= Self.window
+        }
     }
 }
 

@@ -91,7 +91,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     func connect(
         endpoint: NWEndpoint,
         savedMachineID: UUID,
-        pairingCode: String?,
+        bootstrapCredential: GlassyStreamBootstrapCredential?,
         expectedHostIdentifier: Data? = nil,
         desiredQuality: RemoteSessionQuality = .best,
         fallbackEndpoints: [NWEndpoint] = []
@@ -106,12 +106,15 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         let configuration = ConnectionConfiguration(
             endpoint: endpoint,
             savedMachineID: savedMachineID,
-            pairingCode: pairingCode,
+            bootstrapCredential: bootstrapCredential,
             expectedHostIdentifier: expectedHostIdentifier,
             desiredQuality: desiredQuality,
             reconnectEndpoints: fallbackEndpoints
         )
-        retryConfiguration = configuration
+        // A bootstrap credential is user-entered, so never retain it as a
+        // retry route. Successful authentication replaces this with a safe
+        // configuration that resumes through the random Keychain secret.
+        retryConfiguration = bootstrapCredential == nil ? configuration : nil
         return try await connect(using: configuration)
     }
 
@@ -127,7 +130,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         let configuration = ConnectionConfiguration(
             endpoint: .hostPort(host: NWEndpoint.Host(host), port: networkPort),
             savedMachineID: fallbackSavedMachineID,
-            pairingCode: nil,
+            bootstrapCredential: nil,
             expectedHostIdentifier: nil,
             desiredQuality: quality
         )
@@ -482,7 +485,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
             let authentication = try await controller.connect(
                 endpoint: configuration.endpoint,
                 savedMachineID: configuration.savedMachineID,
-                pairingCode: configuration.pairingCode,
+                bootstrapCredential: configuration.bootstrapCredential,
                 expectedHostIdentifier: configuration.expectedHostIdentifier,
                 desiredQuality: configuration.desiredQuality
             )
@@ -758,6 +761,10 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
             case .cancelled,
                  .pairingCodeRequired,
                  .invalidPairingCode,
+                 .invalidPairingPassword,
+                 .pairingPasswordRequiresTailscale,
+                 .pairingPasswordUnsupported,
+                 .pairingPasswordDerivationFailed,
                  .authenticationRejected,
                  .hostIdentityMismatch,
                  .directInputUnsupported,
@@ -960,7 +967,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 private struct ConnectionConfiguration: @unchecked Sendable {
     let endpoint: NWEndpoint
     let savedMachineID: UUID
-    let pairingCode: String?
+    let bootstrapCredential: GlassyStreamBootstrapCredential?
     let expectedHostIdentifier: Data?
     var desiredQuality: RemoteSessionQuality
     let reconnectEndpoints: [NWEndpoint]
@@ -968,14 +975,14 @@ private struct ConnectionConfiguration: @unchecked Sendable {
     init(
         endpoint: NWEndpoint,
         savedMachineID: UUID,
-        pairingCode: String?,
+        bootstrapCredential: GlassyStreamBootstrapCredential?,
         expectedHostIdentifier: Data?,
         desiredQuality: RemoteSessionQuality,
         reconnectEndpoints: [NWEndpoint] = []
     ) {
         self.endpoint = endpoint
         self.savedMachineID = savedMachineID
-        self.pairingCode = pairingCode
+        self.bootstrapCredential = bootstrapCredential
         self.expectedHostIdentifier = expectedHostIdentifier
         self.desiredQuality = desiredQuality
         self.reconnectEndpoints = Self.orderedUniqueEndpoints(
@@ -984,10 +991,10 @@ private struct ConnectionConfiguration: @unchecked Sendable {
     }
 
     /// Reconnect routes are only eligible after a host has authenticated. This
-    /// guarantees an alternate address can never receive a one-time pairing
-    /// code and must prove the identity pinned by the successful connection.
+    /// guarantees an alternate address can never receive a first-use pairing
+    /// credential and must prove the identity pinned by the successful connection.
     func configurationForReconnectAttempt(_ attempt: Int) -> Self {
-        guard pairingCode == nil,
+        guard bootstrapCredential == nil,
               expectedHostIdentifier != nil,
               !reconnectEndpoints.isEmpty else { return self }
 
@@ -1001,7 +1008,7 @@ private struct ConnectionConfiguration: @unchecked Sendable {
         Self(
             endpoint: endpoint,
             savedMachineID: savedMachineID,
-            pairingCode: nil,
+            bootstrapCredential: nil,
             expectedHostIdentifier: hostIdentifier,
             desiredQuality: desiredQuality,
             reconnectEndpoints: reconnectEndpoints
@@ -1012,7 +1019,7 @@ private struct ConnectionConfiguration: @unchecked Sendable {
         Self(
             endpoint: endpoint,
             savedMachineID: savedMachineID,
-            pairingCode: nil,
+            bootstrapCredential: nil,
             expectedHostIdentifier: expectedHostIdentifier,
             desiredQuality: desiredQuality,
             reconnectEndpoints: reconnectEndpoints

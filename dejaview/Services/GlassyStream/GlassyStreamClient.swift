@@ -204,12 +204,31 @@ final class GlassyStreamClient: @unchecked Sendable {
             return
         }
 
-        if let pairingCode = configuration.pairingCode,
-           GlassyStreamWire.normalizedPairingCode(pairingCode) == nil {
-            callbackQueue.async {
-                callbacks.onCompletion(.failure(.invalidPairingCode))
+        if let bootstrapCredential = configuration.bootstrapCredential {
+            let validationError: GlassyStreamClientError?
+            switch bootstrapCredential {
+            case .oneTimeCode(let pairingCode):
+                validationError = GlassyStreamWire.normalizedPairingCode(pairingCode) == nil
+                    ? .invalidPairingCode
+                    : nil
+            case .password(let password):
+                if !GlassyStreamEndpoint.isRecognizedTailscaleEndpoint(
+                    configuration.endpoint
+                ) {
+                    validationError = .pairingPasswordRequiresTailscale
+                } else {
+                    validationError = GlassyStreamPairingPassword.validated(password) == nil
+                        ? .invalidPairingPassword
+                        : nil
+                }
             }
-            return
+
+            if let validationError {
+                callbackQueue.async {
+                    callbacks.onCompletion(.failure(validationError))
+                }
+                return
+            }
         }
 
         if let expectedHostIdentifier = configuration.expectedHostIdentifier,
@@ -234,6 +253,7 @@ final class GlassyStreamClient: @unchecked Sendable {
 
         generation = UUID()
         let activeGeneration = generation
+        let authenticationTimeout = configuration.authenticationTimeout
         self.configuration = configuration
         self.callbackQueue = DispatchQueue(
             label: "dev.bunn.glassydesk.glassy-stream.callbacks.\(activeGeneration.uuidString)",
@@ -268,10 +288,19 @@ final class GlassyStreamClient: @unchecked Sendable {
             switch networkState {
             case .ready:
                 guard case .connecting = state else { return }
+                if let bootstrapCredential = self.configuration?.bootstrapCredential,
+                   case .password = bootstrapCredential,
+                   connection.currentPath?.usesInterfaceType(.other) != true {
+                    finish(
+                        .failure(.pairingPasswordRequiresTailscale),
+                        generation: activeGeneration
+                    )
+                    return
+                }
                 cancelConnectionEstablishmentTimeout()
                 state = .awaitingServerHello
                 scheduleAuthenticationTimeout(
-                    after: configuration.authenticationTimeout,
+                    after: authenticationTimeout,
                     generation: activeGeneration
                 )
                 AppLog.session.info("Glassy Stream TCP connection ready")
@@ -415,15 +444,32 @@ final class GlassyStreamClient: @unchecked Sendable {
             clientIdentifier = try secureRandomData(count: GlassyStreamWire.identifierLength)
         }
 
-        let credential: Data
+        var credential: Data
         let method: GlassyStreamWire.AuthenticationMethod
         let resumedSession: Bool
-        if let suppliedCode = configuration.pairingCode {
-            guard let code = GlassyStreamWire.normalizedPairingCode(suppliedCode) else {
-                throw GlassyStreamClientError.invalidPairingCode
+        if let bootstrapCredential = configuration.bootstrapCredential {
+            switch bootstrapCredential {
+            case .oneTimeCode(let suppliedCode):
+                guard let code = GlassyStreamWire.normalizedPairingCode(suppliedCode) else {
+                    throw GlassyStreamClientError.invalidPairingCode
+                }
+                credential = Data(code.utf8)
+                method = .pairingCode
+            case .password(let suppliedPassword):
+                guard GlassyStreamEndpoint.isRecognizedTailscaleEndpoint(
+                    configuration.endpoint
+                ) else {
+                    throw GlassyStreamClientError.pairingPasswordRequiresTailscale
+                }
+                guard capabilities.contains(.pairingPassword) else {
+                    throw GlassyStreamClientError.pairingPasswordUnsupported
+                }
+                credential = try GlassyStreamPairingPassword.deriveCredential(
+                    from: suppliedPassword,
+                    hostIdentifier: serverHello.hostIdentifier
+                )
+                method = .pairingPasswordV1
             }
-            credential = Data(code.utf8)
-            method = .pairingCode
             resumedSession = false
         } else if let storedCredential {
             credential = storedCredential.resumeSecret
@@ -432,6 +478,14 @@ final class GlassyStreamClient: @unchecked Sendable {
         } else {
             throw GlassyStreamClientError.pairingCodeRequired(hostName: serverHello.serverName)
         }
+        defer {
+            credential.resetBytes(in: credential.startIndex..<credential.endIndex)
+        }
+
+        // The bootstrap credential has served its only purpose. Keep the
+        // non-sensitive connection settings needed after authentication, but
+        // release the user's code or password before waiting on the network.
+        self.configuration = configuration.withoutBootstrapCredential()
 
         let privateKey = Curve25519.KeyAgreement.PrivateKey()
         let serverPublicKey: Curve25519.KeyAgreement.PublicKey

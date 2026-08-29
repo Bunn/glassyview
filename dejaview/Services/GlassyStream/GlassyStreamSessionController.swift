@@ -44,9 +44,17 @@ enum GlassyStreamSessionError: Error, LocalizedError, Sendable {
         case let .transport(error):
             switch error {
             case .pairingCodeRequired:
-                "Enter the current twelve-symbol code shown by Glassy Host."
+                "Enter the current twelve-symbol code, or choose Password if Glassy Host has a reusable pairing password configured."
             case .invalidPairingCode, .authenticationRejected:
-                "Check the code shown by Glassy Host and try pairing again."
+                "Check the selected code or password and try pairing again."
+            case .invalidPairingPassword:
+                "Use a 15 through 128 character password without control characters or line breaks."
+            case .pairingPasswordRequiresTailscale:
+                "Connect Tailscale on this iPad, confirm the selected peer is your Mac, and save its 100.64–100.127 address, Tailscale IPv6 address, or full .ts.net name. Otherwise, use the one-time code."
+            case .pairingPasswordUnsupported:
+                "Update Glassy Host or pair with its current one-time code instead."
+            case .pairingPasswordDerivationFailed:
+                "Restart Glassy Desk and try again, or use the current one-time code."
             case .hostIdentityMismatch:
                 "The saved address reached a different Mac. Check the Tailscale name or IP, or choose Pair a Different Mac in the machine editor."
             case .directInputUnsupported, .unsupportedHostVersion:
@@ -123,14 +131,14 @@ final class GlassyStreamSessionController {
 
     /// Opens an encrypted Glassy Stream connection and waits for authentication.
     ///
-    /// Pass `nil` for `pairingCode` to resume a previously paired saved machine.
-    /// A new call replaces any in-flight or connected session owned by this
-    /// controller.
+    /// Pass `nil` for `bootstrapCredential` to resume a previously paired saved
+    /// machine. A new call replaces any in-flight or connected session owned by
+    /// this controller.
     @discardableResult
     func connect(
         endpoint: NWEndpoint,
         savedMachineID: UUID,
-        pairingCode: String?,
+        bootstrapCredential: GlassyStreamBootstrapCredential?,
         expectedHostIdentifier: Data? = nil,
         desiredQuality: RemoteSessionQuality = .best
     ) async throws -> GlassyStreamAuthentication {
@@ -148,7 +156,7 @@ final class GlassyStreamSessionController {
         let configuration = GlassyStreamConnectionConfiguration(
             endpoint: endpoint,
             savedMachineID: savedMachineID,
-            pairingCode: pairingCode,
+            bootstrapCredential: bootstrapCredential,
             expectedHostIdentifier: expectedHostIdentifier,
             desiredQuality: desiredQuality
         )

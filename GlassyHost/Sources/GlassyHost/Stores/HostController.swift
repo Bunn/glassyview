@@ -20,6 +20,9 @@ final class HostController {
     private(set) var clientCount = 0
     private(set) var pairingCode = "Starting…"
     private(set) var pairingCodeRemainingSeconds = 0
+    private(set) var isPairingPasswordConfigured = false
+    private(set) var isUpdatingPairingPassword = false
+    private(set) var pairingPasswordError: String?
     private(set) var serverPort: UInt16?
     private(set) var lastError: String?
     private(set) var loginItemStatus: LoginItemRegistrationStatus = .notRegistered
@@ -35,6 +38,7 @@ final class HostController {
     }
 
     private let pairingSecretStore = PairingSecretStore()
+    private let pairingPasswordStore = PairingPasswordStore()
     private let hostServer = HostServer()
     private let loginItemService = LoginItemService()
     private let remoteInputService = RemoteInputService()
@@ -70,6 +74,9 @@ final class HostController {
 
     @ObservationIgnored
     private var isServerReady = false
+
+    @ObservationIgnored
+    private var hostIdentifier: Data?
 
     private var pipelineReconciliation = HostPipelineReconciliationState()
 
@@ -201,7 +208,32 @@ final class HostController {
             let pairingSecret = try await Task.detached(priority: .userInitiated) {
                 try store.loadOrCreate()
             }.value
-            startServer(pairingSecret: pairingSecret)
+            let identifier = HostServer.makeHostIdentifier(from: pairingSecret.keyData)
+            hostIdentifier = identifier
+
+            let passwordStore = pairingPasswordStore
+            let passwordCredential: Data?
+            do {
+                passwordCredential = try await Task.detached(priority: .userInitiated) {
+                    try passwordStore.credential(for: identifier)
+                }.value
+                isPairingPasswordConfigured = passwordCredential != nil
+                pairingPasswordError = nil
+            } catch {
+                // A problem with an optional password must not make the
+                // rotating-code listener unavailable.
+                passwordCredential = nil
+                isPairingPasswordConfigured = false
+                pairingPasswordError = error.localizedDescription
+                HostLog.security.error(
+                    "Could not load the optional pairing password credential"
+                )
+            }
+
+            startServer(
+                pairingSecret: pairingSecret,
+                pairingPasswordCredential: passwordCredential
+            )
             startPairingCodeRefresh()
         } catch {
             fail(with: error)
@@ -490,9 +522,88 @@ final class HostController {
         loginItemService.openSystemSettings()
     }
 
-    func replacePairingKey() {
+    @discardableResult
+    func setPairingPassword(_ password: String) async -> Bool {
+        guard !isUpdatingPairingPassword else { return false }
+        guard let hostIdentifier else {
+            pairingPasswordError = PairingPasswordPolicyError.invalidHostIdentifier
+                .localizedDescription
+            return false
+        }
+
+        isUpdatingPairingPassword = true
+        defer { isUpdatingPairingPassword = false }
         do {
-            let secret = try pairingSecretStore.replace()
+            let store = pairingPasswordStore
+            let credential = try await Task.detached(priority: .userInitiated) {
+                let credential = try PairingPasswordPolicy.deriveCredential(
+                    from: password,
+                    hostIdentifier: hostIdentifier
+                )
+                try store.save(credential, for: hostIdentifier)
+                return credential
+            }.value
+            hostServer.setPairingPasswordCredential(credential)
+            isPairingPasswordConfigured = true
+            pairingPasswordError = nil
+            HostLog.security.notice("Configured an optional pairing password")
+            return true
+        } catch {
+            pairingPasswordError = error.localizedDescription
+            HostLog.security.error("Could not configure the optional pairing password")
+            return false
+        }
+    }
+
+    @discardableResult
+    func removePairingPassword() async -> Bool {
+        guard !isUpdatingPairingPassword else { return false }
+        guard let hostIdentifier else {
+            pairingPasswordError = PairingPasswordPolicyError.invalidHostIdentifier
+                .localizedDescription
+            return false
+        }
+
+        isUpdatingPairingPassword = true
+        defer { isUpdatingPairingPassword = false }
+        do {
+            let store = pairingPasswordStore
+            try await Task.detached(priority: .userInitiated) {
+                try store.deleteCredential(for: hostIdentifier)
+            }.value
+            hostServer.setPairingPasswordCredential(nil)
+            isPairingPasswordConfigured = false
+            pairingPasswordError = nil
+            HostLog.security.notice("Removed the optional pairing password")
+            return true
+        } catch {
+            pairingPasswordError = error.localizedDescription
+            HostLog.security.error("Could not remove the optional pairing password")
+            return false
+        }
+    }
+
+    func replacePairingKey() async {
+        guard !isUpdatingPairingPassword else { return }
+        isUpdatingPairingPassword = true
+        defer { isUpdatingPairingPassword = false }
+
+        do {
+            if let hostIdentifier {
+                let passwordStore = pairingPasswordStore
+                try await Task.detached(priority: .userInitiated) {
+                    try passwordStore.deleteCredential(for: hostIdentifier)
+                }.value
+            }
+            hostServer.setPairingPasswordCredential(nil)
+            isPairingPasswordConfigured = false
+            pairingPasswordError = nil
+
+            let secretStore = pairingSecretStore
+            let secret = try await Task.detached(priority: .userInitiated) {
+                try secretStore.replace()
+            }.value
+            hostIdentifier = HostServer.makeHostIdentifier(from: secret.keyData)
             hostServer.replacePairingSecretAndRestart(secret.keyData)
             refreshPairingCode()
             let effects = streamingDemand.authenticatedClientCountChanged(to: 0)
@@ -500,11 +611,11 @@ final class HostController {
             remoteInputService.releasePressedInput()
             applyStreamingDemandEffects(effects)
             updateInitialOnDemandStartCoalescing()
-            Task {
-                await reconcileCapturePipeline()
-            }
+            await reconcileCapturePipeline()
             lastError = nil
-            HostLog.security.notice("Replaced the host pairing key")
+            HostLog.security.notice(
+                "Replaced the host pairing key and disabled its optional pairing password"
+            )
         } catch {
             fail(with: error)
         }
@@ -855,7 +966,10 @@ final class HostController {
             && (!isStreaming || activeStreamQuality == desiredStreamQuality)
     }
 
-    private func startServer(pairingSecret: PairingSecret) {
+    private func startServer(
+        pairingSecret: PairingSecret,
+        pairingPasswordCredential: Data?
+    ) {
         serverEventContinuation?.finish()
         serverEventTask?.cancel()
 
@@ -882,6 +996,7 @@ final class HostController {
 
         hostServer.start(
             pairingSecret: pairingSecret.keyData,
+            pairingPasswordCredential: pairingPasswordCredential,
             onClientCountChange: { count in
                 continuation.yield(.authenticatedClientCount(count))
             },

@@ -55,7 +55,10 @@ struct GlassyStreamKeychainCredentialStore: GlassyStreamResumeCredentialStoring 
         let value = encode(credential)
         let updateStatus = SecItemUpdate(
             query as CFDictionary,
-            [kSecValueData as String: value] as CFDictionary
+            [
+                kSecValueData as String: value,
+                kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            ] as CFDictionary
         )
         if updateStatus == errSecSuccess {
             return
@@ -66,7 +69,7 @@ struct GlassyStreamKeychainCredentialStore: GlassyStreamResumeCredentialStoring 
 
         var addQuery = query
         addQuery[kSecValueData as String] = value
-        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
         guard addStatus == errSecSuccess else {
             throw storeError(addStatus)

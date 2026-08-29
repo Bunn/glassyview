@@ -25,6 +25,7 @@ enum GlassyStreamWire {
         static let directInput = Capabilities(rawValue: 1 << 2)
         static let streamQualityControl = Capabilities(rawValue: 1 << 3)
         static let cursorPositionUpdates = Capabilities(rawValue: 1 << 4)
+        static let pairingPassword = Capabilities(rawValue: 1 << 5)
     }
 
     enum MessageKind: UInt8, Sendable {
@@ -56,6 +57,7 @@ enum GlassyStreamWire {
     enum AuthenticationMethod: UInt8, Sendable {
         case pairingCode = 1
         case resumeSecret = 2
+        case pairingPasswordV1 = 3
     }
 
     struct Frame: Sendable {

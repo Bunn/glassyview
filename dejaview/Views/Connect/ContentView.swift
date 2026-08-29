@@ -116,10 +116,10 @@ struct ContentView<Session: RemoteSessionControlling,
                 machine: request.machine,
                 initialErrorMessage: request.initialErrorMessage,
                 fixedCandidate: request.fixedCandidate
-            ) { candidate, code in
+            ) { candidate, bootstrapCredential in
                 try await pairGlassyStream(
                     candidate: candidate,
-                    code: code,
+                    bootstrapCredential: bootstrapCredential,
                     request: request
                 )
             }
@@ -857,13 +857,13 @@ struct ContentView<Session: RemoteSessionControlling,
 
         case .glassyStream:
             session.reset()
-            beginGlassyStreamConnection(to: machine, password: password)
+            beginGlassyStreamConnection(to: machine, vncPassword: password)
         }
     }
 
     private func beginGlassyStreamConnection(
         to machine: SavedMachine,
-        password: String
+        vncPassword: String
     ) {
         glassyConnectTask?.cancel()
         preparedGlassySession = nil
@@ -878,7 +878,7 @@ struct ContentView<Session: RemoteSessionControlling,
             glassySession.reset()
             glassyPairingRequest = GlassyStreamPairingRequest(
                 machine: machine,
-                password: password
+                vncPassword: vncPassword
             )
             return
         }
@@ -906,7 +906,7 @@ struct ContentView<Session: RemoteSessionControlling,
                     let authentication = try await glassySession.connect(
                         endpoint: candidate.endpoint,
                         savedMachineID: machine.id,
-                        pairingCode: nil,
+                        bootstrapCredential: nil,
                         expectedHostIdentifier: expectedHostIdentifier,
                         desiredQuality: preferences.quality,
                         fallbackEndpoints: candidates
@@ -922,7 +922,7 @@ struct ContentView<Session: RemoteSessionControlling,
                         for: machine,
                         authentication: authentication,
                         candidate: candidate,
-                        password: password
+                        vncPassword: vncPassword
                     )
                     glassyConnectTask = nil
                     presentGlassySession(for: authenticatedMachine)
@@ -940,7 +940,7 @@ struct ContentView<Session: RemoteSessionControlling,
                         if shouldPromptForGlassyPairing(after: error) {
                             glassyPairingRequest = GlassyStreamPairingRequest(
                                 machine: machine,
-                                password: password,
+                                vncPassword: vncPassword,
                                 initialErrorMessage: pairingPromptMessage(for: error),
                                 fixedCandidate: candidate
                             )
@@ -967,7 +967,7 @@ struct ContentView<Session: RemoteSessionControlling,
 
     private func pairGlassyStream(
         candidate: GlassyStreamEndpointCandidate,
-        code: GlassyHostPairingCode,
+        bootstrapCredential: GlassyStreamBootstrapCredential,
         request: GlassyStreamPairingRequest
     ) async throws {
         let preferences = store.contains(request.machine)
@@ -977,7 +977,7 @@ struct ContentView<Session: RemoteSessionControlling,
         let authentication = try await glassySession.connect(
             endpoint: candidate.endpoint,
             savedMachineID: request.machine.id,
-            pairingCode: code.rawValue,
+            bootstrapCredential: bootstrapCredential,
             expectedHostIdentifier: expectedGlassyHostIdentifier(for: request.machine),
             desiredQuality: preferences.quality
         )
@@ -985,7 +985,7 @@ struct ContentView<Session: RemoteSessionControlling,
             for: request.machine,
             authentication: authentication,
             candidate: candidate,
-            password: request.password
+            vncPassword: request.vncPassword
         )
 
         preparedGlassySession = PreparedGlassySession(
@@ -1018,7 +1018,7 @@ struct ContentView<Session: RemoteSessionControlling,
         for machine: SavedMachine,
         authentication: GlassyStreamAuthentication,
         candidate: GlassyStreamEndpointCandidate,
-        password: String
+        vncPassword: String
     ) -> SavedMachine {
         var authenticatedMachine = machine
         authenticatedMachine.glassyHostIdentifier = authentication.hostIdentifier.base64EncodedString()
@@ -1037,7 +1037,7 @@ struct ContentView<Session: RemoteSessionControlling,
         }
 
         if store.contains(machine) {
-            store.update(authenticatedMachine, password: password)
+            store.update(authenticatedMachine, password: vncPassword)
         }
         return authenticatedMachine
     }
@@ -1058,6 +1058,10 @@ struct ContentView<Session: RemoteSessionControlling,
                  .cancelled,
                  .pairingCodeRequired,
                  .invalidPairingCode,
+                 .invalidPairingPassword,
+                 .pairingPasswordRequiresTailscale,
+                 .pairingPasswordUnsupported,
+                 .pairingPasswordDerivationFailed,
                  .authenticationRejected,
                  .hostIdentityMismatch,
                  .directInputUnsupported,
@@ -1117,7 +1121,7 @@ struct ContentView<Session: RemoteSessionControlling,
         }
         if let sessionError = error as? GlassyStreamSessionError,
            case .transport(.authenticationRejected) = sessionError {
-            return "The saved approval was not accepted. Enter the current code shown by this Glassy Host to pair again."
+            return "The saved approval was not accepted. Use the current one-time code, or the reusable pairing password configured in Glassy Host, to pair again."
         }
         return error.localizedDescription
     }
@@ -1484,7 +1488,7 @@ struct ContentView<Session: RemoteSessionControlling,
 
 private struct GlassyStreamPairingRequest: Identifiable {
     let machine: SavedMachine
-    let password: String
+    let vncPassword: String
     var initialErrorMessage: String? = nil
     var fixedCandidate: GlassyStreamEndpointCandidate? = nil
 

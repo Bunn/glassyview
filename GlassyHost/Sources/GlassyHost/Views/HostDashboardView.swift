@@ -4,6 +4,8 @@ import SwiftUI
 struct HostDashboardView: View {
     @Bindable var controller: HostController
     @State private var isResetConfirmationPresented = false
+    @State private var isPairingPasswordEditorPresented = false
+    @State private var isRemovePasswordConfirmationPresented = false
 
     var body: some View {
         ScrollView {
@@ -20,10 +22,28 @@ struct HostDashboardView: View {
         .alert("Replace Pairing Key?", isPresented: $isResetConfirmationPresented) {
             Button("Cancel", role: .cancel) {}
             Button("Replace Key", role: .destructive) {
-                controller.replacePairingKey()
+                Task {
+                    await controller.replacePairingKey()
+                }
             }
         } message: {
-            Text("Devices paired with the current key will need to pair again.")
+            Text("Devices paired with the current key will need to pair again. The optional pairing password will also be removed.")
+        }
+        .alert(
+            "Remove Pairing Password?",
+            isPresented: $isRemovePasswordConfirmationPresented
+        ) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove Password", role: .destructive) {
+                Task {
+                    await controller.removePairingPassword()
+                }
+            }
+        } message: {
+            Text("New devices can still pair with the rotating code. Devices that are already paired will stay paired.")
+        }
+        .sheet(isPresented: $isPairingPasswordEditorPresented) {
+            PairingPasswordEditorView(controller: controller)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             controller.refreshLoginItemStatus()
@@ -249,6 +269,7 @@ struct HostDashboardView: View {
                     Button("Replace…") {
                         isResetConfirmationPresented = true
                     }
+                    .disabled(controller.isUpdatingPairingPassword)
                 }
                 .padding(12)
                 .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 10))
@@ -256,6 +277,59 @@ struct HostDashboardView: View {
                 Text("Copy uses the 12 symbols without dashes. A new code appears in \(controller.pairingCodeRemainingSeconds) seconds.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                Divider()
+
+                HStack(alignment: .center, spacing: 12) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(controller.isPairingPasswordConfigured
+                                 ? "Reusable password is available"
+                                 : "Optional reusable password")
+                            Text(controller.isPairingPasswordConfigured
+                                 ? "New devices may use the code above or your password."
+                                 : "Set a password when copying the rotating code is inconvenient.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: controller.isPairingPasswordConfigured
+                              ? "lock.fill"
+                              : "lock")
+                    }
+
+                    Spacer(minLength: 12)
+
+                    Button(controller.isPairingPasswordConfigured
+                           ? "Change…"
+                           : "Set Password…") {
+                        isPairingPasswordEditorPresented = true
+                    }
+                    .disabled(controller.isUpdatingPairingPassword)
+
+                    if controller.isPairingPasswordConfigured {
+                        Button("Remove…") {
+                            isRemovePasswordConfirmationPresented = true
+                        }
+                        .disabled(controller.isUpdatingPairingPassword)
+                    }
+                }
+
+                if controller.isUpdatingPairingPassword {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Updating the secure pairing credential…")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                if let pairingPasswordError = controller.pairingPasswordError {
+                    Label(pairingPasswordError, systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                }
             }
             .padding(4)
         }

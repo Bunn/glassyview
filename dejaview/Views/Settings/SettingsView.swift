@@ -48,7 +48,7 @@ struct SettingsView: View {
             } header: {
                 Text("Connections")
             } footer: {
-                Text("Choose VNC or the faster Glassy Stream when you add or edit a machine. Glassy Stream requires Glassy Host and its pairing code; for remote access, save the Mac's Tailscale name or address.")
+                Text("Choose VNC or the faster Glassy Stream when you add or edit a machine. Glassy Stream requires Glassy Host and its pairing code or configured password; for remote access, save the Mac's Tailscale name or address.")
             }
 
             Section("Getting Started") {

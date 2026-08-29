@@ -22,7 +22,7 @@ enum RemoteConnectionMode: String, CaseIterable, Codable, Identifiable, Sendable
         case .vnc:
             "Uses standard Screen Sharing. This is the default and does not require the Glassy Host companion app."
         case .glassyStream:
-            "Uses the faster encrypted Glassy Host video and input stream. It requires the macOS companion app and asks for its pairing code the first time."
+            "Uses the faster encrypted Glassy Host video and input stream. It requires the macOS companion app and asks for a pairing code or configured password the first time."
         }
     }
 

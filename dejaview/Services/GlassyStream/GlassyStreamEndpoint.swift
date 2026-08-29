@@ -10,6 +10,36 @@ struct GlassyStreamDirectAddress: Equatable, Hashable, Sendable {
     let host: String
     let port: UInt16
 
+    /// A conservative, locally checkable Tailscale address marker used to
+    /// keep reusable-password bootstrap off unauthenticated Bonjour/raw TCP
+    /// routes. Short MagicDNS names are intentionally excluded because they
+    /// are indistinguishable from ordinary LAN DNS names before connecting.
+    var isRecognizedTailscaleAddress: Bool {
+        var normalizedHost = host
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        while normalizedHost.hasSuffix(".") {
+            normalizedHost.removeLast()
+        }
+
+        if normalizedHost.hasSuffix(".ts.net"),
+           normalizedHost.count > ".ts.net".count {
+            return true
+        }
+
+        if let ipv6Address = IPv6Address(normalizedHost) {
+            return ipv6Address.rawValue.prefix(6) == Data([
+                0xfd, 0x7a, 0x11, 0x5c, 0xa1, 0xe0
+            ])
+        }
+
+        guard let ipv4Address = IPv4Address(normalizedHost) else { return false }
+        let octets = [UInt8](ipv4Address.rawValue)
+        return octets.count == 4
+            && octets[0] == 100
+            && (64...127).contains(octets[1])
+    }
+
     var endpoint: NWEndpoint {
         .hostPort(
             host: NWEndpoint.Host(host),
@@ -52,6 +82,17 @@ enum GlassyStreamEndpoint {
     static let defaultPort: UInt16 = 51_515
 
     private static let supportedSchemes = ["glassystream", "glassy", "tcp"]
+
+    static func isRecognizedTailscaleEndpoint(_ endpoint: NWEndpoint) -> Bool {
+        guard case let .hostPort(host, port) = endpoint,
+              let address = directAddress(
+                  from: String(describing: host),
+                  defaultPort: port.rawValue
+              ) else {
+            return false
+        }
+        return address.isRecognizedTailscaleAddress
+    }
 
     /// Returns the persisted Glassy Stream port, migrating records created
     /// while the hidden field still contained VNC's default port.

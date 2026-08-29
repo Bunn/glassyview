@@ -10,6 +10,8 @@ struct FAQView: View {
                         answer: "The picker uses Bonjour and normally shows only Macs on the iPad's local network. For a remote Mac, connect Tailscale on both devices, then save the Mac's MagicDNS name or 100.x address in Glassy Desk."),
         SettingsFAQItem(question: "What host and port should I use?",
                         answer: "For VNC, use the Mac's hostname or IP address and normally port 5900. For Glassy Stream, use its Tailscale MagicDNS name or 100.x address and port 51515."),
+        SettingsFAQItem(question: "Can I pair Glassy Stream with a password?",
+                        answer: "Yes, over a trusted Tailscale route. The rotating one-time code remains the default and is required for Nearby or other raw network routes. Configure a reusable password in Glassy Host, connect Tailscale, confirm the selected peer is your Mac, save its Tailscale IP or full .ts.net name, then choose Password. It approves the device once; Glassy Desk keeps only a random device-specific resume credential in Keychain."),
         SettingsFAQItem(question: "How do I use Wake-on-LAN?",
                         answer: "Edit a saved Mac and enter the MAC address of its network interface. Also enable Wake for network access in macOS System Settings. If the Mac is unreachable, tapping its card sends a wake packet and waits up to a minute before connecting. Wake-on-LAN normally requires the devices to be on the same local network or a VPN that forwards broadcasts."),
         SettingsFAQItem(question: "Which credentials should I enter?",
@@ -31,7 +33,7 @@ struct FAQView: View {
         SettingsFAQItem(question: "What input is supported?",
                         answer: "A session supports taps, drags, right click gestures, scrolling, pinch zoom, hardware keyboard input, and the on-screen shortcut strip."),
         SettingsFAQItem(question: "Where are saved passwords stored?",
-                        answer: "Saved machine passwords are stored in the device Keychain. They are used only to authenticate with the machine you choose.")
+                        answer: "Saved machine credentials are protected by the system. Glassy Stream does not save its reusable pairing password on the iPad; after pairing, it stores only a random device-specific resume credential in Keychain.")
     ]
 
     var body: some View {

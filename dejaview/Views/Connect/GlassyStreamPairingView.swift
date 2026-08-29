@@ -2,6 +2,22 @@ import SwiftUI
 
 @MainActor
 struct GlassyStreamPairingView: View {
+    private enum PairingMethod: String, CaseIterable, Identifiable {
+        case oneTimeCode
+        case password
+
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .oneTimeCode:
+                "One-Time Code"
+            case .password:
+                "Password"
+            }
+        }
+    }
+
     @Environment(GlassyHostBrowser.self) private var hostBrowser
     @Environment(\.dismiss) private var dismiss
 
@@ -9,13 +25,15 @@ struct GlassyStreamPairingView: View {
     let fixedCandidate: GlassyStreamEndpointCandidate?
     let pairAndConnect: @MainActor (
         GlassyStreamEndpointCandidate,
-        GlassyHostPairingCode
+        GlassyStreamBootstrapCredential
     ) async throws -> Void
 
     @State private var selectedCandidateID: String?
     @State private var directAddressText: String
     @State private var directPortText: String
+    @State private var pairingMethod: PairingMethod = .oneTimeCode
     @State private var pairingCodeText = ""
+    @State private var pairingPasswordText = ""
     @State private var isPairing = false
     @State private var errorMessage: String?
 
@@ -25,7 +43,7 @@ struct GlassyStreamPairingView: View {
         fixedCandidate: GlassyStreamEndpointCandidate? = nil,
         pairAndConnect: @escaping @MainActor (
             GlassyStreamEndpointCandidate,
-            GlassyHostPairingCode
+            GlassyStreamBootstrapCredential
         ) async throws -> Void
     ) {
         self.machine = machine
@@ -122,24 +140,53 @@ struct GlassyStreamPairingView: View {
                 }
 
                 Section {
-                    TextField("12-symbol code", text: $pairingCodeText)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .keyboardType(.asciiCapable)
-                        .textContentType(.oneTimeCode)
+                    Picker("Pair Using", selection: $pairingMethod) {
+                        ForEach(PairingMethod.allCases) { method in
+                            Text(method.title).tag(method)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(isPairing)
 
-                    if !pairingCodeText.isEmpty, pairingCode == nil {
-                        Label(
-                            "Enter the 12 symbols shown by Glassy Host. Dashes are optional.",
-                            systemImage: "exclamationmark.triangle.fill"
-                        )
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                    switch pairingMethod {
+                    case .oneTimeCode:
+                        TextField("12-symbol code", text: $pairingCodeText)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .keyboardType(.asciiCapable)
+                            .textContentType(.oneTimeCode)
+                            .disabled(isPairing)
+
+                        if !pairingCodeText.isEmpty, pairingCode == nil {
+                            credentialValidationLabel(
+                                "Enter the 12 symbols shown by Glassy Host. Dashes are optional."
+                            )
+                        }
+
+                    case .password:
+                        SecureField("Pairing password", text: $pairingPasswordText)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .textContentType(.password)
+                            .privacySensitive()
+                            .disabled(isPairing || !isPasswordPairingRouteAllowed)
+
+                        if let passwordPairingRouteMessage {
+                            credentialValidationLabel(passwordPairingRouteMessage)
+                        } else if !pairingPasswordText.isEmpty,
+                           let passwordValidationMessage {
+                            credentialValidationLabel(passwordValidationMessage)
+                        }
                     }
                 } header: {
-                    Text("Pairing Code")
+                    Text("Authentication")
                 } footer: {
-                    Text("Enter the code displayed by Glassy Host on your Mac. The code changes every minute and is used only for first-time pairing.")
+                    switch pairingMethod {
+                    case .oneTimeCode:
+                        Text("Enter the code displayed by Glassy Host. It changes every minute and remains the recommended default for first-time pairing.")
+                    case .password:
+                        Text("Before pairing, confirm Tailscale is connected and the selected peer is your Mac. Glassy Desk also requires a Tailscale IP or full .ts.net name and an active VPN route. Later connections use a random Keychain credential.")
+                    }
                 }
 
                 if let errorMessage {
@@ -154,6 +201,7 @@ struct GlassyStreamPairingView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
+                        clearBootstrapInputs()
                         dismiss()
                     }
                     .disabled(isPairing)
@@ -163,7 +211,7 @@ struct GlassyStreamPairingView: View {
                     Button("Pair & Connect") {
                         pair()
                     }
-                    .disabled(selectedCandidate == nil || pairingCode == nil || isPairing)
+                    .disabled(selectedCandidate == nil || bootstrapCredential == nil || isPairing)
                 }
             }
             .interactiveDismissDisabled(isPairing)
@@ -174,6 +222,18 @@ struct GlassyStreamPairingView: View {
                 // preselect. Nearby results require a deliberate choice so a
                 // code can never be sent to an arbitrary first Bonjour result.
                 selectedCandidateID = candidates.first(where: { $0.source == .direct })?.id
+            }
+            .onChange(of: pairingMethod) { oldMethod, _ in
+                switch oldMethod {
+                case .oneTimeCode:
+                    pairingCodeText = ""
+                case .password:
+                    pairingPasswordText = ""
+                }
+                errorMessage = nil
+            }
+            .onDisappear {
+                clearBootstrapInputs()
             }
         }
     }
@@ -241,8 +301,43 @@ struct GlassyStreamPairingView: View {
         GlassyHostPairingCode(pairingCodeText)
     }
 
+    private var passwordValidationMessage: String? {
+        GlassyStreamPairingPassword.validationFailure(
+            for: pairingPasswordText
+        )?.message
+    }
+
+    private var isPasswordPairingRouteAllowed: Bool {
+        guard let selectedCandidate else { return false }
+        return GlassyStreamEndpoint.isRecognizedTailscaleEndpoint(
+            selectedCandidate.endpoint
+        )
+    }
+
+    private var passwordPairingRouteMessage: String? {
+        guard pairingMethod == .password,
+              !isPasswordPairingRouteAllowed else { return nil }
+        return "Choose a saved Tailscale 100.64–100.127 address, Tailscale IPv6 address, or full .ts.net name. Use the one-time code for Nearby or other routes."
+    }
+
+    private var bootstrapCredential: GlassyStreamBootstrapCredential? {
+        switch pairingMethod {
+        case .oneTimeCode:
+            guard let pairingCode else { return nil }
+            return .oneTimeCode(pairingCode.rawValue)
+        case .password:
+            guard isPasswordPairingRouteAllowed else { return nil }
+            guard let password = GlassyStreamPairingPassword.validated(
+                pairingPasswordText
+            ) else {
+                return nil
+            }
+            return .password(password)
+        }
+    }
+
     private func pair() {
-        guard let selectedCandidate, let pairingCode else { return }
+        guard let selectedCandidate, let bootstrapCredential else { return }
 
         errorMessage = nil
         isPairing = true
@@ -250,7 +345,8 @@ struct GlassyStreamPairingView: View {
             defer { isPairing = false }
 
             do {
-                try await pairAndConnect(selectedCandidate, pairingCode)
+                try await pairAndConnect(selectedCandidate, bootstrapCredential)
+                clearBootstrapInputs()
                 dismiss()
             } catch {
                 errorMessage = pairingFailureMessage(error)
@@ -259,6 +355,12 @@ struct GlassyStreamPairingView: View {
     }
 
     private func pairingFailureMessage(_ error: Error) -> String {
+        if pairingMethod == .password,
+           let sessionError = error as? GlassyStreamSessionError,
+           case .transport(.authenticationRejected) = sessionError {
+            return "Glassy Host did not accept that pairing password. Check the password configured on the Mac and try again."
+        }
+
         let description = error.localizedDescription
         guard let localizedError = error as? LocalizedError,
               let suggestion = localizedError.recoverySuggestion,
@@ -266,5 +368,16 @@ struct GlassyStreamPairingView: View {
             return description
         }
         return "\(description) \(suggestion)"
+    }
+
+    private func credentialValidationLabel(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(.footnote)
+            .foregroundStyle(.red)
+    }
+
+    private func clearBootstrapInputs() {
+        pairingCodeText = ""
+        pairingPasswordText = ""
     }
 }

@@ -48,6 +48,7 @@ enum HostProtocol {
         static let directInput = Capabilities(rawValue: 1 << 2)
         static let streamQualityControl = Capabilities(rawValue: 1 << 3)
         static let cursorPositionTelemetry = Capabilities(rawValue: 1 << 4)
+        static let pairingPassword = Capabilities(rawValue: 1 << 5)
     }
 
     static let advertisedCapabilities: Capabilities = [
@@ -57,6 +58,12 @@ enum HostProtocol {
         .streamQualityControl,
         .cursorPositionTelemetry
     ]
+
+    static func advertisedCapabilities(pairingPasswordEnabled: Bool) -> Capabilities {
+        pairingPasswordEnabled
+            ? advertisedCapabilities.union(.pairingPassword)
+            : advertisedCapabilities
+    }
 
     enum MessageKind: UInt8, Sendable {
         case serverHello = 0x01
@@ -94,6 +101,20 @@ enum HostProtocol {
         /// Subsequent connections. The client proves the 256-bit resume secret
         /// issued inside the encrypted authentication-accepted message.
         case resumeSecret = 2
+
+        /// Optional first-use pairing with a user-selected password. The
+        /// password is converted to a host-bound PBKDF2 credential before it
+        /// participates in the proof and is never transmitted.
+        case pairingPasswordV1 = 3
+
+        var isBootstrapPairing: Bool {
+            switch self {
+            case .pairingCode, .pairingPasswordV1:
+                true
+            case .resumeSecret:
+                false
+            }
+        }
     }
 
     /// An allowlisted host capture/encoding preset. Lower raw values are more

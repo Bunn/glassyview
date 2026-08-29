@@ -38,15 +38,22 @@ enum GlassyStreamEvent: Equatable, Sendable {
     case pong(Data)
 }
 
+/// A first-use credential supplied explicitly by the user. Once the host has
+/// authenticated, this value is discarded and subsequent connections use the
+/// random per-device resume secret stored in Keychain.
+enum GlassyStreamBootstrapCredential: Sendable {
+    case oneTimeCode(String)
+    case password(String)
+}
+
 /// Everything required to open one Glassy Stream connection.
 ///
-/// Pass the raw twelve-symbol value from ``GlassyHostPairingCode``. Hyphens
-/// are also accepted defensively, but are removed before authentication. When
-/// `pairingCode` is nil, the client attempts secure resume from Keychain.
+/// Pass a first-use code or password as `bootstrapCredential`. When it is nil,
+/// the client attempts secure resume from Keychain.
 struct GlassyStreamConnectionConfiguration: @unchecked Sendable {
     let endpoint: NWEndpoint
     let savedMachineID: UUID
-    let pairingCode: String?
+    let bootstrapCredential: GlassyStreamBootstrapCredential?
     let expectedHostIdentifier: Data?
     let desiredQuality: RemoteSessionQuality
     let clientName: String
@@ -54,18 +61,30 @@ struct GlassyStreamConnectionConfiguration: @unchecked Sendable {
 
     init(endpoint: NWEndpoint,
          savedMachineID: UUID,
-         pairingCode: String? = nil,
+         bootstrapCredential: GlassyStreamBootstrapCredential? = nil,
          expectedHostIdentifier: Data? = nil,
          desiredQuality: RemoteSessionQuality = .best,
          clientName: String = ProcessInfo.processInfo.hostName,
          authenticationTimeout: TimeInterval = 10) {
         self.endpoint = endpoint
         self.savedMachineID = savedMachineID
-        self.pairingCode = pairingCode
+        self.bootstrapCredential = bootstrapCredential
         self.expectedHostIdentifier = expectedHostIdentifier
         self.desiredQuality = desiredQuality
         self.clientName = clientName
         self.authenticationTimeout = authenticationTimeout
+    }
+
+    func withoutBootstrapCredential() -> Self {
+        Self(
+            endpoint: endpoint,
+            savedMachineID: savedMachineID,
+            bootstrapCredential: nil,
+            expectedHostIdentifier: expectedHostIdentifier,
+            desiredQuality: desiredQuality,
+            clientName: clientName,
+            authenticationTimeout: authenticationTimeout
+        )
     }
 }
 
@@ -100,6 +119,10 @@ enum GlassyStreamClientError: Error, LocalizedError, Sendable {
     case authenticationTimedOut
     case pairingCodeRequired(hostName: String)
     case invalidPairingCode
+    case invalidPairingPassword
+    case pairingPasswordRequiresTailscale
+    case pairingPasswordUnsupported
+    case pairingPasswordDerivationFailed(Int32)
     case authenticationRejected(String)
     case hostIdentityMismatch
     case directInputUnsupported
@@ -123,6 +146,14 @@ enum GlassyStreamClientError: Error, LocalizedError, Sendable {
             "Enter the pairing code shown by \(hostName)."
         case .invalidPairingCode:
             "The pairing code must contain twelve valid symbols."
+        case .invalidPairingPassword:
+            "The pairing password must be 15 through 128 characters and cannot contain control characters or line breaks."
+        case .pairingPasswordRequiresTailscale:
+            "Reusable-password pairing requires an active Tailscale VPN route and a saved Tailscale IP or full .ts.net address."
+        case .pairingPasswordUnsupported:
+            "This Glassy Host does not support password pairing."
+        case let .pairingPasswordDerivationFailed(status):
+            "The pairing password could not be prepared securely (status \(status))."
         case let .authenticationRejected(message):
             "Glassy Host rejected authentication: \(message)"
         case .hostIdentityMismatch:

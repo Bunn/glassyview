@@ -141,7 +141,22 @@ func protocolWireValues() throws {
     #expect(HostProtocol.Capabilities.directInput.rawValue == 0x0000_0004)
     #expect(HostProtocol.Capabilities.streamQualityControl.rawValue == 0x0000_0008)
     #expect(HostProtocol.Capabilities.cursorPositionTelemetry.rawValue == 0x0000_0010)
+    #expect(HostProtocol.Capabilities.pairingPassword.rawValue == 0x0000_0020)
     #expect(HostProtocol.advertisedCapabilities.rawValue == 0x0000_001F)
+    #expect(
+        HostProtocol.advertisedCapabilities(pairingPasswordEnabled: true).rawValue
+            == 0x0000_003F
+    )
+    #expect(
+        HostProtocol.advertisedCapabilities(pairingPasswordEnabled: false).rawValue
+            == 0x0000_001F
+    )
+    #expect(HostProtocol.AuthenticationMethod.pairingCode.rawValue == 1)
+    #expect(HostProtocol.AuthenticationMethod.resumeSecret.rawValue == 2)
+    #expect(HostProtocol.AuthenticationMethod.pairingPasswordV1.rawValue == 3)
+    #expect(HostProtocol.AuthenticationMethod.pairingCode.isBootstrapPairing)
+    #expect(HostProtocol.AuthenticationMethod.pairingPasswordV1.isBootstrapPairing)
+    #expect(!HostProtocol.AuthenticationMethod.resumeSecret.isBootstrapPairing)
     #expect(HostProtocol.MessageKind.keyFrameRequest.rawValue == 0x12)
     #expect(HostProtocol.MessageKind.streamQualityRequest.rawValue == 0x13)
     #expect(HostProtocol.MessageKind.cursorPositionSubscriptionRequest.rawValue == 0x14)
