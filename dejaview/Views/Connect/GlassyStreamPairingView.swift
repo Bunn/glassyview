@@ -72,11 +72,13 @@ struct GlassyStreamPairingView: View {
             Form {
                 if fixedCandidate == nil {
                     Section {
-                        TextField("Tailscale name or 100.x address", text: $directAddressText)
+                        TextField("Host name or IP address", text: $directAddressText)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
                             .disabled(isPairing)
+                            .accessibilityLabel("Glassy Stream host name or IP address")
+                            .accessibilityIdentifier("connection.glassy-stream.address")
 
                         TextField("TCP port", text: $directPortText)
                             .keyboardType(.numberPad)

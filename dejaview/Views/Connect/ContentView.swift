@@ -24,8 +24,7 @@ struct ContentView<Session: RemoteSessionControlling,
     @State private var isSessionPresented = false
     @State private var isSettingsPresented = false
 
-    @State private var editingMachine: SavedMachine?
-    @State private var editingPassword = ""
+    @State private var machineEditorRequest: MachineEditorRequest?
     @State private var pendingConnectionMachine: SavedMachine?
     @State private var pendingConnectionPassword = ""
     @State private var glassyPairingRequest: GlassyStreamPairingRequest?
@@ -105,10 +104,12 @@ struct ContentView<Session: RemoteSessionControlling,
                     }
             }
         }
-        .sheet(item: $editingMachine, onDismiss: connectPendingMachine) { machine in
+        .sheet(item: $machineEditorRequest, onDismiss: connectPendingMachine) { request in
             EditMachineView(store: store,
-                            machine: machine,
-                            password: editingPassword,
+                            machine: request.machine,
+                            password: request.password,
+                            glassyHostBrowser: glassyHostBrowser,
+                            discoveredService: request.discoveredService,
                             connectAfterDismiss: queueConnectionAfterEditor)
         }
         .sheet(item: $glassyPairingRequest, onDismiss: finishGlassyPairing) { request in
@@ -384,7 +385,10 @@ struct ContentView<Session: RemoteSessionControlling,
             }
 
             ForEach(filteredServices) { service in
-                DiscoveredServiceTile(service: service) {
+                let isGlassyHostDetected = matchingGlassyHost(for: service) != nil
+
+                DiscoveredServiceTile(service: service,
+                                      isGlassyHostDetected: isGlassyHostDetected) {
                     addMachine(for: service)
                 }
             }
@@ -401,7 +405,10 @@ struct ContentView<Session: RemoteSessionControlling,
     private var nearbyGridContent: some View {
         LazyVGrid(columns: gridColumns, alignment: .leading, spacing: 16) {
             ForEach(filteredServices) { service in
-                DiscoveredServiceTile(service: service) {
+                let isGlassyHostDetected = matchingGlassyHost(for: service) != nil
+
+                DiscoveredServiceTile(service: service,
+                                      isGlassyHostDetected: isGlassyHostDetected) {
                     addMachine(for: service)
                 }
             }
@@ -496,6 +503,15 @@ struct ContentView<Session: RemoteSessionControlling,
         browser.services.contains { !$0.isResolved }
     }
 
+    private func matchingGlassyHost(
+        for service: DiscoveredService
+    ) -> DiscoveredGlassyHost? {
+        BonjourMachineMatcher.glassyHost(
+            matching: service,
+            among: glassyHostBrowser.hosts
+        )
+    }
+
     private var isSearching: Bool {
         !searchQuery.isEmpty
     }
@@ -514,8 +530,11 @@ struct ContentView<Session: RemoteSessionControlling,
 
     private func addMachine() {
         AppLog.ui.info("Opening New Machine sheet")
-        editingPassword = ""
-        editingMachine = SavedMachine(name: "", host: "", username: "")
+        machineEditorRequest = MachineEditorRequest(
+            machine: SavedMachine(name: "", host: "", username: ""),
+            password: "",
+            discoveredService: nil
+        )
     }
 
     private func addMachine(for service: DiscoveredService) {
@@ -524,18 +543,25 @@ struct ContentView<Session: RemoteSessionControlling,
             return
         }
 
-        AppLog.ui.info("Opening New Machine sheet from nearby service '\(service.name, privacy: .public)' at \(serviceHost, privacy: .public):\(servicePort, privacy: .public)")
-        editingPassword = ""
-        editingMachine = SavedMachine(name: service.name,
-                                      host: serviceHost,
-                                      port: servicePort,
-                                      username: "")
+        let isGlassyHostDetected = matchingGlassyHost(for: service) != nil
+        AppLog.ui.info("Opening New Machine sheet from nearby service '\(service.name, privacy: .public)' at \(serviceHost, privacy: .public):\(servicePort, privacy: .public) glassyHostDetected=\(isGlassyHostDetected, privacy: .public)")
+        machineEditorRequest = MachineEditorRequest(
+            machine: SavedMachine(name: service.name,
+                                  host: serviceHost,
+                                  port: servicePort,
+                                  username: ""),
+            password: "",
+            discoveredService: service
+        )
     }
 
     private func edit(_ machine: SavedMachine) {
         AppLog.ui.info("Opening Edit Machine sheet for '\(machine.displayName, privacy: .public)'")
-        editingPassword = store.password(for: machine)
-        editingMachine = machine
+        machineEditorRequest = MachineEditorRequest(
+            machine: machine,
+            password: store.password(for: machine),
+            discoveredService: nil
+        )
     }
 
     private func confirmDelete(_ machine: SavedMachine) {
@@ -549,8 +575,8 @@ struct ContentView<Session: RemoteSessionControlling,
         pendingDeletionMachine = nil
         isDeleteConfirmationPresented = false
 
-        if editingMachine?.id == machine.id {
-            editingMachine = nil
+        if machineEditorRequest?.machine.id == machine.id {
+            machineEditorRequest = nil
         }
 
         if pendingConnectionMachine?.id == machine.id {
@@ -658,11 +684,14 @@ struct ContentView<Session: RemoteSessionControlling,
         }
 
         AppLog.ui.info("Opening connection details for recent session '\(entry.displayName, privacy: .public)'")
-        editingPassword = ""
-        editingMachine = SavedMachine(name: entry.displayName,
-                                      host: entry.host,
-                                      port: entry.port,
-                                      username: entry.username)
+        machineEditorRequest = MachineEditorRequest(
+            machine: SavedMachine(name: entry.displayName,
+                                  host: entry.host,
+                                  port: entry.port,
+                                  username: entry.username),
+            password: "",
+            discoveredService: nil
+        )
     }
 
     private func canReconnectDirectly(to entry: ConnectionHistoryEntry) -> Bool {
@@ -690,14 +719,14 @@ struct ContentView<Session: RemoteSessionControlling,
 
         selectedSection = .hosts
         searchText = ""
-        editingMachine = nil
+        machineEditorRequest = nil
         connect(to: machine)
     }
 
     private func openFromIntent(destination: DejaViewDestination) {
         selectedSection = connectSection(for: destination)
         searchText = ""
-        editingMachine = nil
+        machineEditorRequest = nil
     }
 
     private func refreshNearbyFromIntent() {
@@ -1484,6 +1513,14 @@ struct ContentView<Session: RemoteSessionControlling,
     private func reachabilityEndpointKey(host: String, port: UInt16) -> String {
         "\(host.trimmingCharacters(in: .whitespacesAndNewlines)):\(port)"
     }
+}
+
+private struct MachineEditorRequest: Identifiable {
+    let machine: SavedMachine
+    let password: String
+    let discoveredService: DiscoveredService?
+
+    var id: UUID { machine.id }
 }
 
 private struct GlassyStreamPairingRequest: Identifiable {

@@ -10,6 +10,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @Environment(SubscriptionStore.self) private var subscriptionStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     @State private var isSessionPaywallPresented = false
     @State private var isFreeSessionTimerInfoPresented = false
@@ -27,6 +28,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @State private var externalDisplayCoordinator = ExternalDisplayCoordinator.shared
     @State private var inputFocused = false
     @State private var externalKeyboardFocused = true
+    @State private var areBottomControlsCollapsed = false
 
     private let freeSessionDurationInterval: TimeInterval = 2 * 60
 
@@ -246,23 +248,47 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
     @ViewBuilder
     private var sessionBottomControls: some View {
-        if horizontalSizeClass == .compact {
-            VStack(spacing: 10) {
-                HStack {
-                    sessionZoomControls
-                    Spacer(minLength: 0)
-                }
+        GlassEffectContainer(spacing: 12) {
+            if horizontalSizeClass == .compact {
+                VStack(spacing: 10) {
+                    if !areBottomControlsCollapsed {
+                        HStack {
+                            sessionZoomControls
+                                .glassEffectTransition(.materialize)
+                                .transition(sessionZoomTransition)
+                            Spacer(minLength: 0)
+                        }
+                    }
 
-                HStack {
-                    Spacer(minLength: 0)
-                    sessionMenuControls
+                    HStack {
+                        sessionControlsVisibilityButton
+                        Spacer(minLength: 0)
+
+                        if !areBottomControlsCollapsed {
+                            sessionMenuControls
+                                .glassEffectTransition(.materialize)
+                                .transition(sessionMenuTransition)
+                        }
+                    }
                 }
-            }
-        } else {
-            HStack(spacing: 12) {
-                sessionZoomControls
-                Spacer(minLength: 12)
-                sessionMenuControls
+            } else {
+                HStack(spacing: 12) {
+                    sessionControlsVisibilityButton
+
+                    if !areBottomControlsCollapsed {
+                        sessionZoomControls
+                            .glassEffectTransition(.materialize)
+                            .transition(sessionZoomTransition)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    if !areBottomControlsCollapsed {
+                        sessionMenuControls
+                            .glassEffectTransition(.materialize)
+                            .transition(sessionMenuTransition)
+                    }
+                }
             }
         }
     }
@@ -284,6 +310,37 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                externalDisplayCoordinator: externalDisplayCoordinator,
                                usesGlassyStream: glassyStream != nil)
         }
+    }
+
+    private var sessionControlsVisibilityButton: some View {
+        Button(action: toggleBottomControls) {
+            Image(systemName: areBottomControlsCollapsed ? "chevron.up" : "chevron.down")
+                .font(.body.weight(.medium))
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+                .contentTransition(sessionControlsSymbolTransition)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+        .padding(5)
+        .liquidGlass(in: Circle())
+        .accessibilityLabel(
+            areBottomControlsCollapsed
+                ? "Expand session controls"
+                : "Collapse session controls"
+        )
+        .accessibilityValue(areBottomControlsCollapsed ? "Collapsed" : "Expanded")
+        .accessibilityHint(
+            areBottomControlsCollapsed
+                ? "Shows zoom, display, and session options."
+                : "Hides zoom, display, and session options."
+        )
+        .accessibilityIdentifier("session.controls.toggle")
+        .help(
+            areBottomControlsCollapsed
+                ? "Expand session controls"
+                : "Collapse session controls"
+        )
     }
 
     private var controlPill: some View {
@@ -351,15 +408,33 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
     private func logDisplayControlState(reason: String) {
         let displayCount = session.displays.count
-        let bottomControlsVisible = session.status == .connected && !showsInputBar
+        let bottomControlsVisible = session.status == .connected
+            && !showsInputBar
+            && !isExternalControllerActive
         let displayOptionCount = session.displayOptions.count
-        let displayControlVisible = bottomControlsVisible && displayOptionCount > 1
+        let displayControlVisible = bottomControlsVisible
+            && !areBottomControlsCollapsed
+            && displayOptionCount > 1
         let optionDescription = session.displayOptions.map(\.logDescription).joined(separator: "; ")
         let layoutDescription = session.displays.isEmpty
             ? "none"
             : session.displays.map(\.logDescription).joined(separator: "; ")
 
-        AppLog.ui.info("Session display controls state; reason=\(reason, privacy: .public) status=\(self.session.status.logDescription, privacy: .public) displayCount=\(displayCount, privacy: .public) selection=\(self.session.displaySelection.logDescription, privacy: .public) bottomControlsVisible=\(bottomControlsVisible, privacy: .public) displayControlVisible=\(displayControlVisible, privacy: .public) displayOptionCount=\(displayOptionCount, privacy: .public) displayOptions=\(optionDescription, privacy: .public) inputBarVisible=\(self.showsInputBar, privacy: .public) layout=\(layoutDescription, privacy: .public)")
+        AppLog.ui.info("Session display controls state; reason=\(reason, privacy: .public) status=\(self.session.status.logDescription, privacy: .public) displayCount=\(displayCount, privacy: .public) selection=\(self.session.displaySelection.logDescription, privacy: .public) bottomControlsVisible=\(bottomControlsVisible, privacy: .public) bottomControlsCollapsed=\(self.areBottomControlsCollapsed, privacy: .public) displayControlVisible=\(displayControlVisible, privacy: .public) displayOptionCount=\(displayOptionCount, privacy: .public) displayOptions=\(optionDescription, privacy: .public) inputBarVisible=\(self.showsInputBar, privacy: .public) layout=\(layoutDescription, privacy: .public)")
+    }
+
+    private var sessionMenuTransition: AnyTransition {
+        guard !accessibilityReduceMotion else { return .opacity }
+        return .opacity.combined(with: .scale(scale: 0.92, anchor: .trailing))
+    }
+
+    private var sessionZoomTransition: AnyTransition {
+        guard !accessibilityReduceMotion else { return .opacity }
+        return .opacity.combined(with: .scale(scale: 0.94, anchor: .leading))
+    }
+
+    private var sessionControlsSymbolTransition: ContentTransition {
+        accessibilityReduceMotion ? .opacity : .symbolEffect(.replace)
     }
 
     private func updatePreference<Value: Equatable>(
@@ -479,6 +554,21 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
         AppLog.ui.info("Software input bar visibility changed; visible=\(self.showsInputBar, privacy: .public)")
         inputFocused = showsInputBar
+    }
+
+    private func toggleBottomControls() {
+        let willCollapse = !areBottomControlsCollapsed
+
+        withAnimation(
+            accessibilityReduceMotion
+                ? nil
+                : .snappy(duration: 0.38, extraBounce: 0.04)
+        ) {
+            areBottomControlsCollapsed = willCollapse
+        }
+
+        AppLog.ui.info("Session bottom controls changed; collapsed=\(willCollapse, privacy: .public)")
+        logDisplayControlState(reason: "bottomControlsToggled")
     }
 
     private func toggleExternalKeyboard() {

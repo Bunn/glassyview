@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DiscoveredServiceTile: View {
     let service: DiscoveredService
+    let isGlassyHostDetected: Bool
     let select: () -> Void
 
     var body: some View {
@@ -26,6 +27,11 @@ struct DiscoveredServiceTile: View {
                         .lineLimit(1)
 
                     ReachabilityStatusBadge(status: reachabilityStatus)
+
+                    if isGlassyHostDetected {
+                        GlassyStreamDetectionBadge()
+                            .accessibilityHidden(true)
+                    }
                 }
 
                 Spacer(minLength: 8)
@@ -42,7 +48,8 @@ struct DiscoveredServiceTile: View {
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
         .glassPanel(cornerRadius: 24, isInteractive: service.isResolved)
-        .accessibilityHint(service.isResolved ? "Opens connection details." : "Address is still resolving.")
+        .glassyStreamDetectionAccessibilityValue(isGlassyHostDetected)
+        .accessibilityHint(accessibilityHint)
     }
 
     private var subtitle: String {
@@ -55,5 +62,21 @@ struct DiscoveredServiceTile: View {
 
     private var reachabilityStatus: MachineReachabilityStatus {
         service.isResolved ? .reachable : .checking
+    }
+
+    private var accessibilityHint: String {
+        guard service.isResolved else { return "Address is still resolving." }
+        return "Opens connection details."
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func glassyStreamDetectionAccessibilityValue(_ isDetected: Bool) -> some View {
+        if isDetected {
+            accessibilityValue("Glassy Stream detected")
+        } else {
+            self
+        }
     }
 }

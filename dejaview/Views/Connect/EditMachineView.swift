@@ -5,6 +5,8 @@ import OSLog
 struct EditMachineView<Store: MachineStoring>: View {
     @Environment(\.dismiss) private var dismiss
     let store: Store
+    let glassyHostBrowser: GlassyHostBrowser
+    let discoveredService: DiscoveredService?
     let connectAfterDismiss: ((SavedMachine, String) -> Void)?
 
     @State private var machine: SavedMachine
@@ -16,15 +18,22 @@ struct EditMachineView<Store: MachineStoring>: View {
     @State private var glassyHostIdentifier: String?
     @State private var glassyHostName: String?
     @State private var portText: String
+    @State private var vncPortText: String
+    @State private var glassyStreamPortText: String
     @State private var macAddress: String
+    @State private var isRemoteConnectionInfoPresented = false
 
     private let isNew: Bool
 
     init(store: Store,
          machine: SavedMachine,
          password: String,
+         glassyHostBrowser: GlassyHostBrowser,
+         discoveredService: DiscoveredService? = nil,
          connectAfterDismiss: ((SavedMachine, String) -> Void)? = nil) {
         self.store = store
+        self.glassyHostBrowser = glassyHostBrowser
+        self.discoveredService = discoveredService
         self.connectAfterDismiss = connectAfterDismiss
         isNew = !store.contains(machine)
         _machine = State(initialValue: machine)
@@ -39,7 +48,23 @@ struct EditMachineView<Store: MachineStoring>: View {
             ? GlassyStreamEndpoint.effectivePort(for: machine)
             : machine.port
         _portText = State(initialValue: String(initialPort))
+        _vncPortText = State(
+            initialValue: machine.connectionMode == .vnc ? String(machine.port) : "5900"
+        )
+        _glassyStreamPortText = State(
+            initialValue: machine.connectionMode == .glassyStream
+                ? String(initialPort)
+                : String(GlassyStreamEndpoint.defaultPort)
+        )
         _macAddress = State(initialValue: machine.macAddress ?? "")
+    }
+
+    private var isGlassyHostDetected: Bool {
+        guard let discoveredService else { return false }
+        return BonjourMachineMatcher.glassyHost(
+            matching: discoveredService,
+            among: glassyHostBrowser.hosts
+        ) != nil
     }
 
     private var canSubmit: Bool {
@@ -90,6 +115,30 @@ struct EditMachineView<Store: MachineStoring>: View {
                     }
                     .pickerStyle(.segmented)
                     .accessibilityHint("Choose standard VNC or the faster Glassy Host stream for this Mac.")
+
+                    if isGlassyHostDetected {
+                        VStack(alignment: .leading, spacing: 4) {
+                            GlassyStreamDetectionBadge(
+                                title: "Glassy Stream detected on this Mac"
+                            )
+
+                            Text("This Mac is advertising Glassy Stream support. Choose Glassy Stream above to pair and connect.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityHint("Choose Glassy Stream in the connection method picker to use it.")
+                        .accessibilityIdentifier("connection.glassy-host.detected")
+                    }
+
+                    Button {
+                        isRemoteConnectionInfoPresented = true
+                    } label: {
+                        Label("Remote Connection Info", systemImage: "questionmark.circle")
+                    }
+                    .accessibilityHint("Explains how to securely connect to a Mac outside your local network.")
+                    .accessibilityIdentifier("connection.remote-access-info")
                 } header: {
                     Text("Connection")
                 } footer: {
@@ -102,12 +151,22 @@ struct EditMachineView<Store: MachineStoring>: View {
                     TextField(
                         connectionMode == .vnc
                             ? "Host or IP address"
-                            : "Tailscale name or 100.x address (optional nearby)",
+                            : "Host name or IP address (optional for nearby)",
                         text: $host
                     )
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
+                        .accessibilityLabel(
+                            connectionMode == .vnc
+                                ? "VNC host or IP address"
+                                : "Glassy Stream host name or IP address"
+                        )
+                        .accessibilityIdentifier(
+                            connectionMode == .vnc
+                                ? "connection.vnc.address"
+                                : "connection.glassy-stream.address"
+                        )
 
                     TextField(
                         connectionMode == .vnc ? "Port" : "Glassy Host Port",
@@ -226,6 +285,9 @@ struct EditMachineView<Store: MachineStoring>: View {
                     .disabled(!canSubmit)
                 }
             }
+            .sheet(isPresented: $isRemoteConnectionInfoPresented) {
+                RemoteConnectionInfoSheet()
+            }
         }
     }
 
@@ -302,16 +364,20 @@ struct EditMachineView<Store: MachineStoring>: View {
         from oldMode: RemoteConnectionMode,
         to newMode: RemoteConnectionMode
     ) {
-        let trimmedPort = portText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard oldMode != newMode else { return }
 
-        switch (oldMode, newMode) {
-        case (.vnc, .glassyStream) where trimmedPort == "5900":
-            portText = String(GlassyStreamEndpoint.defaultPort)
-        case (.glassyStream, .vnc)
-            where trimmedPort == String(GlassyStreamEndpoint.defaultPort):
-            portText = "5900"
-        default:
-            break
+        switch oldMode {
+        case .vnc:
+            vncPortText = portText
+        case .glassyStream:
+            glassyStreamPortText = portText
+        }
+
+        switch newMode {
+        case .vnc:
+            portText = vncPortText
+        case .glassyStream:
+            portText = glassyStreamPortText
         }
     }
 }
