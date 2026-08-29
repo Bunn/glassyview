@@ -255,9 +255,9 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                         HStack {
                             sessionZoomControls
                                 .glassEffectTransition(.materialize)
-                                .transition(sessionZoomTransition)
                             Spacer(minLength: 0)
                         }
+                        .transition(sessionControlsSlideTransition)
                     }
 
                     HStack {
@@ -267,7 +267,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                         if !areBottomControlsCollapsed {
                             sessionMenuControls
                                 .glassEffectTransition(.materialize)
-                                .transition(sessionMenuTransition)
+                                .transition(sessionControlsSlideTransition)
                         }
                     }
                 }
@@ -278,7 +278,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                     if !areBottomControlsCollapsed {
                         sessionZoomControls
                             .glassEffectTransition(.materialize)
-                            .transition(sessionZoomTransition)
+                            .transition(sessionControlsSlideTransition)
                     }
 
                     Spacer(minLength: 12)
@@ -286,7 +286,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                     if !areBottomControlsCollapsed {
                         sessionMenuControls
                             .glassEffectTransition(.materialize)
-                            .transition(sessionMenuTransition)
+                            .transition(sessionControlsSlideTransition)
                     }
                 }
             }
@@ -314,11 +314,11 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
     private var sessionControlsVisibilityButton: some View {
         Button(action: toggleBottomControls) {
-            Image(systemName: areBottomControlsCollapsed ? "chevron.up" : "chevron.down")
+            Image(systemName: "chevron.right")
                 .font(.body.weight(.medium))
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
-                .contentTransition(sessionControlsSymbolTransition)
+                .rotationEffect(.degrees(areBottomControlsCollapsed ? 0 : 180))
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
@@ -423,18 +423,12 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         AppLog.ui.info("Session display controls state; reason=\(reason, privacy: .public) status=\(self.session.status.logDescription, privacy: .public) displayCount=\(displayCount, privacy: .public) selection=\(self.session.displaySelection.logDescription, privacy: .public) bottomControlsVisible=\(bottomControlsVisible, privacy: .public) bottomControlsCollapsed=\(self.areBottomControlsCollapsed, privacy: .public) displayControlVisible=\(displayControlVisible, privacy: .public) displayOptionCount=\(displayOptionCount, privacy: .public) displayOptions=\(optionDescription, privacy: .public) inputBarVisible=\(self.showsInputBar, privacy: .public) layout=\(layoutDescription, privacy: .public)")
     }
 
-    private var sessionMenuTransition: AnyTransition {
+    private var sessionControlsSlideTransition: AnyTransition {
         guard !accessibilityReduceMotion else { return .opacity }
-        return .opacity.combined(with: .scale(scale: 0.92, anchor: .trailing))
-    }
 
-    private var sessionZoomTransition: AnyTransition {
-        guard !accessibilityReduceMotion else { return .opacity }
-        return .opacity.combined(with: .scale(scale: 0.94, anchor: .leading))
-    }
-
-    private var sessionControlsSymbolTransition: ContentTransition {
-        accessibilityReduceMotion ? .opacity : .symbolEffect(.replace)
+        let slide = AnyTransition.move(edge: .leading)
+        let soften = AnyTransition.scale(scale: 0.97, anchor: .leading)
+        return slide.combined(with: soften)
     }
 
     private func updatePreference<Value: Equatable>(
@@ -562,7 +556,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         withAnimation(
             accessibilityReduceMotion
                 ? nil
-                : .snappy(duration: 0.38, extraBounce: 0.04)
+                : .smooth(duration: 0.5)
         ) {
             areBottomControlsCollapsed = willCollapse
         }

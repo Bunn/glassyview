@@ -269,6 +269,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         state = .connecting
 
         let tcpOptions = NWProtocolTCP.Options()
+        tcpOptions.noDelay = true
         tcpOptions.enableKeepalive = true
         tcpOptions.keepaliveIdle = 10
         tcpOptions.keepaliveInterval = 5

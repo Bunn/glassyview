@@ -67,6 +67,24 @@ struct EditMachineView<Store: MachineStoring>: View {
         ) != nil
     }
 
+    private var glassyStreamDetectionMessage: String {
+        switch connectionMode {
+        case .vnc:
+            "This Mac is advertising Glassy Stream support. Select Glassy Stream above to use it."
+        case .glassyStream:
+            "Glassy Stream is selected for this Mac. Save or connect to continue."
+        }
+    }
+
+    private var glassyStreamDetectionHint: String {
+        switch connectionMode {
+        case .vnc:
+            "Select Glassy Stream in the connection method picker to use it."
+        case .glassyStream:
+            "Save or connect to continue."
+        }
+    }
+
     private var canSubmit: Bool {
         let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -122,13 +140,13 @@ struct EditMachineView<Store: MachineStoring>: View {
                                 title: "Glassy Stream detected on this Mac"
                             )
 
-                            Text("This Mac is advertising Glassy Stream support. Choose Glassy Stream above to pair and connect.")
+                            Text(glassyStreamDetectionMessage)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .accessibilityElement(children: .combine)
-                        .accessibilityHint("Choose Glassy Stream in the connection method picker to use it.")
+                        .accessibilityHint(glassyStreamDetectionHint)
                         .accessibilityIdentifier("connection.glassy-host.detected")
                     }
 

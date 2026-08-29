@@ -553,6 +553,7 @@ private extension HostServer {
             guard activeGeneration == generation, listener == nil else { return }
             do {
                 let tcpOptions = NWProtocolTCP.Options()
+                tcpOptions.noDelay = true
                 tcpOptions.enableKeepalive = true
                 tcpOptions.keepaliveIdle = 10
                 tcpOptions.keepaliveInterval = 5

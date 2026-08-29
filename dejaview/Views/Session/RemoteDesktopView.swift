@@ -155,7 +155,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private var pendingZeroCursorFollowTask: Task<Void, Never>?
 
         // Single-touch state
-        private var lastTouchLocation: CGPoint = .zero
+        private var relativePointer = RelativePointerAccumulator()
         private var touchStartTime: TimeInterval = 0
         private var touchMoved = false
         private var isDragging = false
@@ -1340,7 +1340,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-            guard let touch = touches.first, session != nil else { return }
+            guard let touch = touches.first, let session else { return }
 
             becomeFirstResponderIfAppropriate()
 
@@ -1355,7 +1355,10 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             switch effectiveTouchMode {
             case .trackpad:
-                lastTouchLocation = location
+                relativePointer.begin(
+                    touchLocation: location,
+                    cursorLocation: session.cursorLocation
+                )
                 touchStartTime = touch.timestamp
                 touchMoved = false
                 isDragging = false
@@ -1432,25 +1435,23 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             switch effectiveTouchMode {
             case .trackpad:
-                let delta = CGPoint(x: location.x - lastTouchLocation.x,
-                                    y: location.y - lastTouchLocation.y)
+                guard let requestedTarget = relativePointer.advance(
+                    to: location,
+                    framebufferScale: effectiveScale
+                ) else { return }
 
                 if !touchMoved,
-                   abs(delta.x) + abs(delta.y) > tapMovementThreshold {
+                   relativePointer.hasMoved(beyond: tapMovementThreshold) {
                     touchMoved = true
                     cancelLongPress()
                 }
 
-                guard touchMoved else { return }
-
-                lastTouchLocation = location
-
-                // View-point delta → framebuffer delta, so finger travel
-                // matches on-screen cursor travel.
-                let scale = effectiveScale
-                let fbDelta = CGPoint(x: delta.x / scale, y: delta.y / scale)
-
-                session.moveCursor(by: fbDelta, dragging: isDragging)
+                // Keep the gesture's own absolute target. Glassy Stream also
+                // receives asynchronous host cursor telemetry, which may
+                // describe an older pointer command. Rebasing every delta on
+                // that telemetry makes the next command jump backwards.
+                session.moveCursor(to: requestedTarget, dragging: isDragging)
+                relativePointer.synchronizeTarget(to: session.cursorLocation)
                 cursorLocationDidChange()
 
             case .direct:
@@ -1481,12 +1482,16 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                 cancelLongPress()
 
                 if isDragging {
-                    session.releaseAtCursor()
+                    let point = relativePointer.target ?? session.cursorLocation
+                    session.leftButtonUp(at: point)
                     isDragging = false
                 } else if !touchMoved,
                           touch.timestamp - touchStartTime < tapDurationThreshold {
-                    session.clickAtCursor()
+                    let point = relativePointer.target ?? session.cursorLocation
+                    session.leftButtonDown(at: point)
+                    session.leftButtonUp(at: point)
                 }
+                relativePointer.reset()
 
             case .direct:
                 // Tap ended before the debounce → full click now.
@@ -1510,9 +1515,11 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             cancelPendingPress()
 
             if isDragging {
-                session.releaseAtCursor()
+                let point = relativePointer.target ?? session.cursorLocation
+                session.leftButtonUp(at: point)
                 isDragging = false
             }
+            relativePointer.reset()
 
             if directPressed {
                 directPressed = false
@@ -1534,9 +1541,13 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             cancelPendingPress()
 
             if isDragging {
-                session?.releaseAtCursor()
+                if let session {
+                    let point = relativePointer.target ?? session.cursorLocation
+                    session.leftButtonUp(at: point)
+                }
                 isDragging = false
             }
+            relativePointer.reset()
 
             if directPressed {
                 directPressed = false
@@ -1584,7 +1595,11 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                       !self.multiTouchActive else { return }
 
                 self.isDragging = true
-                self.session?.pressAtCursor()
+                if let session = self.session {
+                    let point = self.relativePointer.target ?? session.cursorLocation
+                    session.leftButtonDown(at: point)
+                    self.relativePointer.synchronizeTarget(to: session.cursorLocation)
+                }
 
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             }

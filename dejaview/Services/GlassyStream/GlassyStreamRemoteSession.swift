@@ -23,13 +23,14 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     private let framebufferUpdateSubject = CurrentValueSubject<RemoteFramebufferUpdate, Never>(.empty)
     private let cursorSubject = CurrentValueSubject<RemoteCursor?, Never>(nil)
     private let cursorLocationSubject = CurrentValueSubject<CGPoint, Never>(.zero)
+    private let pointerClock = ContinuousClock()
     private var framebufferSize: CGSize = .zero
     private(set) var cursorLocation: CGPoint = .zero {
         didSet {
             cursorLocationSubject.send(cursorLocation)
         }
     }
-    private var remoteCursorPosition: GlassyStreamCursorPosition?
+    private var cursorReconciler = GlassyStreamCursorReconciler()
     private var pointerButtons: GlassyStreamPointerButtons = []
     private var heldModifierKeys: Set<RemoteModifierKey> = []
     private var retryConfiguration: ConnectionConfiguration?
@@ -316,9 +317,9 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 
     func leftButtonDown(at point: CGPoint) {
         guard canSendPointerInput else { return }
-        cursorLocation = clampedPoint(point)
+        let positionChanged = updateLocalCursorLocation(to: point)
         pointerButtons.insert(.left)
-        sendCurrentPointer()
+        sendCurrentPointer(localPositionIsAuthoritative: positionChanged)
     }
 
     func leftButtonUp(at point: CGPoint) {
@@ -326,9 +327,9 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
             pointerButtons.remove(.left)
             return
         }
-        cursorLocation = clampedPoint(point)
+        let positionChanged = updateLocalCursorLocation(to: point)
         pointerButtons.remove(.left)
-        sendCurrentPointer()
+        sendCurrentPointer(localPositionIsAuthoritative: positionChanged)
     }
 
     func moveCursor(by delta: CGPoint, dragging: Bool) {
@@ -341,11 +342,14 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 
     func moveCursor(to point: CGPoint, dragging: Bool) {
         guard canSendPointerInput else { return }
-        cursorLocation = clampedPoint(point)
+        updateLocalCursorLocation(to: point)
         if dragging {
             pointerButtons.insert(.left)
         }
-        sendCurrentPointer()
+        // A movement sample is local pointer authority even when framebuffer
+        // clamping leaves the wire coordinate unchanged (for example while a
+        // finger keeps moving against an edge).
+        sendCurrentPointer(localPositionIsAuthoritative: true)
     }
 
     func clickAtCursor() {
@@ -355,10 +359,10 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 
     func rightClick(at point: CGPoint) {
         guard canSendPointerInput else { return }
-        cursorLocation = clampedPoint(point)
+        let positionChanged = updateLocalCursorLocation(to: point)
         let originalButtons = pointerButtons
         pointerButtons.insert(.right)
-        sendCurrentPointer()
+        sendCurrentPointer(localPositionIsAuthoritative: positionChanged)
         pointerButtons = originalButtons
         sendCurrentPointer()
     }
@@ -801,8 +805,8 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 
         let previousSize = framebufferSize
         framebufferSize = dimensions
-        if let remoteCursorPosition {
-            cursorLocation = framebufferPoint(for: remoteCursorPosition)
+        if let preferredCursorPosition = cursorReconciler.preferredPosition {
+            cursorLocation = framebufferPoint(for: preferredCursorPosition)
         } else if previousSize == .zero {
             cursorLocation = CGPoint(x: dimensions.width / 2,
                                      y: dimensions.height / 2)
@@ -828,7 +832,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     private func clearGeometry() {
         framebufferSize = .zero
         cursorLocation = .zero
-        remoteCursorPosition = nil
+        cursorReconciler.reset()
         displays = []
         cursorSubject.send(nil)
         framebufferUpdateSubject.send(.empty)
@@ -846,10 +850,23 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     }
 
     private func updateRemoteCursorPosition(_ position: GlassyStreamCursorPosition) {
-        remoteCursorPosition = position
-        guard framebufferSize.width > 0,
+        let shouldAccept = cursorReconciler.receiveRemotePosition(
+            position,
+            at: pointerClock.now
+        )
+        guard shouldAccept,
+              framebufferSize.width > 0,
               framebufferSize.height > 0 else { return }
+
         cursorLocation = framebufferPoint(for: position)
+    }
+
+    @discardableResult
+    private func updateLocalCursorLocation(to point: CGPoint) -> Bool {
+        let previousPosition = streamCursorPosition(for: cursorLocation)
+        let updatedLocation = clampedPoint(point)
+        cursorLocation = updatedLocation
+        return streamCursorPosition(for: updatedLocation) != previousPosition
     }
 
     private func framebufferPoint(
@@ -866,12 +883,28 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         return CGFloat(value) / CGFloat(UInt16.max) * (length - 1)
     }
 
-    private func sendCurrentPointer() {
+    private func sendCurrentPointer(
+        localPositionIsAuthoritative: Bool = false
+    ) {
         guard canSendPointerInput else { return }
+        let position = streamCursorPosition(for: cursorLocation)
+        if localPositionIsAuthoritative {
+            cursorReconciler.recordLocalPosition(
+                position,
+                at: pointerClock.now
+            )
+        }
         controller.sendPointerInput(
-            x: normalizedCoordinate(cursorLocation.x, length: framebufferSize.width),
-            y: normalizedCoordinate(cursorLocation.y, length: framebufferSize.height),
+            x: position.x,
+            y: position.y,
             buttons: pointerButtons
+        )
+    }
+
+    private func streamCursorPosition(for point: CGPoint) -> GlassyStreamCursorPosition {
+        GlassyStreamCursorPosition(
+            x: normalizedCoordinate(point.x, length: framebufferSize.width),
+            y: normalizedCoordinate(point.y, length: framebufferSize.height)
         )
     }
 
