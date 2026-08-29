@@ -227,7 +227,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Support/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Glassy Desk";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Glassy Desk connects to Macs on your local network to view and control their screens.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Glassy Desk connects to Macs on your local or private network to view and control their screens.";
 				INFOPLIST_KEY_RevenueCatAPIKey = "$(REVENUECAT_API_KEY)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -259,7 +259,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Support/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Glassy Desk";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Glassy Desk connects to Macs on your local network to view and control their screens.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Glassy Desk connects to Macs on your local or private network to view and control their screens.";
 				INFOPLIST_KEY_RevenueCatAPIKey = "$(REVENUECAT_API_KEY)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

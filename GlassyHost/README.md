@@ -16,6 +16,20 @@ Grant Screen Recording and Accessibility access locally, then leave Glassy Host 
 
 Connected Glassy Desk devices can request Data Saver (720p/15 FPS/~2 Mbps), Balanced (1080p/30 FPS/~5 Mbps), or Best (up to 4K/60 FPS/~12 Mbps). The host accepts only these bounded presets and reconfigures capture and H.264 encoding without dropping the authenticated session. Because one encoder serves every connected device, the most bandwidth-conscious active request determines the shared stream.
 
+## Connect remotely with Tailscale
+
+Tailscale provides a private route to a remote Mac without exposing Glassy Host to the public internet:
+
+1. Install Tailscale on the Mac and iPad, sign in to the same tailnet, and confirm both devices appear online.
+2. Install and run the same current Glassy Desk/Glassy Host version on both devices. Leave Glassy Host running and grant its Screen Recording and Accessibility permissions.
+3. In Tailscale on the Mac, copy the Mac's MagicDNS name or `100.x.y.z` address.
+4. In Glassy Desk, edit the saved Mac, select **Glassy Stream**, enter that Tailscale name or address, and use TCP port `51515`.
+5. Connect and enter the pairing code currently shown by Glassy Host on that remote Mac. The code must come from the Mac whose Tailscale address you entered.
+
+The nearby-host picker uses Bonjour, which normally discovers only Macs on the iPad's local network. A remote Tailscale Mac is therefore not expected to appear in that list; connect with its saved address instead. Do not configure router port forwarding or expose port `51515` publicly.
+
+If the direct connection cannot be established, verify that both devices still show as online in the same tailnet, that the tailnet's access-control policy permits the iPad to reach the Mac on TCP `51515`, and that the macOS firewall allows the current Glassy Host app. Rebuilding or replacing only one side can also produce protocol or authentication errors, so deploy compatible Glassy Desk and Glassy Host builds together.
+
 ## Verify
 
 ```sh

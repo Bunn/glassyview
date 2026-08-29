@@ -6,8 +6,10 @@ struct FAQView: View {
                         answer: "Glassy Desk connects your iPhone or iPad to a Mac's built-in Screen Sharing service so you can view and control the desktop over VNC/RFB."),
         SettingsFAQItem(question: "Why can I not see my Mac nearby?",
                         answer: "Check that Screen Sharing or Remote Management is enabled on the Mac, both devices are on the same network or VPN, Local Network permission is allowed for Glassy Desk, and the Mac is awake. Some networks block Bonjour discovery, so adding the host manually can still work."),
+        SettingsFAQItem(question: "Why is my remote Glassy Host not in the picker?",
+                        answer: "The picker uses Bonjour and normally shows only Macs on the iPad's local network. For a remote Mac, connect Tailscale on both devices, then save the Mac's MagicDNS name or 100.x address in Glassy Desk."),
         SettingsFAQItem(question: "What host and port should I use?",
-                        answer: "Use the Mac's local hostname, IP address, or DNS name. macOS Screen Sharing normally listens on port 5900."),
+                        answer: "For VNC, use the Mac's hostname or IP address and normally port 5900. For Glassy Stream, use its Tailscale MagicDNS name or 100.x address and port 51515."),
         SettingsFAQItem(question: "How do I use Wake-on-LAN?",
                         answer: "Edit a saved Mac and enter the MAC address of its network interface. Also enable Wake for network access in macOS System Settings. If the Mac is unreachable, tapping its card sends a wake packet and waits up to a minute before connecting. Wake-on-LAN normally requires the devices to be on the same local network or a VPN that forwards broadcasts."),
         SettingsFAQItem(question: "Which credentials should I enter?",
@@ -20,7 +22,7 @@ struct FAQView: View {
         SettingsFAQItem(question: "Does it work with non-Mac VNC servers?",
                         answer: "Standard VNC/RFB servers may work, but the app is tuned and tested around macOS Screen Sharing behavior."),
         SettingsFAQItem(question: "Can I connect when away from home?",
-                        answer: "Yes, if your iPhone or iPad can reach the Mac through a VPN or routed network. Glassy Desk does not include a cloud relay service."),
+                        answer: "Yes. The easiest current setup is Tailscale on the iPad and Mac, signed into the same tailnet. Save the Mac's Tailscale address for Glassy Stream; no public port forwarding is needed. Glassy Desk does not include a cloud relay service."),
         SettingsFAQItem(question: "Does it use Apple's high-performance Screen Sharing protocol?",
                         answer: "No. Third-party clients use the classic VNC/RFB Screen Sharing path exposed by macOS.")
     ]

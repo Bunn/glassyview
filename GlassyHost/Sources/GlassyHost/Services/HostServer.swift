@@ -32,8 +32,9 @@ final class HostServer: @unchecked Sendable {
     private let core: Core
     private let pairingCodeSource = PairingCodeSource()
 
-    init(serviceName: String = Host.current().localizedName ?? "Glassy Host") {
-        core = Core(serviceName: serviceName)
+    init(serviceName: String = Host.current().localizedName ?? "Glassy Host",
+         port: UInt16 = HostProtocol.defaultPort) {
+        core = Core(serviceName: serviceName, port: port)
     }
 
     deinit {
@@ -181,6 +182,34 @@ final class HostServer: @unchecked Sendable {
         )
         return Data(digest.prefix(HostProtocol.identifierLength))
     }
+
+    static func listenerFailureMessage(for error: NWError,
+                                       port: UInt16 = HostProtocol.defaultPort) -> String {
+        if isAddressInUse(error) {
+            return "TCP port \(port) is already in use. Quit the other Glassy Host instance or app using this port. Glassy Host will retry automatically every 30 seconds."
+        }
+        return "Glassy Host could not listen on TCP port \(port): \(error.localizedDescription). It will retry automatically."
+    }
+
+    static func isAddressInUse(_ error: NWError) -> Bool {
+        if case .posix(.EADDRINUSE) = error {
+            return true
+        }
+        return false
+    }
+}
+
+struct HostListenerRetryPolicy {
+    private static let transientDelays: [TimeInterval] = [1, 2, 4, 8, 15, 30]
+    static let addressInUseDelay: TimeInterval = 30
+
+    static func delay(after error: NWError?, attempt: Int) -> TimeInterval {
+        if let error, HostServer.isAddressInUse(error) {
+            return addressInUseDelay
+        }
+        let index = min(max(attempt, 0), transientDelays.count - 1)
+        return transientDelays[index]
+    }
 }
 
 // MARK: - Network core
@@ -199,8 +228,12 @@ private extension HostServer {
         private let queue = DispatchQueue(label: "dev.bunn.glassydesk.host.server",
                                           qos: .userInteractive)
         private let serviceName: String
+        private let listenerPort: UInt16
 
         private var listener: NWListener?
+        private var listenerRetryWorkItem: DispatchWorkItem?
+        private var listenerRetryIdentifier: UUID?
+        private var listenerRetryAttempt = 0
         private var generation = UUID()
         private var clients: [UUID: Client] = [:]
         private var authenticatedClientRegistry = HostAuthenticatedClientRegistry()
@@ -223,8 +256,9 @@ private extension HostServer {
         private var clientCountHandler: ClientCountHandler = { _ in }
         private var statusHandler: StatusHandler = { _ in }
 
-        init(serviceName: String) {
+        init(serviceName: String, port: UInt16) {
             self.serviceName = serviceName
+            listenerPort = port
         }
 
         func start(pairingSecret: Data,
@@ -448,7 +482,11 @@ private extension HostServer {
             hostIdentifier = HostServer.makeHostIdentifier(from: pairingSecret)
             failedPairingAttempts.removeAll(keepingCapacity: true)
             publishStatus(.starting)
+            startListenerLocked(activeGeneration: activeGeneration)
+        }
 
+        private func startListenerLocked(activeGeneration: UUID) {
+            guard activeGeneration == generation, listener == nil else { return }
             do {
                 let tcpOptions = NWProtocolTCP.Options()
                 tcpOptions.enableKeepalive = true
@@ -456,10 +494,17 @@ private extension HostServer {
                 tcpOptions.keepaliveInterval = 5
                 tcpOptions.keepaliveCount = 3
                 let parameters = NWParameters(tls: nil, tcp: tcpOptions)
-                parameters.allowLocalEndpointReuse = true
+                // A single owner makes a saved direct endpoint deterministic.
+                // If another process owns the stable port, surface that conflict
+                // instead of silently advertising an ambiguous listener.
+                parameters.allowLocalEndpointReuse = false
                 parameters.includePeerToPeer = true
 
-                let listener = try NWListener(using: parameters)
+                guard let port = NWEndpoint.Port(rawValue: listenerPort) else {
+                    publishStatus(.failed("TCP port \(listenerPort) is invalid."))
+                    return
+                }
+                let listener = try NWListener(using: parameters, on: port)
                 listener.service = NWListener.Service(name: serviceName,
                                                       type: HostProtocol.bonjourServiceType)
                 listener.stateUpdateHandler = { [weak self, weak listener] state in
@@ -478,17 +523,34 @@ private extension HostServer {
                 self.listener = listener
                 listener.start(queue: queue)
             } catch {
-                publishStatus(.failed(error.localizedDescription))
+                if let networkError = error as? NWError {
+                    failListenerCreation(networkError)
+                } else {
+                    let message = "Glassy Host could not create its TCP listener on port \(listenerPort): \(error.localizedDescription). It will retry automatically."
+                    Self.logger.error("Listener creation failed: \(message, privacy: .public)")
+                    publishStatus(.failed(message))
+                    scheduleListenerRetry(after: nil)
+                }
             }
         }
 
         private func stopLocked(publishStopped: Bool) {
             generation = UUID()
+            cancelListenerRetry()
+            listenerRetryAttempt = 0
             listener?.stateUpdateHandler = nil
             listener?.newConnectionHandler = nil
             listener?.cancel()
             listener = nil
 
+            retireAllClientsLocked()
+            if publishStopped {
+                publishStatus(.stopped)
+            }
+        }
+
+        private func retireAllClientsLocked() {
+            let hadAuthenticatedClients = authenticatedClientRegistry.activeConnectionCount > 0
             let existingClients = Array(clients.values)
             clients.removeAll(keepingCapacity: true)
             authenticatedClientRegistry.removeAll()
@@ -498,36 +560,116 @@ private extension HostServer {
                 client.connection.cancel()
                 client.isClosed = true
             }
+            if hadAuthenticatedClients {
+                authenticatedClientReplacementHandler?()
+            }
             publishAuthenticatedClientCountIfNeeded(force: true)
             publishEffectiveStreamQualityIfNeeded()
-            if publishStopped {
-                publishStatus(.stopped)
-            }
         }
 
         private func handleListenerState(_ state: NWListener.State,
                                          listener: NWListener) {
             switch state {
-            case .setup, .waiting:
+            case .setup:
                 publishStatus(.starting)
+            case let .waiting(error):
+                if HostServer.isAddressInUse(error) {
+                    failListener(error, listener: listener)
+                } else {
+                    Self.logger.notice("Listener waiting: \(error.localizedDescription, privacy: .public)")
+                    publishStatus(.starting)
+                }
             case .ready:
                 guard let port = listener.port?.rawValue else {
-                    publishStatus(.failed("The listener did not receive a TCP port."))
+                    failListener(
+                        "The Glassy Host listener did not receive a TCP port. It will retry automatically.",
+                        listener: listener,
+                        retryAfter: nil
+                    )
                     return
                 }
                 Self.logger.info("Glassy Host listening on port \(port, privacy: .public)")
+                cancelListenerRetry()
+                listenerRetryAttempt = 0
                 publishStatus(.listening(port: port))
             case let .failed(error):
-                Self.logger.error("Listener failed: \(error.localizedDescription, privacy: .public)")
-                if listener === self.listener {
-                    self.listener = nil
-                }
-                publishStatus(.failed(error.localizedDescription))
+                failListener(error, listener: listener)
             case .cancelled:
                 break
             @unknown default:
-                publishStatus(.failed("Unknown listener state."))
+                failListener(
+                    "The Glassy Host listener entered an unknown state. It will retry automatically.",
+                    listener: listener,
+                    retryAfter: nil
+                )
             }
+        }
+
+        private func failListener(_ error: NWError, listener: NWListener) {
+            let message = HostServer.listenerFailureMessage(
+                for: error,
+                port: listenerPort
+            )
+            failListener(message, listener: listener, retryAfter: error)
+        }
+
+        private func failListener(_ message: String,
+                                  listener: NWListener,
+                                  retryAfter error: NWError?) {
+            Self.logger.error("Listener failed: \(message, privacy: .public)")
+            if listener === self.listener {
+                listener.stateUpdateHandler = nil
+                listener.newConnectionHandler = nil
+                listener.cancel()
+                self.listener = nil
+            }
+            retireAllClientsLocked()
+            publishStatus(.failed(message))
+            scheduleListenerRetry(after: error)
+        }
+
+        private func failListenerCreation(_ error: NWError) {
+            let message = HostServer.listenerFailureMessage(
+                for: error,
+                port: listenerPort
+            )
+            Self.logger.error("Listener creation failed: \(message, privacy: .public)")
+            publishStatus(.failed(message))
+            scheduleListenerRetry(after: error)
+        }
+
+        private func scheduleListenerRetry(after error: NWError?) {
+            guard listener == nil, rootSecretData != nil else { return }
+
+            cancelListenerRetry()
+            let activeGeneration = generation
+            let retryIdentifier = UUID()
+            let delay = HostListenerRetryPolicy.delay(
+                after: error,
+                attempt: listenerRetryAttempt
+            )
+            listenerRetryAttempt += 1
+            listenerRetryIdentifier = retryIdentifier
+
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self,
+                      generation == activeGeneration,
+                      listenerRetryIdentifier == retryIdentifier,
+                      listener == nil else { return }
+                listenerRetryWorkItem = nil
+                listenerRetryIdentifier = nil
+                publishStatus(.starting)
+                startListenerLocked(activeGeneration: activeGeneration)
+            }
+            listenerRetryWorkItem = workItem
+            Self.logger.notice("Retrying the Glassy Host listener in \(delay, privacy: .public) seconds")
+            queue.asyncAfter(deadline: .now() + delay, execute: workItem)
+        }
+
+        private func cancelListenerRetry() {
+            listenerRetryWorkItem?.cancel()
+            listenerRetryWorkItem = nil
+            listenerRetryIdentifier = nil
         }
 
         private func publishStatus(_ status: Status) {

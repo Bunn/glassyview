@@ -21,10 +21,15 @@ final class GlassyStreamClient: @unchecked Sendable {
 
     private enum State: Sendable {
         case idle
+        case connecting
         case awaitingServerHello
         case awaitingAuthentication(PendingAuthentication)
         case authenticated(GlassyStreamWire.SessionMaterial)
     }
+
+    /// Allows time for MagicDNS resolution and a dormant Tailscale path to
+    /// become usable before the secure-handshake clock starts.
+    private static let connectionEstablishmentTimeout: TimeInterval = 20
 
     private let queue = DispatchQueue(label: "dev.bunn.glassydesk.glassy-stream.network",
                                       qos: .userInteractive)
@@ -40,6 +45,7 @@ final class GlassyStreamClient: @unchecked Sendable {
     private var lastInboundSequence: UInt64 = 0
     private var nextOutboundSequence: UInt64 = 1
     private var maximumInboundPayloadLength = GlassyStreamWire.maximumHandshakePayloadLength
+    private var connectionEstablishmentTimeoutWorkItem: DispatchWorkItem?
     private var authenticationTimeoutWorkItem: DispatchWorkItem?
     private var supportsStreamQuality = false
     private var supportsCursorPositionUpdates = false
@@ -49,6 +55,7 @@ final class GlassyStreamClient: @unchecked Sendable {
     }
 
     deinit {
+        connectionEstablishmentTimeoutWorkItem?.cancel()
         authenticationTimeoutWorkItem?.cancel()
         connection?.stateUpdateHandler = nil
         connection?.cancel()
@@ -239,7 +246,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         maximumInboundPayloadLength = GlassyStreamWire.maximumHandshakePayloadLength
         supportsStreamQuality = false
         supportsCursorPositionUpdates = false
-        state = .awaitingServerHello
+        state = .connecting
 
         let tcpOptions = NWProtocolTCP.Options()
         tcpOptions.enableKeepalive = true
@@ -250,8 +257,8 @@ final class GlassyStreamClient: @unchecked Sendable {
         parameters.includePeerToPeer = true
         let connection = NWConnection(to: configuration.endpoint, using: parameters)
         self.connection = connection
-        scheduleAuthenticationTimeout(
-            after: configuration.authenticationTimeout,
+        scheduleConnectionEstablishmentTimeout(
+            after: Self.connectionEstablishmentTimeout,
             generation: activeGeneration
         )
         connection.stateUpdateHandler = { [weak self, weak connection] networkState in
@@ -260,6 +267,13 @@ final class GlassyStreamClient: @unchecked Sendable {
                   connection === self.connection else { return }
             switch networkState {
             case .ready:
+                guard case .connecting = state else { return }
+                cancelConnectionEstablishmentTimeout()
+                state = .awaitingServerHello
+                scheduleAuthenticationTimeout(
+                    after: configuration.authenticationTimeout,
+                    generation: activeGeneration
+                )
                 AppLog.session.info("Glassy Stream TCP connection ready")
                 receiveNext(generation: activeGeneration)
             case let .failed(error):
@@ -344,6 +358,8 @@ final class GlassyStreamClient: @unchecked Sendable {
             switch state {
             case .idle:
                 throw GlassyStreamClientError.protocolViolation("message arrived after disconnect")
+            case .connecting:
+                throw GlassyStreamClientError.protocolViolation("message arrived before TCP connection was ready")
             case .awaitingServerHello:
                 try handleServerHello(frame, generation: activeGeneration)
             case let .awaitingAuthentication(pending):
@@ -691,6 +707,7 @@ final class GlassyStreamClient: @unchecked Sendable {
     private func finish(_ result: Result<Void, GlassyStreamClientError>,
                         generation activeGeneration: UUID) {
         guard activeGeneration == generation, let connection else { return }
+        cancelConnectionEstablishmentTimeout()
         cancelAuthenticationTimeout()
         connection.stateUpdateHandler = nil
         connection.cancel()
@@ -728,6 +745,32 @@ final class GlassyStreamClient: @unchecked Sendable {
         }
         authenticationTimeoutWorkItem = workItem
         queue.asyncAfter(deadline: .now() + timeout, execute: workItem)
+    }
+
+    private func scheduleConnectionEstablishmentTimeout(
+        after timeout: TimeInterval,
+        generation activeGeneration: UUID
+    ) {
+        cancelConnectionEstablishmentTimeout()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self,
+                  activeGeneration == generation,
+                  connection != nil,
+                  case .connecting = state else {
+                return
+            }
+            finish(
+                .failure(.connectionFailed("The connection attempt timed out.")),
+                generation: activeGeneration
+            )
+        }
+        connectionEstablishmentTimeoutWorkItem = workItem
+        queue.asyncAfter(deadline: .now() + timeout, execute: workItem)
+    }
+
+    private func cancelConnectionEstablishmentTimeout() {
+        connectionEstablishmentTimeoutWorkItem?.cancel()
+        connectionEstablishmentTimeoutWorkItem = nil
     }
 
     private func cancelAuthenticationTimeout() {

@@ -38,7 +38,7 @@ enum GlassyStreamSessionError: Error, LocalizedError, Sendable {
         case .cancelled:
             nil
         case .connectionEndedBeforeAuthentication:
-            "Make sure Glassy Host is running, then try again."
+            "Make sure Glassy Host is running. For remote access, connect Tailscale on both devices and verify TCP port 51515 is allowed by your tailnet policy."
         case .videoReadinessTimedOut:
             "Open Glassy Host, allow Screen Recording, check the selected display, and reconnect."
         case let .transport(error):
@@ -47,8 +47,14 @@ enum GlassyStreamSessionError: Error, LocalizedError, Sendable {
                 "Enter the current twelve-symbol code shown by Glassy Host."
             case .invalidPairingCode, .authenticationRejected:
                 "Check the code shown by Glassy Host and try pairing again."
+            case .hostIdentityMismatch:
+                "The saved address reached a different Mac. Check the Tailscale name or IP, or choose Pair a Different Mac in the machine editor."
+            case .directInputUnsupported, .unsupportedHostVersion:
+                "Update Glassy Host and Glassy Desk, then try again."
+            case .credentialStoreFailed:
+                "Check Keychain access on this device, then pair again."
             default:
-                "Make sure the iPad and Mac are on the same network, then try again."
+                "Make sure Glassy Host is running. For remote access, connect Tailscale on both devices and verify the saved address and TCP port 51515."
             }
         case .video:
             "Reconnect to request a fresh video configuration and keyframe."

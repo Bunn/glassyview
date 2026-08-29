@@ -31,7 +31,7 @@
 	<key>GlassyHostPairingSecretStorage</key>
 	<string>protected-file</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Glassy Host streams this Mac securely to paired Glassy Desk devices on your local network.</string>
+	<string>Glassy Host streams this Mac securely to paired Glassy Desk devices on your local or private network.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSScreenCaptureUsageDescription</key>

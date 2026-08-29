@@ -35,7 +35,10 @@ struct EditMachineView<Store: MachineStoring>: View {
         _connectionMode = State(initialValue: machine.connectionMode)
         _glassyHostIdentifier = State(initialValue: machine.glassyHostIdentifier)
         _glassyHostName = State(initialValue: machine.glassyHostName)
-        _portText = State(initialValue: String(machine.port))
+        let initialPort = machine.connectionMode == .glassyStream
+            ? GlassyStreamEndpoint.effectivePort(for: machine)
+            : machine.port
+        _portText = State(initialValue: String(initialPort))
         _macAddress = State(initialValue: machine.macAddress ?? "")
     }
 
@@ -45,7 +48,29 @@ struct EditMachineView<Store: MachineStoring>: View {
         let hasIdentity = connectionMode == .vnc
             ? !trimmedHost.isEmpty
             : !trimmedName.isEmpty || !trimmedHost.isEmpty
-        return hasIdentity && isMACAddressValid
+        return hasIdentity && isPortValid && isGlassyAddressValid && isMACAddressValid
+    }
+
+    private var isPortValid: Bool {
+        guard let port = UInt16(portText.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            return false
+        }
+        return port > 0
+    }
+
+    private var isGlassyAddressValid: Bool {
+        guard connectionMode == .glassyStream else { return true }
+
+        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedHost.isEmpty else { return true }
+        guard let port = UInt16(portText.trimmingCharacters(in: .whitespacesAndNewlines)),
+              port > 0 else {
+            return false
+        }
+        return GlassyStreamEndpoint.directAddress(
+            from: trimmedHost,
+            defaultPort: port
+        ) != nil
     }
 
     private var isMACAddressValid: Bool {
@@ -71,22 +96,43 @@ struct EditMachineView<Store: MachineStoring>: View {
                     Text(connectionMode.description)
                 }
 
-                Section("Machine") {
+                Section {
                     TextField(connectionMode == .vnc ? "Name (optional)" : "Name", text: $name)
 
                     TextField(
                         connectionMode == .vnc
                             ? "Host or IP address"
-                            : "Mac name or IP address (optional)",
+                            : "Tailscale name or 100.x address (optional nearby)",
                         text: $host
                     )
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
 
-                    if connectionMode == .vnc {
-                        TextField("Port", text: $portText)
-                            .keyboardType(.numberPad)
+                    TextField(
+                        connectionMode == .vnc ? "Port" : "Glassy Host Port",
+                        text: $portText
+                    )
+                        .keyboardType(.numberPad)
+
+                    if !isPortValid {
+                        Label("Enter a TCP port from 1 through 65535.",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    } else if !isGlassyAddressValid {
+                        Label("Enter a host name, IPv4 address, or bracketed IPv6 address.",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("Machine")
+                } footer: {
+                    if connectionMode == .glassyStream {
+                        Text("For remote access, use the Mac's Tailscale MagicDNS name or 100.x address. Connect both devices to the same tailnet; no public port forwarding is needed.")
+                    } else {
+                        Text("Enter the Mac's host name or IP address and its Screen Sharing port.")
                     }
                 }
 
@@ -163,6 +209,9 @@ struct EditMachineView<Store: MachineStoring>: View {
             }
             .navigationTitle(isNew ? "New Machine" : "Edit Machine")
             .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: connectionMode) { oldMode, newMode in
+                updateDefaultPort(from: oldMode, to: newMode)
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -218,11 +267,24 @@ struct EditMachineView<Store: MachineStoring>: View {
         var prepared = machine
         prepared.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         prepared.host = host.trimmingCharacters(in: .whitespacesAndNewlines)
-        prepared.port = UInt16(portText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 5900
+        let fallbackPort = connectionMode == .glassyStream
+            ? GlassyStreamEndpoint.defaultPort
+            : UInt16(5_900)
+        prepared.port = UInt16(portText.trimmingCharacters(in: .whitespacesAndNewlines))
+            ?? fallbackPort
         prepared.username = username.trimmingCharacters(in: .whitespacesAndNewlines)
         prepared.connectionMode = connectionMode
         prepared.glassyHostIdentifier = glassyHostIdentifier
         prepared.glassyHostName = glassyHostName
+
+        if connectionMode == .glassyStream,
+           let directAddress = GlassyStreamEndpoint.directAddress(
+               from: prepared.host,
+               defaultPort: prepared.port
+           ) {
+            prepared.host = directAddress.host
+            prepared.port = directAddress.port
+        }
 
         let trimmedMACAddress = macAddress.trimmingCharacters(in: .whitespacesAndNewlines)
         prepared.macAddress = trimmedMACAddress.isEmpty
@@ -234,5 +296,22 @@ struct EditMachineView<Store: MachineStoring>: View {
         }
 
         return prepared
+    }
+
+    private func updateDefaultPort(
+        from oldMode: RemoteConnectionMode,
+        to newMode: RemoteConnectionMode
+    ) {
+        let trimmedPort = portText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch (oldMode, newMode) {
+        case (.vnc, .glassyStream) where trimmedPort == "5900":
+            portText = String(GlassyStreamEndpoint.defaultPort)
+        case (.glassyStream, .vnc)
+            where trimmedPort == String(GlassyStreamEndpoint.defaultPort):
+            portText = "5900"
+        default:
+            break
+        }
     }
 }

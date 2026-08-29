@@ -21,6 +21,9 @@ import Foundation
 /// sequence are authenticated as additional data.
 enum HostProtocol {
     static let bonjourServiceType = "_glassydesk._tcp"
+    /// Stable direct-connect port used by Bonjour, saved endpoints, and
+    /// private overlay networks such as Tailscale.
+    static let defaultPort: UInt16 = 51_515
     static let version: UInt8 = 1
     static let magic: UInt32 = 0x474C_5359 // "GLSY"
     static let headerLength = 20

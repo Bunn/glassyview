@@ -85,14 +85,16 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 
     /// Opens a discovered Glassy Host and returns its authenticated identity.
     /// After first pairing, pass that identity back on every resume attempt so
-    /// a saved machine can never silently connect to another nearby Mac.
+    /// a saved machine can never silently connect to another nearby Mac. Known
+    /// alternate addresses are retained for authenticated reconnects only.
     @discardableResult
     func connect(
         endpoint: NWEndpoint,
         savedMachineID: UUID,
         pairingCode: String?,
         expectedHostIdentifier: Data? = nil,
-        desiredQuality: RemoteSessionQuality = .best
+        desiredQuality: RemoteSessionQuality = .best,
+        fallbackEndpoints: [NWEndpoint] = []
     ) async throws -> GlassyStreamAuthentication {
         cancelRetryTask()
         automaticReconnectAttempt = 0
@@ -106,7 +108,8 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
             savedMachineID: savedMachineID,
             pairingCode: pairingCode,
             expectedHostIdentifier: expectedHostIdentifier,
-            desiredQuality: desiredQuality
+            desiredQuality: desiredQuality,
+            reconnectEndpoints: fallbackEndpoints
         )
         retryConfiguration = configuration
         return try await connect(using: configuration)
@@ -497,12 +500,8 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
             // this value prevents a legacy connection from overwriting the saved
             // per-machine preference.
             quality = configuration.desiredQuality
-            retryConfiguration = ConnectionConfiguration(
-                endpoint: configuration.endpoint,
-                savedMachineID: configuration.savedMachineID,
-                pairingCode: nil,
-                expectedHostIdentifier: authentication.hostIdentifier,
-                desiredQuality: configuration.desiredQuality
+            retryConfiguration = configuration.authenticated(
+                as: authentication.hostIdentifier
             )
             automaticReconnectAttempt = 0
             hasConnectedAtLeastOnce = true
@@ -628,6 +627,9 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
                     continue
                 }
                 guard let configuration = self.retryConfiguration else { return }
+                let attemptConfiguration = configuration.configurationForReconnectAttempt(
+                    attempt
+                )
 
                 self.status = .reconnecting(
                     RemoteReconnectState(
@@ -644,7 +646,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
                 self.automaticReconnectConnectionGeneration = connectionGeneration
                 do {
                     _ = try await self.connect(
-                        using: configuration,
+                        using: attemptConfiguration,
                         preservingReconnectStatus: true
                     )
                     if self.automaticReconnectConnectionGeneration == connectionGeneration {
@@ -961,4 +963,68 @@ private struct ConnectionConfiguration: @unchecked Sendable {
     let pairingCode: String?
     let expectedHostIdentifier: Data?
     var desiredQuality: RemoteSessionQuality
+    let reconnectEndpoints: [NWEndpoint]
+
+    init(
+        endpoint: NWEndpoint,
+        savedMachineID: UUID,
+        pairingCode: String?,
+        expectedHostIdentifier: Data?,
+        desiredQuality: RemoteSessionQuality,
+        reconnectEndpoints: [NWEndpoint] = []
+    ) {
+        self.endpoint = endpoint
+        self.savedMachineID = savedMachineID
+        self.pairingCode = pairingCode
+        self.expectedHostIdentifier = expectedHostIdentifier
+        self.desiredQuality = desiredQuality
+        self.reconnectEndpoints = Self.orderedUniqueEndpoints(
+            [endpoint] + reconnectEndpoints
+        )
+    }
+
+    /// Reconnect routes are only eligible after a host has authenticated. This
+    /// guarantees an alternate address can never receive a one-time pairing
+    /// code and must prove the identity pinned by the successful connection.
+    func configurationForReconnectAttempt(_ attempt: Int) -> Self {
+        guard pairingCode == nil,
+              expectedHostIdentifier != nil,
+              !reconnectEndpoints.isEmpty else { return self }
+
+        let index = max(0, attempt - 1) % reconnectEndpoints.count
+        return replacingEndpoint(with: reconnectEndpoints[index])
+    }
+
+    /// Promote the route that just worked so a later transport interruption or
+    /// foreground resume tries it first, while retaining all other known routes.
+    func authenticated(as hostIdentifier: Data) -> Self {
+        Self(
+            endpoint: endpoint,
+            savedMachineID: savedMachineID,
+            pairingCode: nil,
+            expectedHostIdentifier: hostIdentifier,
+            desiredQuality: desiredQuality,
+            reconnectEndpoints: reconnectEndpoints
+        )
+    }
+
+    private func replacingEndpoint(with endpoint: NWEndpoint) -> Self {
+        Self(
+            endpoint: endpoint,
+            savedMachineID: savedMachineID,
+            pairingCode: nil,
+            expectedHostIdentifier: expectedHostIdentifier,
+            desiredQuality: desiredQuality,
+            reconnectEndpoints: reconnectEndpoints
+        )
+    }
+
+    private static func orderedUniqueEndpoints(
+        _ endpoints: [NWEndpoint]
+    ) -> [NWEndpoint] {
+        endpoints.reduce(into: []) { uniqueEndpoints, endpoint in
+            guard !uniqueEndpoints.contains(endpoint) else { return }
+            uniqueEndpoints.append(endpoint)
+        }
+    }
 }

@@ -6,12 +6,15 @@ struct GlassyStreamPairingView: View {
     @Environment(\.dismiss) private var dismiss
 
     let machine: SavedMachine
+    let fixedCandidate: GlassyStreamEndpointCandidate?
     let pairAndConnect: @MainActor (
-        DiscoveredGlassyHost,
+        GlassyStreamEndpointCandidate,
         GlassyHostPairingCode
     ) async throws -> Void
 
-    @State private var selectedHostID: String?
+    @State private var selectedCandidateID: String?
+    @State private var directAddressText: String
+    @State private var directPortText: String
     @State private var pairingCodeText = ""
     @State private var isPairing = false
     @State private var errorMessage: String?
@@ -19,35 +22,102 @@ struct GlassyStreamPairingView: View {
     init(
         machine: SavedMachine,
         initialErrorMessage: String? = nil,
+        fixedCandidate: GlassyStreamEndpointCandidate? = nil,
         pairAndConnect: @escaping @MainActor (
-            DiscoveredGlassyHost,
+            GlassyStreamEndpointCandidate,
             GlassyHostPairingCode
         ) async throws -> Void
     ) {
         self.machine = machine
+        self.fixedCandidate = fixedCandidate
         self.pairAndConnect = pairAndConnect
         _errorMessage = State(initialValue: initialErrorMessage)
+        _selectedCandidateID = State(initialValue: fixedCandidate?.id)
+
+        let effectivePort = GlassyStreamEndpoint.effectivePort(for: machine)
+        if let directAddress = GlassyStreamEndpoint.directAddress(
+            from: machine.host,
+            defaultPort: effectivePort
+        ) {
+            _directAddressText = State(initialValue: directAddress.host)
+            _directPortText = State(initialValue: String(directAddress.port))
+        } else {
+            _directAddressText = State(
+                initialValue: machine.host.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            _directPortText = State(initialValue: String(effectivePort))
+        }
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Glassy Host") {
-                    if hostBrowser.hosts.isEmpty {
+                if fixedCandidate == nil {
+                    Section {
+                        TextField("Tailscale name or 100.x address", text: $directAddressText)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                            .disabled(isPairing)
+
+                        TextField("TCP port", text: $directPortText)
+                            .keyboardType(.numberPad)
+                            .disabled(isPairing)
+
+                        if let directInputValidationMessage {
+                            Label(
+                                directInputValidationMessage,
+                                systemImage: "exclamationmark.triangle.fill"
+                            )
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                        }
+                    } header: {
+                        Text("Connection Address")
+                    } footer: {
+                        if directAddressText.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).isEmpty {
+                            Text("Enter the remote Mac's Tailscale MagicDNS name or 100.x address. Leave the address empty to choose a nearby Mac instead.")
+                        } else {
+                            Text("Glassy Host uses TCP port \(GlassyStreamEndpoint.defaultPort) by default. A port included in the address takes precedence.")
+                        }
+                    }
+                }
+
+                Section {
+                    if candidates.isEmpty {
                         ContentUnavailableView(
-                            "No Glassy Host Found",
-                            systemImage: "macbook.slash",
+                            directInputValidationMessage == nil
+                                ? "No Connection Route"
+                                : "Fix the Connection Address",
+                            systemImage: directInputValidationMessage == nil
+                                ? "macbook.slash"
+                                : "exclamationmark.triangle",
                             description: Text(
-                                "Open Glassy Host on the Mac and keep both devices on the same local network. Streaming starts automatically after authentication."
+                                directInputValidationMessage == nil
+                                    ? "Open Glassy Host on the Mac. For remote access, enter its Tailscale name or 100.x address. For nearby access, keep both devices on the same local network."
+                                    : "Correct the address or TCP port before selecting a Mac."
                             )
                         )
                     } else {
-                        Picker("Mac", selection: $selectedHostID) {
-                            ForEach(hostBrowser.hosts) { host in
-                                Text(host.name)
-                                    .tag(Optional(host.id))
+                        Picker("Mac", selection: $selectedCandidateID) {
+                            Text("Choose a Mac")
+                                .tag(String?.none)
+
+                            ForEach(candidates) { candidate in
+                                Text("\(candidate.name) — \(candidate.detail)")
+                                    .tag(Optional(candidate.id))
                             }
                         }
+                    }
+                } header: {
+                    Text("Glassy Host")
+                } footer: {
+                    if candidates.contains(where: { $0.source == .direct }) {
+                        Text("Direct uses the saved Tailscale or network address. Nearby Macs are discovered only on the local network.")
+                    } else {
+                        Text("Choose the Mac displaying the pairing code. Nearby discovery works only on the local network.")
                     }
                 }
 
@@ -93,21 +163,78 @@ struct GlassyStreamPairingView: View {
                     Button("Pair & Connect") {
                         pair()
                     }
-                    .disabled(selectedHost == nil || pairingCode == nil || isPairing)
+                    .disabled(selectedCandidate == nil || pairingCode == nil || isPairing)
                 }
             }
             .interactiveDismissDisabled(isPairing)
-            .onChange(of: hostBrowser.hosts.map(\.id), initial: true) { _, hostIDs in
-                if !hostIDs.contains(selectedHostID ?? "") {
-                    selectedHostID = hostIDs.first
-                }
+            .onChange(of: candidates.map(\.id), initial: true) { _, candidateIDs in
+                guard !candidateIDs.contains(selectedCandidateID ?? "") else { return }
+
+                // A saved direct address is explicit user intent and is safe to
+                // preselect. Nearby results require a deliberate choice so a
+                // code can never be sent to an arbitrary first Bonjour result.
+                selectedCandidateID = candidates.first(where: { $0.source == .direct })?.id
             }
         }
     }
 
-    private var selectedHost: DiscoveredGlassyHost? {
-        guard let selectedHostID else { return nil }
-        return hostBrowser.hosts.first { $0.id == selectedHostID }
+    private var candidates: [GlassyStreamEndpointCandidate] {
+        if let fixedCandidate {
+            return [fixedCandidate]
+        }
+
+        guard directInputValidationMessage == nil else { return [] }
+
+        return GlassyStreamEndpoint.candidates(
+            for: pairingMachine,
+            discoveredHosts: hostBrowser.hosts
+        )
+    }
+
+    private var pairingMachine: SavedMachine {
+        var pairingMachine = machine
+        pairingMachine.connectionMode = .glassyStream
+        pairingMachine.host = directAddressText.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        pairingMachine.port = directPort ?? GlassyStreamEndpoint.defaultPort
+        return pairingMachine
+    }
+
+    private var directPort: UInt16? {
+        let value = directPortText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty,
+              value.allSatisfy(\.isNumber),
+              let port = UInt16(value),
+              port > 0 else {
+            return nil
+        }
+        return port
+    }
+
+    private var directInputValidationMessage: String? {
+        guard fixedCandidate == nil else { return nil }
+
+        let address = directAddressText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !address.isEmpty else { return nil }
+
+        guard let directPort else {
+            return "Enter a TCP port from 1 to 65535."
+        }
+
+        guard GlassyStreamEndpoint.directAddress(
+            from: address,
+            defaultPort: directPort
+        ) != nil else {
+            return "Enter a valid Tailscale name or IP address."
+        }
+
+        return nil
+    }
+
+    private var selectedCandidate: GlassyStreamEndpointCandidate? {
+        guard let selectedCandidateID else { return nil }
+        return candidates.first { $0.id == selectedCandidateID }
     }
 
     private var pairingCode: GlassyHostPairingCode? {
@@ -115,7 +242,7 @@ struct GlassyStreamPairingView: View {
     }
 
     private func pair() {
-        guard let selectedHost, let pairingCode else { return }
+        guard let selectedCandidate, let pairingCode else { return }
 
         errorMessage = nil
         isPairing = true
@@ -123,11 +250,21 @@ struct GlassyStreamPairingView: View {
             defer { isPairing = false }
 
             do {
-                try await pairAndConnect(selectedHost, pairingCode)
+                try await pairAndConnect(selectedCandidate, pairingCode)
                 dismiss()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = pairingFailureMessage(error)
             }
         }
+    }
+
+    private func pairingFailureMessage(_ error: Error) -> String {
+        let description = error.localizedDescription
+        guard let localizedError = error as? LocalizedError,
+              let suggestion = localizedError.recoverySuggestion,
+              !suggestion.isEmpty else {
+            return description
+        }
+        return "\(description) \(suggestion)"
     }
 }
