@@ -122,3 +122,10 @@ Customer Center is most useful once the app has real subscriptions because it le
 - Always provide a Restore Purchases path.
 - Refresh customer info when entering purchase-sensitive flows.
 - Replace the Test Store key before submitting to the App Store.
+
+## Product Analytics
+
+Glassy Desk records fixed RevenueCat funnel milestones alongside anonymous
+Cloudflare aggregate events. The schema, privacy boundary, free-session usage
+bands, and required Cloudflare Worker allowlist are documented in
+[`analytics.md`](analytics.md).

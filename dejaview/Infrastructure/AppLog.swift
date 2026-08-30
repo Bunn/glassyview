@@ -16,4 +16,8 @@ enum AppLog {
     static let wakeOnLAN = Logger(subsystem: subsystem, category: "WakeOnLAN")
     static let externalDisplay = Logger(subsystem: subsystem, category: "ExternalDisplay")
     static let subscriptions = Logger(subsystem: subsystem, category: "Subscriptions")
+
+    #if DEBUG
+    static let analytics = Logger(subsystem: subsystem, category: "Analytics")
+    #endif
 }

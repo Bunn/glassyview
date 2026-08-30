@@ -3,6 +3,11 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(SubscriptionStore.self) private var subscriptionStore
+    @Environment(\.analyticsTracker) private var analytics
+    @Environment(\.funnelMilestoneTracker) private var funnelMilestones
+
+    @AppStorage(AnalyticsPreference.collectionEnabledKey)
+    private var analyticsEnabled = AnalyticsPreference.defaultCollectionEnabled
 
     @State private var isPaywallPresented = false
 
@@ -67,6 +72,14 @@ struct SettingsView: View {
                 }
             }
 
+            Section {
+                Toggle("Share Anonymous Analytics", isOn: $analyticsEnabled)
+            } header: {
+                Text("Privacy")
+            } footer: {
+                Text("Shares coarse app, free-session, and purchase-funnel events. Machine details, addresses, credentials, and session content are never included.")
+            }
+
             #if DEBUG
             debugPaymentsSection
             #endif
@@ -96,6 +109,10 @@ struct SettingsView: View {
             if hasProAccess {
                 isPaywallPresented = false
             }
+        }
+        .onChange(of: analyticsEnabled) { _, enabled in
+            analytics.setCollectionEnabled(enabled)
+            funnelMilestones.setCollectionEnabled(enabled)
         }
     }
 

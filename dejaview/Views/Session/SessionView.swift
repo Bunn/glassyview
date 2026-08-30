@@ -8,11 +8,14 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     let sessionTitle: String
     let glassyStream: GlassyStreamSessionController?
     @Environment(SubscriptionStore.self) private var subscriptionStore
+    @Environment(\.analyticsTracker) private var analytics
+    @Environment(\.funnelMilestoneTracker) private var funnelMilestones
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     @State private var isSessionPaywallPresented = false
+    @State private var sessionPaywallSource: PaywallSource = .sessionLimit
     @State private var isFreeSessionTimerInfoPresented = false
     @State private var freeSessionEndDate: Date?
     @State private var shouldEndSessionOnPaywallDismiss = false
@@ -29,6 +32,8 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @State private var inputFocused = false
     @State private var externalKeyboardFocused = true
     @State private var areBottomControlsCollapsed = false
+    @State private var didRecordFreeSessionStart = false
+    @State private var didRecordFreeSessionLimit = false
 
     private let freeSessionDurationInterval: TimeInterval = 2 * 60
 
@@ -87,7 +92,10 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $isSessionPaywallPresented,
                onDismiss: handleSessionPaywallDismissed) {
-            RevenueCatPaywallSheet(onProAccessGranted: handleSessionProAccessGranted)
+            RevenueCatPaywallSheet(
+                source: sessionPaywallSource,
+                onProAccessGranted: handleSessionProAccessGranted
+            )
         }
         .sheet(isPresented: $isFreeSessionTimerInfoPresented,
                onDismiss: handleFreeSessionTimerInfoDismissed) {
@@ -450,6 +458,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
         if freeSessionEndDate == nil {
             freeSessionEndDate = Date.now.addingTimeInterval(freeSessionDurationInterval)
+            recordFreeSessionStartIfNeeded()
         }
 
         guard let freeSessionEndDate else { return }
@@ -462,7 +471,11 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         while isFreeSessionLifecycleActive {
             if session.status == .connected {
                 AppLog.subscriptions.info("Free session limit reached; presenting paywall")
-                presentSessionPaywall(endsSessionOnDismiss: true)
+                recordFreeSessionLimitIfNeeded()
+                presentSessionPaywall(
+                    endsSessionOnDismiss: true,
+                    source: .sessionLimit
+                )
                 return
             }
 
@@ -502,12 +515,20 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         guard isConnectedFreeSession else { return }
 
         AppLog.subscriptions.info("Free session timer tapped")
+        analytics.track(
+            .freeSessionTimerOpened,
+            context: AnalyticsEventContext(source: .freeSessionTimer)
+        )
         isFreeSessionTimerInfoPresented = true
     }
 
     private func purchaseFromFreeSessionTimerInfo() {
         AppLog.subscriptions.info("Free session timer purchase button tapped")
-        presentSessionPaywall(endsSessionOnDismiss: freeSessionHasExpired)
+        funnelMilestones.record(.freeTimerUpgradeTapped)
+        presentSessionPaywall(
+            endsSessionOnDismiss: freeSessionHasExpired,
+            source: .freeSessionTimer
+        )
     }
 
     private func handleFreeSessionTimerInfoDismissed() {
@@ -516,11 +537,18 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         opensPaywallAfterFreeSessionInfoDismissal = false
         let endsSessionOnDismiss = pendingPaywallEndsSessionOnDismiss
         pendingPaywallEndsSessionOnDismiss = false
-        presentSessionPaywall(endsSessionOnDismiss: endsSessionOnDismiss)
+        presentSessionPaywall(
+            endsSessionOnDismiss: endsSessionOnDismiss,
+            source: sessionPaywallSource
+        )
     }
 
-    private func presentSessionPaywall(endsSessionOnDismiss: Bool) {
+    private func presentSessionPaywall(
+        endsSessionOnDismiss: Bool,
+        source: PaywallSource
+    ) {
         releaseHeldModifierKeys()
+        sessionPaywallSource = source
 
         if isSessionPaywallPresented {
             shouldEndSessionOnPaywallDismiss = shouldEndSessionOnPaywallDismiss || endsSessionOnDismiss
@@ -536,6 +564,38 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
         shouldEndSessionOnPaywallDismiss = endsSessionOnDismiss
         isSessionPaywallPresented = true
+    }
+
+    private func recordFreeSessionStartIfNeeded() {
+        guard !didRecordFreeSessionStart else { return }
+        didRecordFreeSessionStart = true
+
+        let startKind = funnelMilestones.recordFreeSessionStarted()
+        analytics.track(
+            .freeSessionStarted,
+            context: AnalyticsEventContext(source: .app, outcome: .success)
+        )
+
+        switch startKind {
+        case .first:
+            break
+        case .returning:
+            analytics.track(.freeSessionRestarted)
+        case .restartedAfterLimit:
+            analytics.track(.freeSessionRestarted)
+            analytics.track(.freeSessionRestartedAfterLimit)
+        }
+    }
+
+    private func recordFreeSessionLimitIfNeeded() {
+        guard !didRecordFreeSessionLimit else { return }
+        didRecordFreeSessionLimit = true
+
+        funnelMilestones.recordFreeSessionLimitReached()
+        analytics.track(
+            .freeSessionLimitReached,
+            context: AnalyticsEventContext(source: .sessionLimit)
+        )
     }
 
     private func toggleInputBar() {

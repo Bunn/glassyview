@@ -6,6 +6,8 @@ struct ContentView<Session: RemoteSessionControlling,
                    Store: MachineStoring,
                    Router: AppIntentRouting>: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.analyticsTracker) private var analytics
+    @Environment(\.funnelMilestoneTracker) private var funnelMilestones
 
     @StateObject private var session: Session
     @StateObject private var glassySession: GlassyStreamRemoteSession
@@ -649,6 +651,11 @@ struct ContentView<Session: RemoteSessionControlling,
     private func completeOnboarding() {
         hasCompletedOnboarding = true
         isOnboardingPresented = false
+        funnelMilestones.record(.onboardingCompleted)
+        analytics.track(
+            .onboardingCompleted,
+            context: AnalyticsEventContext(source: .onboarding, outcome: .success)
+        )
     }
 
     private func refreshNearbyMacs() {
@@ -764,6 +771,11 @@ struct ContentView<Session: RemoteSessionControlling,
             let historyID = store.startSession(to: sessionMachine,
                                                connectedAt: connectedAt)
             sessionHistoryContext = SessionHistoryContext(id: historyID)
+            funnelMilestones.record(.firstRemoteSessionConnected)
+            analytics.track(
+                .remoteSessionConnected,
+                context: AnalyticsEventContext(source: .app, outcome: .success)
+            )
             AppLog.storage.info("Session history tracking started for '\(sessionMachine.displayName, privacy: .public)'; id=\(historyID.uuidString, privacy: .public) recentCount=\(self.store.recentConnections.count, privacy: .public)")
 
         case .disconnected(let message):
