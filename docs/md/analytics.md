@@ -20,7 +20,7 @@ RevenueCat remains necessary to load products and verify purchases.
 | Do activation and conversion differ between iPhone and iPad? | Every Cloudflare event grouped by `deviceClass` |
 | Do people reach the product's value? | `remote_session_connected` compared with `app_opened` and `onboarding_completed` |
 | Do free users return for another timed session? | `free_session_restarted` and RevenueCat attribute `gv_free_session_band` |
-| Are people deliberately resetting the two-minute allowance? | `free_session_restarted_after_limit` and milestone `gv_ms_refresh_after_limit` |
+| Are people deliberately resetting the one-minute allowance? | `free_session_restarted_after_limit` and milestone `gv_ms_refresh_after_limit` |
 | Which upgrade prompt works best? | `paywall_presented` grouped by `settings`, `free_session_timer`, or `session_limit` |
 | Do people reject the offer before trying to buy? | `paywall_dismissed / paywall_presented` |
 | Do they show intent but abandon Apple's purchase sheet? | `purchase_cancelled / purchase_started` |

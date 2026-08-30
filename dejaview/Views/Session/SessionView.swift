@@ -35,7 +35,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @State private var didRecordFreeSessionStart = false
     @State private var didRecordFreeSessionLimit = false
 
-    private let freeSessionDurationInterval: TimeInterval = 2 * 60
+    private let freeSessionDurationInterval: TimeInterval = 60
 
     init(session: Session,
          preferences: Binding<SessionPreferences>,
