@@ -202,6 +202,33 @@ struct AnalyticsTests {
         ])
     }
 
+    @Test("Opting out delivers a final event before disabling collection")
+    func optOutDeliversFinalEventBeforeDisablingCollection() async throws {
+        let transport = AnalyticsTransportSpy()
+        let tracker = CloudflareAnalyticsTracker(
+            transport: transport,
+            metadata: metadata,
+            retryDelays: []
+        )
+        tracker.setCollectionEnabled(true)
+        tracker.track(.appOpened)
+
+        await tracker.disableCollectionAfterTrackingOptOut()
+
+        tracker.track(.purchaseStarted)
+        await tracker.waitForPendingDelivery()
+
+        let events = await transport.batches().flatMap { $0 }
+        #expect(events.map(\.event) == [.appOpened, .analyticsDisabled])
+
+        let optOut = try #require(events.last)
+        #expect(optOut.context == AnalyticsEventContext(
+            source: .settings,
+            outcome: .success
+        ))
+        #expect(tracker.pendingEventCount == 0)
+    }
+
     @Test("Retryable failures retain a batch for a later flush")
     func retryableFailureIsRetained() async {
         let transport = AnalyticsTransportSpy(results: [.retry, .accepted])

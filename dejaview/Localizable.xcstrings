@@ -14475,42 +14475,42 @@
         }
       }
     },
-    "Shares coarse app, free-session, and purchase-funnel events. Machine details, addresses, credentials, and session content are never included." : {
+    "Your analytics are private. No identifiable information is ever sent." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Teilt grobe App-, Free-Session- und Purchase-Funnel-Events. Maschinendetails, Adressen, Anmeldeinformationen und Sitzungsinhalte sind niemals enthalten."
+            "value" : "Deine Analysedaten sind privat. Es werden niemals identifizierbare Informationen gesendet."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Comparte eventos generales de aplicaciones, sesiones gratuitas y embudos de compra. Los detalles de la máquina, las direcciones, las credenciales y el contenido de la sesión nunca se incluyen."
+            "value" : "Tus datos de análisis son privados. Nunca se envía información identificable."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "大まかなアプリ、無料セッション、購入ファネル イベントを共有します。マシンの詳細、アドレス、資格情報、セッションの内容は決して含まれません。"
+            "value" : "分析データは非公開です。個人を特定できる情報が送信されることはありません。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deelt grove app-, gratis sessie- en aankooptrechterevenementen. Machinegegevens, adressen, inloggegevens en sessie-inhoud worden nooit opgenomen."
+            "value" : "Je analysegegevens zijn privé. Er wordt nooit identificeerbare informatie verzonden."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Compartilha eventos grosseiros de aplicativos, sessões gratuitas e funis de compra. Detalhes da máquina, endereços, credenciais e conteúdo da sessão nunca são incluídos."
+            "value" : "Seus dados de análise são privados. Nenhuma informação identificável é enviada."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "共享粗略应用程序、免费会话和购买渠道事件。从不包括计算机详细信息、地址、凭据和会话内容。"
+            "value" : "你的分析数据是私密的。绝不会发送任何可识别身份的信息。"
           }
         }
       }

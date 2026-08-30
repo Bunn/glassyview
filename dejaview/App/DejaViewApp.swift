@@ -64,8 +64,19 @@ struct DejaViewApp: App {
             }
         }
         .onChange(of: analyticsEnabled) { _, enabled in
-            analytics.setCollectionEnabled(enabled)
-            funnelMilestones.setCollectionEnabled(enabled)
+            updateAnalyticsCollection(enabled)
+        }
+    }
+
+    private func updateAnalyticsCollection(_ enabled: Bool) {
+        funnelMilestones.setCollectionEnabled(enabled)
+
+        if enabled {
+            analytics.setCollectionEnabled(true)
+        } else {
+            Task {
+                await analytics.disableCollectionAfterTrackingOptOut()
+            }
         }
     }
 }

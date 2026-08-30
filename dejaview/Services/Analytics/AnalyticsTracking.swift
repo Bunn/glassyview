@@ -8,6 +8,7 @@ enum AnalyticsPreference {
 
 enum AnalyticsEventName: String, Codable, Sendable {
     case appOpened = "app_opened"
+    case analyticsDisabled = "analytics_disabled"
     case onboardingCompleted = "onboarding_completed"
     case remoteSessionConnected = "remote_session_connected"
     case freeSessionStarted = "free_session_started"
@@ -161,6 +162,7 @@ struct AnalyticsAppMetadata: Equatable, Sendable {
 @MainActor
 protocol AnalyticsTracking: Sendable {
     func setCollectionEnabled(_ enabled: Bool)
+    func disableCollectionAfterTrackingOptOut() async
     func track(_ event: AnalyticsEventName, context: AnalyticsEventContext?)
     func flush()
 }
@@ -174,6 +176,7 @@ extension AnalyticsTracking {
 @MainActor
 struct NoOpAnalyticsTracker: AnalyticsTracking {
     func setCollectionEnabled(_ enabled: Bool) {}
+    func disableCollectionAfterTrackingOptOut() async {}
     func track(_ event: AnalyticsEventName, context: AnalyticsEventContext?) {}
     func flush() {}
 }

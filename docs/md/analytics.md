@@ -9,9 +9,10 @@ approach used by BreadCount:
    RevenueCat customer so behavior can be related to later conversion.
 
 Analytics is enabled by default and can be disabled in Settings with **Share
-Anonymous Analytics**. Disabling it immediately clears pending Cloudflare
-events and local funnel state. It does not disable RevenueCat itself because
-RevenueCat remains necessary to load products and verify purchases.
+Anonymous Analytics**. Disabling it immediately clears local funnel state and
+sends `analytics_disabled` as the final Cloudflare event before Cloudflare
+collection stops. It does not disable RevenueCat itself because RevenueCat
+remains necessary to load products and verify purchases.
 
 ## What this answers
 
@@ -86,6 +87,7 @@ The Cloudflare Worker must allow app value `glassydesk` and these events:
 
 ```text
 app_opened
+analytics_disabled
 onboarding_completed
 remote_session_connected
 free_session_started
