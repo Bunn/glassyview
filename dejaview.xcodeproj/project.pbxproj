@@ -315,7 +315,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.bunn.glassydesk;
 				PRODUCT_NAME = GlassyDesk;
 				REVENUECAT_API_KEY = test_RMgvIJaZNhHZuuEztlmXnxXFXUj;
@@ -347,7 +347,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.bunn.glassydesk;
 				PRODUCT_NAME = GlassyDesk;
 				REVENUECAT_API_KEY = appl_bLPxgXKygXLDtUmEexuNkNGENfd;
