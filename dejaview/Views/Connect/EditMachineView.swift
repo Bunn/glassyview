@@ -21,7 +21,6 @@ struct EditMachineView<Store: MachineStoring>: View {
     @State private var vncPortText: String
     @State private var glassyStreamPortText: String
     @State private var macAddress: String
-    @State private var isRemoteConnectionInfoPresented = false
 
     private let isNew: Bool
 
@@ -127,14 +126,16 @@ struct EditMachineView<Store: MachineStoring>: View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Connection Method", selection: $connectionMode) {
-                        ForEach(RemoteConnectionMode.availableCases) { mode in
-                            Label(mode.title, systemImage: mode.systemImage)
-                                .tag(mode)
+                    if FeatureFlags.isGlassyStreamEnabled {
+                        Picker("Connection Method", selection: $connectionMode) {
+                            ForEach(RemoteConnectionMode.availableCases) { mode in
+                                Label(mode.title, systemImage: mode.systemImage)
+                                    .tag(mode)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .accessibilityHint("Choose standard VNC or the faster Glassy Host stream for this Mac.")
                     }
-                    .pickerStyle(.segmented)
-                    .accessibilityHint(connectionMethodAccessibilityHint)
 
                     if isGlassyHostDetected {
                         VStack(alignment: .leading, spacing: 4) {
@@ -151,14 +152,6 @@ struct EditMachineView<Store: MachineStoring>: View {
                         .accessibilityHint(glassyStreamDetectionHint)
                         .accessibilityIdentifier("connection.glassy-host.detected")
                     }
-
-                    Button {
-                        isRemoteConnectionInfoPresented = true
-                    } label: {
-                        Label("Remote Connection Info", systemImage: "questionmark.circle")
-                    }
-                    .accessibilityHint("Explains how to securely connect to a Mac outside your local network.")
-                    .accessibilityIdentifier("connection.remote-access-info")
                 } header: {
                     Text("Connection")
                 } footer: {
@@ -285,9 +278,23 @@ struct EditMachineView<Store: MachineStoring>: View {
                         }
                     }
                 }
+
+                Section {
+                    NavigationLink(value: EditMachineRoute.remoteConnectionInfo) {
+                        Label("Remote Connection Info", systemImage: "questionmark.circle")
+                    }
+                    .accessibilityHint("Explains how to securely connect to a Mac outside your local network.")
+                    .accessibilityIdentifier("connection.remote-access-info")
+                }
             }
             .navigationTitle(isNew ? "New Machine" : "Edit Machine")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: EditMachineRoute.self) { destination in
+                switch destination {
+                case .remoteConnectionInfo:
+                    RemoteConnectionInfoView()
+                }
+            }
             .onChange(of: connectionMode) { oldMode, newMode in
                 updateDefaultPort(from: oldMode, to: newMode)
             }
@@ -304,9 +311,6 @@ struct EditMachineView<Store: MachineStoring>: View {
                     }
                     .disabled(!canSubmit)
                 }
-            }
-            .sheet(isPresented: $isRemoteConnectionInfoPresented) {
-                RemoteConnectionInfoSheet()
             }
         }
     }
@@ -398,14 +402,6 @@ struct EditMachineView<Store: MachineStoring>: View {
             portText = vncPortText
         case .glassyStream:
             portText = glassyStreamPortText
-        }
-    }
-
-    private var connectionMethodAccessibilityHint: String {
-        if FeatureFlags.isGlassyStreamEnabled {
-            "Choose standard VNC or the faster Glassy Host stream for this Mac."
-        } else {
-            "Uses standard VNC Screen Sharing for this Mac."
         }
     }
 }
