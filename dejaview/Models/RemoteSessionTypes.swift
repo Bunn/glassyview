@@ -35,11 +35,11 @@ enum RemoteSessionQuality: String, CaseIterable, Codable, Equatable, Identifiabl
     var title: String {
         switch self {
         case .dataSaver:
-            "Data Saver"
+            String(localized: "Data Saver")
         case .balanced:
-            "Balanced"
+            String(localized: "Balanced")
         case .best:
-            "Best Quality"
+            String(localized: "Best Quality")
         }
     }
 
@@ -57,11 +57,11 @@ enum RemoteSessionQuality: String, CaseIterable, Codable, Equatable, Identifiabl
     var detail: String {
         switch self {
         case .dataSaver:
-            "720p · 15 FPS · ~2 Mbps"
+            String(localized: "720p · 15 FPS · ~2 Mbps")
         case .balanced:
-            "1080p · 30 FPS · ~5 Mbps"
+            String(localized: "1080p · 30 FPS · ~5 Mbps")
         case .best:
-            "Up to 4K · 60 FPS · ~12 Mbps"
+            String(localized: "Up to 4K · 60 FPS · ~12 Mbps")
         }
     }
 }
@@ -140,13 +140,13 @@ enum RemoteDisplayRegion: String, CaseIterable, Codable, Sendable {
     var title: String {
         switch self {
         case .left:
-            "Left Display"
+            String(localized: "Left Display")
         case .right:
-            "Right Display"
+            String(localized: "Right Display")
         case .top:
-            "Top Display"
+            String(localized: "Top Display")
         case .bottom:
-            "Bottom Display"
+            String(localized: "Bottom Display")
         }
     }
 

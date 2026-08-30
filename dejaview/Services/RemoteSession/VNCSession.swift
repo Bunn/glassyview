@@ -318,12 +318,12 @@ final class VNCSession: NSObject, ObservableObject, RemoteSessionControlling, @u
     }
 
     private func beginAutomaticReconnect(message: String?) {
-        lastDisconnectMessage = message ?? "The connection was interrupted."
+        lastDisconnectMessage = message ?? String(localized: "The connection was interrupted.")
 
         let attempt = automaticReconnectAttempt + 1
 
         guard let delay = automaticReconnectPolicy.delay(beforeAttempt: attempt) else {
-            let message = "Glassy Desk couldn't reconnect after \(automaticReconnectPolicy.maximumAttempts) attempts."
+            let message = String(localized: "Glassy Desk couldn't reconnect after \(automaticReconnectPolicy.maximumAttempts) attempts.")
             AppLog.session.error("Automatic reconnect attempts exhausted")
             finishDisconnected(message: message)
             return
@@ -788,7 +788,7 @@ final class VNCSession: NSObject, ObservableObject, RemoteSessionControlling, @u
             .enumerated()
             .map { index, screen in
                 RemoteDisplay(id: screen.id,
-                              name: "Display \(index + 1)",
+                              name: String(localized: "Display \(index + 1)"),
                               frame: screen.cgFrame)
             }
     }
@@ -797,7 +797,7 @@ final class VNCSession: NSObject, ObservableObject, RemoteSessionControlling, @u
                                        framebufferFrame: CGRect?) -> [RemoteDisplayOption] {
         var options = [
             RemoteDisplayOption(selection: .all,
-                                title: "All Displays",
+                                title: String(localized: "All Displays"),
                                 systemImage: "rectangle.split.2x1")
         ]
 

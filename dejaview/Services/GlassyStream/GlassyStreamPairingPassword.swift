@@ -24,13 +24,13 @@ enum GlassyStreamPairingPassword {
         var message: String {
             switch self {
             case .tooShort:
-                "Use at least \(minimumUnicodeScalarCount) characters."
+                String(localized: "Use at least \(minimumUnicodeScalarCount) characters.")
             case .tooLong:
-                "Use no more than \(maximumUnicodeScalarCount) characters."
+                String(localized: "Use no more than \(maximumUnicodeScalarCount) characters.")
             case .tooManyBytes:
-                "Use a password no larger than \(maximumUTF8ByteCount) UTF-8 bytes."
+                String(localized: "Use a password no larger than \(maximumUTF8ByteCount) UTF-8 bytes.")
             case .containsControlCharacter:
-                "Passwords cannot contain control characters or line breaks."
+                String(localized: "Passwords cannot contain control characters or line breaks.")
             }
         }
     }

@@ -10,22 +10,22 @@ enum ConnectSection: String, CaseIterable, Hashable, Identifiable {
     var title: String {
         switch self {
         case .hosts:
-            "Hosts"
+            String(localized: "Hosts")
         case .recents:
-            "Recents"
+            String(localized: "Recents")
         case .nearby:
-            "Nearby Macs"
+            String(localized: "Nearby Macs")
         }
     }
 
     var subtitle: String {
         switch self {
         case .hosts:
-            "Saved and discovered screen sharing targets."
+            String(localized: "Saved and discovered screen sharing targets.")
         case .recents:
-            "Previously connected Macs and session details."
+            String(localized: "Previously connected Macs and session details.")
         case .nearby:
-            "Macs advertising Screen Sharing on this network."
+            String(localized: "Macs advertising Screen Sharing on this network.")
         }
     }
 

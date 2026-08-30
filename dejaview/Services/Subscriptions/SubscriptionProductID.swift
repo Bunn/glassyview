@@ -10,22 +10,22 @@ enum SubscriptionProductID: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .lifetime:
-            "Lifetime"
+            String(localized: "Lifetime")
         case .yearly:
-            "Yearly"
+            String(localized: "Yearly")
         case .monthly:
-            "Monthly"
+            String(localized: "Monthly")
         }
     }
 
     var fallbackDescription: String {
         switch self {
         case .lifetime:
-            "One-time access to Glassy Desk Pro."
+            String(localized: "One-time access to Glassy Desk Pro.")
         case .yearly:
-            "Annual access to Glassy Desk Pro."
+            String(localized: "Annual access to Glassy Desk Pro.")
         case .monthly:
-            "Monthly access to Glassy Desk Pro."
+            String(localized: "Monthly access to Glassy Desk Pro.")
         }
     }
 

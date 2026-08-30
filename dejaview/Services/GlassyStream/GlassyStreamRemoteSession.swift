@@ -576,7 +576,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
                 ) else {
                     self.automaticReconnectAttempt = 0
                     self.status = .disconnected(
-                        "Glassy Desk couldn't reconnect after \(self.automaticReconnectPolicy.maximumAttempts) attempts."
+                        String(localized: "Glassy Desk couldn't reconnect after \(self.automaticReconnectPolicy.maximumAttempts) attempts.")
                     )
                     return
                 }

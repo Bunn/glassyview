@@ -13,26 +13,26 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .welcome:
-            "Control your Mac"
+            String(localized: "Control your Mac")
         case .setup:
-            "Prepare the Mac"
+            String(localized: "Prepare the Mac")
         case .connect:
-            "Connect and work"
+            String(localized: "Connect and work")
         case .supported:
-            "Supported machines"
+            String(localized: "Supported machines")
         }
     }
 
     var subtitle: String {
         switch self {
         case .welcome:
-            "Glassy Desk connects your iPhone or iPad to macOS Screen Sharing so you can view and control your desktop from the devices you already carry."
+            String(localized: "Glassy Desk connects your iPhone or iPad to macOS Screen Sharing so you can view and control your desktop from the devices you already carry.")
         case .setup:
-            "A good session starts with the Mac advertising Screen Sharing and being reachable from your current network."
+            String(localized: "A good session starts with the Mac advertising Screen Sharing and being reachable from your current network.")
         case .connect:
-            "Use nearby discovery when it is available, or save a host manually for one-tap connections later."
+            String(localized: "Use nearby discovery when it is available, or save a host manually for one-tap connections later.")
         case .supported:
-            "Glassy Desk is tuned for Apple's classic Screen Sharing path over VNC/RFB."
+            String(localized: "Glassy Desk is tuned for Apple's classic Screen Sharing path over VNC/RFB.")
         }
     }
 

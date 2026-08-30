@@ -63,7 +63,7 @@ final class SubscriptionStore {
 
     func purchase(_ productID: SubscriptionProductID) async {
         guard let package = package(for: productID) else {
-            present(message: "\(productID.displayName) is not available in the current RevenueCat offering.")
+            present(message: String(localized: "\(productID.displayName) is not available in the current RevenueCat offering."))
             return
         }
 
@@ -115,7 +115,7 @@ final class SubscriptionStore {
 
     private var isConfigured: Bool {
         guard Purchases.isConfigured else {
-            present(message: "RevenueCat is not configured. Set the RevenueCatAPIKey Info.plist value before using purchases.")
+            present(message: String(localized: "RevenueCat is not configured. Set the RevenueCatAPIKey Info.plist value before using purchases."))
             return false
         }
 

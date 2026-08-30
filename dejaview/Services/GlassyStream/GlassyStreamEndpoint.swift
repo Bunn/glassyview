@@ -59,9 +59,9 @@ enum GlassyStreamEndpointSource: Equatable, Sendable {
     var title: String {
         switch self {
         case .direct:
-            "Direct"
+            String(localized: "Direct")
         case .bonjour:
-            "Nearby"
+            String(localized: "Nearby")
         }
     }
 }

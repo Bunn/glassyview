@@ -85,7 +85,9 @@ struct SessionShortcutStrip<Session: RemoteSessionInputControlling>: View {
         .buttonStyle(.plain)
         .foregroundStyle(.white)
         .accessibilityLabel(modifier.title)
-        .accessibilityValue(isActive ? "Held" : "Not held")
+        .accessibilityValue(
+            isActive ? String(localized: "Held") : String(localized: "Not held")
+        )
     }
 
     @ViewBuilder
@@ -169,23 +171,23 @@ private struct SessionShortcutAction: Identifiable {
     }
 
     static func key(id: String,
-                    title: String,
+                    title: LocalizedStringResource,
                     systemImage: String? = nil,
                     keyCode: VNCKeyCode,
                     modifiers: [VNCKeyCode] = []) -> Self {
         Self(id: id,
-             title: title,
+             title: String(localized: title),
              systemImage: systemImage,
              action: .key(keyCode, modifiers: modifiers))
     }
 
     static func text(id: String,
-                     title: String,
+                     title: LocalizedStringResource,
                      systemImage: String? = nil,
                      text: String,
                      modifiers: [VNCKeyCode] = []) -> Self {
         Self(id: id,
-             title: title,
+             title: String(localized: title),
              systemImage: systemImage,
              action: .text(text, modifiers: modifiers))
     }

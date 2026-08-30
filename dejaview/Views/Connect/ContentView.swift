@@ -1142,7 +1142,7 @@ struct ContentView<Session: RemoteSessionControlling,
 
     private func glassyConnectionFailureMessage(for error: Error?) -> String {
         guard let error else {
-            return "Could not reach Glassy Host. Check that Tailscale and Glassy Host are running, then try again."
+            return String(localized: "Could not reach Glassy Host. Check that Tailscale and Glassy Host are running, then try again.")
         }
 
         let description = error.localizedDescription
@@ -1172,7 +1172,7 @@ struct ContentView<Session: RemoteSessionControlling,
         }
         if let sessionError = error as? GlassyStreamSessionError,
            case .transport(.authenticationRejected) = sessionError {
-            return "The saved approval was not accepted. Use the current one-time code, or the reusable pairing password configured in Glassy Host, to pair again."
+            return String(localized: "The saved approval was not accepted. Use the current one-time code, or the reusable pairing password configured in Glassy Host, to pair again.")
         }
         return error.localizedDescription
     }

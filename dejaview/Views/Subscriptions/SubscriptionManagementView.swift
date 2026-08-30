@@ -85,7 +85,9 @@ struct SubscriptionManagementView: View {
     }
 
     private var accessText: String {
-        subscriptionStore.hasProAccess ? "Glassy Desk Pro" : "Free"
+        subscriptionStore.hasProAccess
+            ? String(localized: "Glassy Desk Pro")
+            : String(localized: "Free")
     }
 
     private var accessSystemImage: String {

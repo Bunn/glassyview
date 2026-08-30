@@ -1,0 +1,28 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Glassy Desk" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Glassy Desk" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Glassy Desk" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Glassy Desk" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Glassy Desk" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Glassy Desk" } }
+      }
+    },
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Privacy description for local network access",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Glassy Desk verbindet sich mit Macs in deinem lokalen oder privaten Netzwerk, um deren Bildschirme anzuzeigen und zu steuern." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Glassy Desk se conecta a Macs de tu red local o privada para ver y controlar sus pantallas." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Glassy Deskは、ローカルまたはプライベートネットワーク上のMacに接続して、画面を表示および操作します。" } },
+        "nl" : { "stringUnit" : { "state" : "translated", "value" : "Glassy Desk maakt verbinding met Macs op je lokale of privénetwerk om hun schermen te bekijken en te bedienen." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Glassy Desk se conecta a Macs na sua rede local ou privada para visualizar e controlar suas telas." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Glassy Desk 会连接到本地或专用网络中的 Mac，以查看和控制其屏幕。" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -21,11 +21,11 @@ enum GlassyStreamSessionError: Error, LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .cancelled:
-            "The Glassy Stream connection was cancelled."
+            String(localized: "The Glassy Stream connection was cancelled.")
         case .connectionEndedBeforeAuthentication:
-            "Glassy Host ended the connection before authentication completed."
+            String(localized: "Glassy Host ended the connection before authentication completed.")
         case .videoReadinessTimedOut:
-            "The secure connection succeeded, but Glassy Host could not start video automatically. On the Mac, check Screen Recording access and the selected display, then reconnect."
+            String(localized: "The secure connection succeeded, but Glassy Host could not start video automatically. On the Mac, check Screen Recording access and the selected display, then reconnect.")
         case let .transport(error):
             error.localizedDescription
         case let .video(error):
@@ -38,34 +38,34 @@ enum GlassyStreamSessionError: Error, LocalizedError, Sendable {
         case .cancelled:
             nil
         case .connectionEndedBeforeAuthentication:
-            "Make sure Glassy Host is running. For remote access, connect Tailscale on both devices and verify TCP port 51515 is allowed by your tailnet policy."
+            String(localized: "Make sure Glassy Host is running. For remote access, connect Tailscale on both devices and verify TCP port 51515 is allowed by your tailnet policy.")
         case .videoReadinessTimedOut:
-            "Open Glassy Host, allow Screen Recording, check the selected display, and reconnect."
+            String(localized: "Open Glassy Host, allow Screen Recording, check the selected display, and reconnect.")
         case let .transport(error):
             switch error {
             case .pairingCodeRequired:
-                "Enter the current twelve-symbol code, or choose Password if Glassy Host has a reusable pairing password configured."
+                String(localized: "Enter the current twelve-symbol code, or choose Password if Glassy Host has a reusable pairing password configured.")
             case .invalidPairingCode, .authenticationRejected:
-                "Check the selected code or password and try pairing again."
+                String(localized: "Check the selected code or password and try pairing again.")
             case .invalidPairingPassword:
-                "Use a 15 through 128 character password without control characters or line breaks."
+                String(localized: "Use a 15 through 128 character password without control characters or line breaks.")
             case .pairingPasswordRequiresTailscale:
-                "Connect Tailscale on this iPad, confirm the selected peer is your Mac, and save its 100.64–100.127 address, Tailscale IPv6 address, or full .ts.net name. Otherwise, use the one-time code."
+                String(localized: "Connect Tailscale on this iPad, confirm the selected peer is your Mac, and save its 100.64–100.127 address, Tailscale IPv6 address, or full .ts.net name. Otherwise, use the one-time code.")
             case .pairingPasswordUnsupported:
-                "Update Glassy Host or pair with its current one-time code instead."
+                String(localized: "Update Glassy Host or pair with its current one-time code instead.")
             case .pairingPasswordDerivationFailed:
-                "Restart Glassy Desk and try again, or use the current one-time code."
+                String(localized: "Restart Glassy Desk and try again, or use the current one-time code.")
             case .hostIdentityMismatch:
-                "The saved address reached a different Mac. Check the Tailscale name or IP, or choose Pair a Different Mac in the machine editor."
+                String(localized: "The saved address reached a different Mac. Check the Tailscale name or IP, or choose Pair a Different Mac in the machine editor.")
             case .directInputUnsupported, .unsupportedHostVersion:
-                "Update Glassy Host and Glassy Desk, then try again."
+                String(localized: "Update Glassy Host and Glassy Desk, then try again.")
             case .credentialStoreFailed:
-                "Check Keychain access on this device, then pair again."
+                String(localized: "Check Keychain access on this device, then pair again.")
             default:
-                "Make sure Glassy Host is running. For remote access, connect Tailscale on both devices and verify the saved address and TCP port 51515."
+                String(localized: "Make sure Glassy Host is running. For remote access, connect Tailscale on both devices and verify the saved address and TCP port 51515.")
             }
         case .video:
-            "Reconnect to request a fresh video configuration and keyframe."
+            String(localized: "Reconnect to request a fresh video configuration and keyframe.")
         }
     }
 }

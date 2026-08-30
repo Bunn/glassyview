@@ -15,9 +15,9 @@ enum DejaViewDestination: String, CaseIterable, AppEnum {
     var displayName: String {
         switch self {
         case .hosts:
-            "Hosts"
+            String(localized: "Hosts")
         case .nearby:
-            "Nearby Computers"
+            String(localized: "Nearby Computers")
         }
     }
 }
@@ -132,9 +132,9 @@ private enum DejaViewIntentError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingHost:
-            "Host is required."
+            String(localized: "Host is required.")
         case .invalidPort(let port):
-            "Port \(port) is invalid. Use a value from 1 to 65535."
+            String(localized: "Port \(port) is invalid. Use a value from 1 to 65535.")
         }
     }
 }

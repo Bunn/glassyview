@@ -11,9 +11,9 @@ struct GlassyStreamPairingView: View {
         var title: String {
             switch self {
             case .oneTimeCode:
-                "One-Time Code"
+                String(localized: "One-Time Code")
             case .password:
-                "Password"
+                String(localized: "Password")
             }
         }
     }
@@ -281,14 +281,14 @@ struct GlassyStreamPairingView: View {
         guard !address.isEmpty else { return nil }
 
         guard let directPort else {
-            return "Enter a TCP port from 1 to 65535."
+            return String(localized: "Enter a TCP port from 1 to 65535.")
         }
 
         guard GlassyStreamEndpoint.directAddress(
             from: address,
             defaultPort: directPort
         ) != nil else {
-            return "Enter a valid Tailscale name or IP address."
+            return String(localized: "Enter a valid Tailscale name or IP address.")
         }
 
         return nil
@@ -319,7 +319,7 @@ struct GlassyStreamPairingView: View {
     private var passwordPairingRouteMessage: String? {
         guard pairingMethod == .password,
               !isPasswordPairingRouteAllowed else { return nil }
-        return "Choose a saved Tailscale 100.64–100.127 address, Tailscale IPv6 address, or full .ts.net name. Use the one-time code for Nearby or other routes."
+        return String(localized: "Choose a saved Tailscale 100.64–100.127 address, Tailscale IPv6 address, or full .ts.net name. Use the one-time code for Nearby or other routes.")
     }
 
     private var bootstrapCredential: GlassyStreamBootstrapCredential? {
@@ -360,7 +360,7 @@ struct GlassyStreamPairingView: View {
         if pairingMethod == .password,
            let sessionError = error as? GlassyStreamSessionError,
            case .transport(.authenticationRejected) = sessionError {
-            return "Glassy Host did not accept that pairing password. Check the password configured on the Mac and try again."
+            return String(localized: "Glassy Host did not accept that pairing password. Check the password configured on the Mac and try again.")
         }
 
         let description = error.localizedDescription

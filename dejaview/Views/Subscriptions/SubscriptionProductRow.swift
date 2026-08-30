@@ -24,12 +24,12 @@ struct SubscriptionProductRow: View {
     }
 
     private var purchaseButtonTitle: String {
-        guard let package else { return "Unavailable" }
+        guard let package else { return String(localized: "Unavailable") }
         return package.storeProduct.localizedPriceString
     }
 
     private var description: String {
-        guard let package else { return "Missing from the current offering." }
+        guard let package else { return String(localized: "Missing from the current offering.") }
 
         let product = package.storeProduct
         if product.localizedDescription.isEmpty {

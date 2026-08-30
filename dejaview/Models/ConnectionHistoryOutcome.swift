@@ -1,3 +1,5 @@
+import Foundation
+
 enum ConnectionHistoryOutcome: String, Codable, Equatable, Sendable {
     case completed
     case interrupted
@@ -5,9 +7,9 @@ enum ConnectionHistoryOutcome: String, Codable, Equatable, Sendable {
     var title: String {
         switch self {
         case .completed:
-            "Completed"
+            String(localized: "Completed")
         case .interrupted:
-            "Interrupted"
+            String(localized: "Interrupted")
         }
     }
 

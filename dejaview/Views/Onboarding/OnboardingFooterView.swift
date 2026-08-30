@@ -2,7 +2,7 @@ import SwiftUI
 
 struct OnboardingFooterView: View {
     let selectedPage: OnboardingPage
-    let completionTitle: String
+    let completionTitle: LocalizedStringResource
     let onPrimaryButtonTapped: () -> Void
 
     var body: some View {
@@ -23,7 +23,9 @@ struct OnboardingFooterView: View {
     }
 
     private var primaryButtonTitle: String {
-        selectedPage.isLast ? completionTitle : "Continue"
+        selectedPage.isLast
+            ? String(localized: completionTitle)
+            : String(localized: "Continue")
     }
 
     private var primaryButtonSystemImage: String {

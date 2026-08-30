@@ -8,11 +8,11 @@ enum WakeOnLANError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .couldNotCreateSocket:
-            "The network connection for Wake-on-LAN could not be created."
+            String(localized: "The network connection for Wake-on-LAN could not be created.")
         case .couldNotEnableBroadcast:
-            "This network did not allow a Wake-on-LAN broadcast."
+            String(localized: "This network did not allow a Wake-on-LAN broadcast.")
         case .couldNotSendPacket:
-            "The Wake-on-LAN packet could not be sent on this network."
+            String(localized: "The Wake-on-LAN packet could not be sent on this network.")
         }
     }
 }

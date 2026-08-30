@@ -133,39 +133,39 @@ enum GlassyStreamClientError: Error, LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .alreadyConnecting:
-            "A Glassy Stream connection is already active."
+            String(localized: "A Glassy Stream connection is already active.")
         case .cancelled:
-            "The Glassy Stream connection was cancelled."
+            String(localized: "The Glassy Stream connection was cancelled.")
         case let .connectionFailed(message):
-            "Could not connect to Glassy Host: \(message)"
+            String(localized: "Could not connect to Glassy Host: \(message)")
         case .connectionClosed:
-            "Glassy Host closed the connection."
+            String(localized: "Glassy Host closed the connection.")
         case .authenticationTimedOut:
-            "Glassy Host did not complete the secure connection in time."
+            String(localized: "Glassy Host did not complete the secure connection in time.")
         case let .pairingCodeRequired(hostName):
-            "Enter the pairing code shown by \(hostName)."
+            String(localized: "Enter the pairing code shown by \(hostName).")
         case .invalidPairingCode:
-            "The pairing code must contain twelve valid symbols."
+            String(localized: "The pairing code must contain twelve valid symbols.")
         case .invalidPairingPassword:
-            "The pairing password must be 15 through 128 characters and cannot contain control characters or line breaks."
+            String(localized: "The pairing password must be 15 through 128 characters and cannot contain control characters or line breaks.")
         case .pairingPasswordRequiresTailscale:
-            "Reusable-password pairing requires an active Tailscale VPN route and a saved Tailscale IP or full .ts.net address."
+            String(localized: "Reusable-password pairing requires an active Tailscale VPN route and a saved Tailscale IP or full .ts.net address.")
         case .pairingPasswordUnsupported:
-            "This Glassy Host does not support password pairing."
+            String(localized: "This Glassy Host does not support password pairing.")
         case let .pairingPasswordDerivationFailed(status):
-            "The pairing password could not be prepared securely (status \(status))."
+            String(localized: "The pairing password could not be prepared securely (status \(status)).")
         case let .authenticationRejected(message):
-            "Glassy Host rejected authentication: \(message)"
+            String(localized: "Glassy Host rejected authentication: \(message)")
         case .hostIdentityMismatch:
-            "This Glassy Host is not the Mac paired with this saved machine."
+            String(localized: "This Glassy Host is not the Mac paired with this saved machine.")
         case .directInputUnsupported:
-            "This version of Glassy Host does not support secure keyboard and pointer input. Update Glassy Host and try again."
+            String(localized: "This version of Glassy Host does not support secure keyboard and pointer input. Update Glassy Host and try again.")
         case let .unsupportedHostVersion(version):
-            "Glassy Host protocol version \(version) is not supported."
+            String(localized: "Glassy Host protocol version \(version) is not supported.")
         case let .protocolViolation(message):
-            "Glassy Host sent an invalid message: \(message)"
+            String(localized: "Glassy Host sent an invalid message: \(message)")
         case let .credentialStoreFailed(message):
-            "Could not access the Glassy Stream credential: \(message)"
+            String(localized: "Could not access the Glassy Stream credential: \(message)")
         }
     }
 }

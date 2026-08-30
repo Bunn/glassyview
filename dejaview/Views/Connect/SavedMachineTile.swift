@@ -95,11 +95,11 @@ struct SavedMachineTile: View {
 
     private var primaryActionAccessibilityHint: String {
         if isWaking {
-            "Waiting for this Mac to wake."
+            String(localized: "Waiting for this Mac to wake.")
         } else if wakeAndConnect != nil && reachabilityStatus != .reachable {
-            "Wakes this Mac if needed, then connects."
+            String(localized: "Wakes this Mac if needed, then connects.")
         } else {
-            "Connects to this saved machine."
+            String(localized: "Connects to this saved machine.")
         }
     }
 }

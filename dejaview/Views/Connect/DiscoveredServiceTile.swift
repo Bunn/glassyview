@@ -54,7 +54,7 @@ struct DiscoveredServiceTile: View {
 
     private var subtitle: String {
         guard let host = service.host, let port = service.port else {
-            return "Resolving address..."
+            return String(localized: "Resolving address…")
         }
 
         return "\(host):\(String(port))"
@@ -65,8 +65,8 @@ struct DiscoveredServiceTile: View {
     }
 
     private var accessibilityHint: String {
-        guard service.isResolved else { return "Address is still resolving." }
-        return "Opens connection details."
+        guard service.isResolved else { return String(localized: "Address is still resolving.") }
+        return String(localized: "Opens connection details.")
     }
 }
 

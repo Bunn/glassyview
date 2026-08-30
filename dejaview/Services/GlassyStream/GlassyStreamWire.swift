@@ -355,9 +355,9 @@ enum GlassyStreamWire {
             let code = try reader.readUInt16()
             let message = try reader.readLengthPrefixedString(maximumByteCount: 1_024)
             try reader.requireEnd()
-            return message.isEmpty ? "Host error \(code)" : message
+            return message.isEmpty ? String(localized: "Host error \(code)") : message
         } catch {
-            return "The host rejected the protocol message."
+            return String(localized: "The host rejected the protocol message.")
         }
     }
 

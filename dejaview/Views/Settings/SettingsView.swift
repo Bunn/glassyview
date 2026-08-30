@@ -118,19 +118,19 @@ struct SettingsView: View {
 
     private var proStatusText: String {
         if subscriptionStore.customerInfo == nil && subscriptionStore.isRefreshing {
-            "Checking"
+            String(localized: "Checking")
         } else if subscriptionStore.hasProAccess {
-            "Active"
+            String(localized: "Active")
         } else {
-            "Free"
+            String(localized: "Free")
         }
     }
 
     private var connectionMethodDescription: String {
         if FeatureFlags.isGlassyStreamEnabled {
-            "Choose VNC or the faster Glassy Stream when you add or edit a machine. Glassy Stream requires Glassy Host and its pairing code or configured password; for remote access, save the Mac's Tailscale name or address."
+            String(localized: "Choose VNC or the faster Glassy Stream when you add or edit a machine. Glassy Stream requires Glassy Host and its pairing code or configured password; for remote access, save the Mac's Tailscale name or address.")
         } else {
-            "Connections use the Mac's standard Screen Sharing service over VNC."
+            String(localized: "Connections use the Mac's standard Screen Sharing service over VNC.")
         }
     }
 
@@ -189,7 +189,7 @@ struct SettingsView: View {
     }
 
     private func formattedIdentifiers(_ identifiers: some Collection<String>) -> String {
-        guard !identifiers.isEmpty else { return "None" }
+        guard !identifiers.isEmpty else { return String(localized: "None") }
         return identifiers.sorted().joined(separator: ", ")
     }
 

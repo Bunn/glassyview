@@ -1,3 +1,4 @@
+import Foundation
 import RoyalVNCKit
 
 enum RemoteModifierKey: String, CaseIterable, Identifiable, Hashable {
@@ -11,13 +12,13 @@ enum RemoteModifierKey: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .command:
-            "Cmd"
+            String(localized: "Cmd")
         case .shift:
-            "Shift"
+            String(localized: "Shift")
         case .option:
-            "Opt"
+            String(localized: "Opt")
         case .control:
-            "Ctrl"
+            String(localized: "Ctrl")
         }
     }
 

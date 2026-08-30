@@ -10,11 +10,11 @@ enum RemoteFrameRate: Int, CaseIterable, Codable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .batterySaver:
-            "Battery Saver"
+            String(localized: "Battery Saver")
         case .balanced:
-            "Balanced"
+            String(localized: "Balanced")
         case .responsive:
-            "Responsive"
+            String(localized: "Responsive")
         }
     }
 

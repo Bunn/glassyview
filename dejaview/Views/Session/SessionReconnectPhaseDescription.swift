@@ -20,6 +20,9 @@ struct SessionReconnectPhaseDescription: View {
 
     private func retryDescription(at date: Date, retryDate: Date) -> String {
         let remainingSeconds = max(1, Int(retryDate.timeIntervalSince(date).rounded(.up)))
-        return "Trying again in \(remainingSeconds) second\(remainingSeconds == 1 ? "" : "s")."
+        if remainingSeconds == 1 {
+            return String(localized: "Trying again in \(remainingSeconds) second.")
+        }
+        return String(localized: "Trying again in \(remainingSeconds) seconds.")
     }
 }

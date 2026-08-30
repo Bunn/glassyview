@@ -15,7 +15,7 @@ struct SessionZoomControls: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            zoomButton("Zoom Out",
+            zoomButton(String(localized: "Zoom Out"),
                        systemImage: "minus.magnifyingglass",
                        action: zoomOut)
                 .disabled(zoomScale <= minimumZoomScale)
@@ -26,7 +26,7 @@ struct SessionZoomControls: View {
                 .frame(width: 58)
                 .accessibilityLabel("Zoom \(zoomPercent) percent")
 
-            zoomButton("Zoom In",
+            zoomButton(String(localized: "Zoom In"),
                        systemImage: "plus.magnifyingglass",
                        action: zoomIn)
                 .disabled(zoomScale >= maximumZoomScale)
@@ -36,24 +36,24 @@ struct SessionZoomControls: View {
                 .overlay(.white.opacity(0.32))
                 .padding(.horizontal, 4)
 
-            zoomButton("Reset Zoom",
+            zoomButton(String(localized: "Reset Zoom"),
                        systemImage: "arrow.counterclockwise",
                        action: resetZoom)
                 .disabled(zoomScale == minimumZoomScale)
 
-            modeToggle("Keep Cursor Visible",
+            modeToggle(String(localized: "Keep Cursor Visible"),
                        systemImage: "scope",
                        isOn: $followsCursor,
                        hint: followsCursor
-                           ? "Moves the zoomed view when the cursor approaches an edge."
-                           : "Leaves the zoomed view fixed as the cursor moves.")
+                           ? String(localized: "Moves the zoomed view when the cursor approaches an edge.")
+                           : String(localized: "Leaves the zoomed view fixed as the cursor moves."))
 
-            modeToggle("Pan View with Two Fingers",
+            modeToggle(String(localized: "Pan View with Two Fingers"),
                        systemImage: "hand.draw",
                        isOn: $pansViewportWithTwoFingers,
                        hint: pansViewportWithTwoFingers
-                           ? "Two-finger swipes move the zoomed view."
-                           : "Two-finger swipes scroll the remote Mac.")
+                           ? String(localized: "Two-finger swipes move the zoomed view.")
+                           : String(localized: "Two-finger swipes scroll the remote Mac."))
         }
         .padding(5)
         .liquidGlass(in: Capsule())
@@ -98,7 +98,9 @@ struct SessionZoomControls: View {
         .toggleStyle(.button)
         .buttonStyle(.plain)
         .accessibilityLabel(title)
-        .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
+        .accessibilityValue(
+            isOn.wrappedValue ? String(localized: "On") : String(localized: "Off")
+        )
         .accessibilityHint(hint)
         .help(Text(verbatim: hint))
     }

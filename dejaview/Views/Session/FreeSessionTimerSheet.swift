@@ -73,13 +73,23 @@ struct FreeSessionTimerSheet: View {
     private func accessibilityValue(for totalSeconds: Int) -> String {
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
-        let secondUnit = seconds == 1 ? "second" : "seconds"
 
         if minutes > 0 {
-            let minuteUnit = minutes == 1 ? "minute" : "minutes"
-            return "\(minutes) \(minuteUnit), \(seconds) \(secondUnit) remaining"
+            switch (minutes == 1, seconds == 1) {
+            case (true, true):
+                return String(localized: "\(minutes) minute, \(seconds) second remaining")
+            case (true, false):
+                return String(localized: "\(minutes) minute, \(seconds) seconds remaining")
+            case (false, true):
+                return String(localized: "\(minutes) minutes, \(seconds) second remaining")
+            case (false, false):
+                return String(localized: "\(minutes) minutes, \(seconds) seconds remaining")
+            }
         }
 
-        return "\(seconds) \(secondUnit) remaining"
+        if seconds == 1 {
+            return String(localized: "\(seconds) second remaining")
+        }
+        return String(localized: "\(seconds) seconds remaining")
     }
 }

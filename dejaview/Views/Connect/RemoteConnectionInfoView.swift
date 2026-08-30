@@ -46,8 +46,8 @@ struct RemoteConnectionInfoView: View {
     }
 
     private func setupStep(
-        _ title: String,
-        detail: String,
+        _ title: LocalizedStringKey,
+        detail: LocalizedStringKey,
         systemImage: String
     ) -> some View {
         Label {

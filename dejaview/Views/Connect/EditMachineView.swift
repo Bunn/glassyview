@@ -71,18 +71,18 @@ struct EditMachineView<Store: MachineStoring>: View {
     private var glassyStreamDetectionMessage: String {
         switch connectionMode {
         case .vnc:
-            "This Mac is advertising Glassy Stream support. Select Glassy Stream above to use it."
+            String(localized: "This Mac is advertising Glassy Stream support. Select Glassy Stream above to use it.")
         case .glassyStream:
-            "Glassy Stream is selected for this Mac. Save or connect to continue."
+            String(localized: "Glassy Stream is selected for this Mac. Save or connect to continue.")
         }
     }
 
     private var glassyStreamDetectionHint: String {
         switch connectionMode {
         case .vnc:
-            "Select Glassy Stream in the connection method picker to use it."
+            String(localized: "Select Glassy Stream in the connection method picker to use it.")
         case .glassyStream:
-            "Save or connect to continue."
+            String(localized: "Save or connect to continue.")
         }
     }
 
@@ -223,7 +223,7 @@ struct EditMachineView<Store: MachineStoring>: View {
                 if connectionMode == .glassyStream, let glassyHostIdentifier {
                     Section {
                         LabeledContent("Paired Mac") {
-                            Text(glassyHostName ?? "Glassy Host")
+                            Text(glassyHostName ?? String(localized: "Glassy Host"))
                                 .foregroundStyle(.secondary)
                         }
 

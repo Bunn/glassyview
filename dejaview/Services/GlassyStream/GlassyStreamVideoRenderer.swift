@@ -21,15 +21,15 @@ enum GlassyStreamVideoRendererError: Error, Equatable, LocalizedError, Sendable 
     var errorDescription: String? {
         switch self {
         case let .invalidConfiguration(reason):
-            "Invalid Glassy Stream video configuration: \(reason)"
+            String(localized: "Invalid Glassy Stream video configuration: \(reason)")
         case let .invalidAccessUnit(reason):
-            "Invalid Glassy Stream video frame: \(reason)"
+            String(localized: "Invalid Glassy Stream video frame: \(reason)")
         case let .invalidTiming(reason):
-            "Invalid Glassy Stream video timing: \(reason)"
+            String(localized: "Invalid Glassy Stream video timing: \(reason)")
         case let .coreMedia(operation, status):
-            "\(operation) failed with Core Media status \(status)."
+            String(localized: "\(operation) failed with Core Media status \(status).")
         case let .decoder(message):
-            "The hardware video decoder failed: \(message)"
+            String(localized: "The hardware video decoder failed: \(message)")
         }
     }
 }

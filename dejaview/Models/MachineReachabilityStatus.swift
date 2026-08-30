@@ -9,13 +9,13 @@ enum MachineReachabilityStatus: Equatable, Sendable {
     var title: String {
         switch self {
         case .checking:
-            "Checking"
+            String(localized: "Checking")
         case .waking:
-            "Waking"
+            String(localized: "Waking")
         case .reachable:
-            "Reachable"
+            String(localized: "Reachable")
         case .unreachable:
-            "Unreachable"
+            String(localized: "Unreachable")
         }
     }
 }
