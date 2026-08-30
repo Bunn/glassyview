@@ -8231,7 +8231,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anfitrião"
+            "value" : "Host"
           }
         },
         "zh-Hans" : {
@@ -8473,7 +8473,7 @@
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Anfitriões"
+            "value" : "Hosts"
           }
         },
         "zh-Hans" : {
