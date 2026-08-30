@@ -41,25 +41,27 @@ struct EditMachineView<Store: MachineStoring>: View {
         _host = State(initialValue: machine.host)
         _username = State(initialValue: machine.username)
         _password = State(initialValue: password)
-        _connectionMode = State(initialValue: machine.connectionMode)
+        let initialConnectionMode = machine.connectionMode.isEnabled
+            ? machine.connectionMode
+            : RemoteConnectionMode.default
+        _connectionMode = State(initialValue: initialConnectionMode)
         _glassyHostIdentifier = State(initialValue: machine.glassyHostIdentifier)
         _glassyHostName = State(initialValue: machine.glassyHostName)
-        let initialPort = machine.connectionMode == .glassyStream
+        let vncPort = machine.connectionMode == .vnc ? machine.port : UInt16(5_900)
+        let glassyStreamPort = machine.connectionMode == .glassyStream
             ? GlassyStreamEndpoint.effectivePort(for: machine)
-            : machine.port
+            : GlassyStreamEndpoint.defaultPort
+        let initialPort = initialConnectionMode == .glassyStream
+            ? glassyStreamPort
+            : vncPort
         _portText = State(initialValue: String(initialPort))
-        _vncPortText = State(
-            initialValue: machine.connectionMode == .vnc ? String(machine.port) : "5900"
-        )
-        _glassyStreamPortText = State(
-            initialValue: machine.connectionMode == .glassyStream
-                ? String(initialPort)
-                : String(GlassyStreamEndpoint.defaultPort)
-        )
+        _vncPortText = State(initialValue: String(vncPort))
+        _glassyStreamPortText = State(initialValue: String(glassyStreamPort))
         _macAddress = State(initialValue: machine.macAddress ?? "")
     }
 
     private var isGlassyHostDetected: Bool {
+        guard FeatureFlags.isGlassyStreamEnabled else { return false }
         guard let discoveredService else { return false }
         return BonjourMachineMatcher.glassyHost(
             matching: discoveredService,
@@ -126,13 +128,13 @@ struct EditMachineView<Store: MachineStoring>: View {
             Form {
                 Section {
                     Picker("Connection Method", selection: $connectionMode) {
-                        ForEach(RemoteConnectionMode.allCases) { mode in
+                        ForEach(RemoteConnectionMode.availableCases) { mode in
                             Label(mode.title, systemImage: mode.systemImage)
                                 .tag(mode)
                         }
                     }
                     .pickerStyle(.segmented)
-                    .accessibilityHint("Choose standard VNC or the faster Glassy Host stream for this Mac.")
+                    .accessibilityHint(connectionMethodAccessibilityHint)
 
                     if isGlassyHostDetected {
                         VStack(alignment: .leading, spacing: 4) {
@@ -396,6 +398,14 @@ struct EditMachineView<Store: MachineStoring>: View {
             portText = vncPortText
         case .glassyStream:
             portText = glassyStreamPortText
+        }
+    }
+
+    private var connectionMethodAccessibilityHint: String {
+        if FeatureFlags.isGlassyStreamEnabled {
+            "Choose standard VNC or the faster Glassy Host stream for this Mac."
+        } else {
+            "Uses standard VNC Screen Sharing for this Mac."
         }
     }
 }

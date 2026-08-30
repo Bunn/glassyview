@@ -6,7 +6,20 @@ enum RemoteConnectionMode: String, CaseIterable, Codable, Identifiable, Sendable
 
     static let `default`: Self = .vnc
 
+    static var availableCases: [Self] {
+        allCases.filter(\.isEnabled)
+    }
+
     var id: Self { self }
+
+    var isEnabled: Bool {
+        switch self {
+        case .vnc:
+            true
+        case .glassyStream:
+            FeatureFlags.isGlassyStreamEnabled
+        }
+    }
 
     var title: String {
         switch self {

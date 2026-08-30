@@ -48,7 +48,7 @@ struct SettingsView: View {
             } header: {
                 Text("Connections")
             } footer: {
-                Text("Choose VNC or the faster Glassy Stream when you add or edit a machine. Glassy Stream requires Glassy Host and its pairing code or configured password; for remote access, save the Mac's Tailscale name or address.")
+                Text(connectionMethodDescription)
             }
 
             Section("Getting Started") {
@@ -106,6 +106,14 @@ struct SettingsView: View {
             "Active"
         } else {
             "Free"
+        }
+    }
+
+    private var connectionMethodDescription: String {
+        if FeatureFlags.isGlassyStreamEnabled {
+            "Choose VNC or the faster Glassy Stream when you add or edit a machine. Glassy Stream requires Glassy Host and its pairing code or configured password; for remote access, save the Mac's Tailscale name or address."
+        } else {
+            "Connections use the Mac's standard Screen Sharing service over VNC."
         }
     }
 

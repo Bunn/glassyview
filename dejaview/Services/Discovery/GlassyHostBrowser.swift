@@ -82,12 +82,18 @@ final class GlassyHostBrowser {
     private let resolveRecoveryDelay: TimeInterval = 30
 
     func start() {
+        guard FeatureFlags.isGlassyStreamEnabled else { return }
         guard browser == nil else { return }
 
         startBrowser()
     }
 
     func restart(keepingCurrentHosts: Bool) {
+        guard FeatureFlags.isGlassyStreamEnabled else {
+            stop()
+            return
+        }
+
         AppLog.discovery.info(
             "Restarting Glassy Host discovery; keepingCurrentHosts=\(keepingCurrentHosts, privacy: .public)"
         )

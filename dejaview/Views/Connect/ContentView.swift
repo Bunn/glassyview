@@ -506,7 +506,8 @@ struct ContentView<Session: RemoteSessionControlling,
     private func matchingGlassyHost(
         for service: DiscoveredService
     ) -> DiscoveredGlassyHost? {
-        BonjourMachineMatcher.glassyHost(
+        guard FeatureFlags.isGlassyStreamEnabled else { return nil }
+        return BonjourMachineMatcher.glassyHost(
             matching: service,
             among: glassyHostBrowser.hosts
         )
@@ -885,6 +886,15 @@ struct ContentView<Session: RemoteSessionControlling,
             presentVNCSession(for: machine, password: password)
 
         case .glassyStream:
+            guard FeatureFlags.isGlassyStreamEnabled else {
+                AppLog.ui.notice("Blocked Glassy Stream connection because the feature is disabled")
+                showGlassyConnectionFailure(
+                    "Glassy Stream is not available in this build.",
+                    machine: machine
+                )
+                return
+            }
+
             session.reset()
             beginGlassyStreamConnection(to: machine, vncPassword: password)
         }
@@ -1294,6 +1304,8 @@ struct ContentView<Session: RemoteSessionControlling,
     // MARK: - Reachability
 
     private func reachabilityStatus(for machine: SavedMachine) -> MachineReachabilityStatus {
+        guard machine.connectionMode.isEnabled else { return .unreachable }
+
         if wakingMachineID == machine.id {
             return .waking
         }
@@ -1371,6 +1383,11 @@ struct ContentView<Session: RemoteSessionControlling,
         await withTaskGroup(of: (UUID, String, MachineReachabilityStatus).self) { group in
             for machine in machines {
                 let id = machine.id
+                guard machine.connectionMode.isEnabled else {
+                    machineReachabilityStatuses[id] = .unreachable
+                    continue
+                }
+
                 let endpoint = reachabilityEndpoint(for: machine)
                 let host = endpoint.host
                 let port = endpoint.port
