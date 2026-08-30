@@ -119,7 +119,7 @@ struct AnalyticsEvent: Codable, Equatable, Sendable {
     ) {
         schemaVersion = 1
         event = name
-        app = "glassyview"
+        app = "glassydesk"
         platform = metadata.platform
         deviceClass = metadata.deviceClass
         appVersion = metadata.appVersion

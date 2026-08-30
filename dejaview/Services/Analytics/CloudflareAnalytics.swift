@@ -92,11 +92,38 @@ actor CloudflareAnalyticsTransport: AnalyticsTransporting {
                 token: UUID().uuidString
             )
             let (_, response) = try await session.data(for: request)
-            guard let response = response as? HTTPURLResponse else { return .retry }
-            return Self.deliveryResult(for: response.statusCode)
+            guard let response = response as? HTTPURLResponse else {
+                #if DEBUG
+                AppLog.analytics.error(
+                    "Delivery failed; reason=non_http_response"
+                )
+                #endif
+                return .retry
+            }
+
+            let result = Self.deliveryResult(for: response.statusCode)
+
+            #if DEBUG
+            if result != .accepted {
+                AppLog.analytics.error(
+                    "Delivery failed; reason=http_status status=\(response.statusCode, privacy: .public) result=\(String(describing: result), privacy: .public)"
+                )
+            }
+            #endif
+
+            return result
         } catch is CancellationError {
+            #if DEBUG
+            AppLog.analytics.debug("Delivery cancelled")
+            #endif
             return .retry
         } catch let error as AnalyticsRequestError {
+            #if DEBUG
+            AppLog.analytics.error(
+                "Request construction failed; reason=\(String(describing: error), privacy: .public)"
+            )
+            #endif
+
             switch error {
             case .emptyBatch:
                 return .accepted
@@ -104,8 +131,15 @@ actor CloudflareAnalyticsTransport: AnalyticsTransporting {
                 return .discard
             }
         } catch {
-            // Never log analytics bodies, headers, or transport errors. Product
-            // behavior must remain correct even when every upload fails.
+            #if DEBUG
+            let error = error as NSError
+            AppLog.analytics.error(
+                "Delivery failed; reason=transport_error domain=\(error.domain, privacy: .public) code=\(error.code, privacy: .public)"
+            )
+            #endif
+
+            // Never log analytics bodies, headers, or localized error text.
+            // Product behavior must remain correct even when every upload fails.
             return .retry
         }
     }

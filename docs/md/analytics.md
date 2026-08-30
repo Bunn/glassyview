@@ -46,7 +46,7 @@ Each request contains only `{ "events": [...] }`. Each event contains only:
 {
   "schemaVersion": 1,
   "event": "paywall_dismissed",
-  "app": "glassyview",
+  "app": "glassydesk",
   "platform": "ios",
   "deviceClass": "ipad",
   "appVersion": "1.0",
@@ -75,13 +75,14 @@ blocks product behavior.
 Debug builds write analytics diagnostics to the unified logging system under
 the `Analytics` category. These messages contain only allowlisted event names,
 coarse context values, device class, queue and batch counts, and delivery
-outcomes. They never include request bodies, rate-limit tokens, identifiers, or
-transport error descriptions. The analytics logger and every call site are
-excluded from non-debug builds with `#if DEBUG`.
+outcomes. Failed deliveries also include the HTTP status or the transport error
+domain and numeric code. They never include request bodies, rate-limit tokens,
+identifiers, localized error text, or response bodies. The analytics logger and
+every call site are excluded from non-debug builds with `#if DEBUG`.
 
 ## Event allowlist
 
-The Cloudflare Worker must allow app value `glassyview` and these events:
+The Cloudflare Worker must allow app value `glassydesk` and these events:
 
 ```text
 app_opened
@@ -110,7 +111,7 @@ values:
 iphone, ipad, other
 ```
 
-Require `deviceClass` for `app == "glassyview"`; keep it optional for older apps
+Require `deviceClass` for `app == "glassydesk"`; keep it optional for older apps
 such as BreadCount so this additive schema change does not reject their current
 payloads. Add it to the Analytics Engine field mapping and reporting queries so
 funnels can be grouped by device class. Unknown values should continue to fail
@@ -126,12 +127,10 @@ reason:  network, store_unavailable, purchase_not_allowed, payment_pending,
 ```
 
 The production health endpoint currently reports
-`{"status":"ok","service":"app-analytics","version":1}`. However, the Worker
-source path referenced by BreadCount's implementation document
-(`/Users/bunn/Developer/cloudflare/app-analytics`) is no longer present on this
-machine. Update and deploy the Worker's strict app/event/context allowlists
-before enabling this in a production release; otherwise the current Worker may
-discard Glassy Desk payloads as schema errors.
+`{"status":"ok","service":"app-analytics","version":1}`. The Worker source is
+in `/Users/bunn/Developer/worker-apps-analytics`. Deploy its strict
+app/event/context allowlists and register `glassydesk` in the production D1
+`apps` table before enabling this in a production release.
 
 ## RevenueCat attributes
 

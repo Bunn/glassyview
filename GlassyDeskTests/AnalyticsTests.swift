@@ -93,7 +93,7 @@ struct AnalyticsTests {
             "deviceClass", "appVersion", "build", "osMajor", "context",
         ]))
         #expect(encodedEvent["event"] as? String == "paywall_dismissed")
-        #expect(encodedEvent["app"] as? String == "glassyview")
+        #expect(encodedEvent["app"] as? String == "glassydesk")
         #expect(encodedEvent["deviceClass"] as? String == "ipad")
 
         let context = try #require(encodedEvent["context"] as? [String: Any])
