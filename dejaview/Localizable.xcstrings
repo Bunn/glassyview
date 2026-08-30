@@ -2374,47 +2374,6 @@
         }
       }
     },
-    "Choose VNC or the faster Glassy Stream when you add or edit a machine. Glassy Stream requires Glassy Host and its pairing code or configured password; for remote access, save the Mac's Tailscale name or address." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wählen Sie VNC oder das schnellere Glassy Stream, wenn Sie eine Maschine hinzufügen oder bearbeiten. Für Glassy Stream sind Glassy Host und sein Kopplungscode oder konfiguriertes Passwort erforderlich. Speichern Sie für den Fernzugriff den Tailscale-Namen oder die Adresse des Mac."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elija VNC o el más rápido Glassy Stream cuando agregue o edite una máquina. Glassy Stream requiere Glassy Host y su código de emparejamiento o contraseña configurada; para acceso remoto, guarde el nombre o la dirección Tailscale de Mac."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "マシンを追加または編集する場合は、VNC またはより高速な Glassy Stream を選択します。 Glassy Stream には、Glassy Host とそのペアリング コードまたは設定されたパスワードが必要です。リモート アクセスの場合は、Mac の Tailscale 名またはアドレスを保存します。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kies VNC of de snellere Glassy Stream wanneer u een machine toevoegt of bewerkt. Glassy Stream vereist Glassy Host en de bijbehorende koppelingscode of geconfigureerd wachtwoord; voor externe toegang slaat u de Tailscale-naam of het adres van de Mac op."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escolha VNC ou o Glassy Stream mais rápido ao adicionar ou editar uma máquina. Glassy Stream requer Glassy Host e seu código de emparelhamento ou senha configurada; para acesso remoto, salve o nome ou endereço Tailscale do Mac."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加或编辑机器时，选择 VNC 或更快的 Glassy Stream。 Glassy Stream需要Glassy Host及其配对码或配置的密码；对于远程访问，请保存 Mac 的 Tailscale 名称或地址。"
-          }
-        }
-      }
-    },
     "Chooses which remote display to show." : {
       "localizations" : {
         "de" : {
@@ -3578,87 +3537,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "连接方法"
-          }
-        }
-      }
-    },
-    "Connections" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verbindungen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conexiones"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接続"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verbindingen"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conexões"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "连接"
-          }
-        }
-      }
-    },
-    "Connections use the Mac's standard Screen Sharing service over VNC." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verbindungen nutzen den standardmäßigen Bildschirmfreigabedienst des Mac über VNC."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las conexiones utilizan el servicio de pantalla compartida estándar de Mac a través de VNC."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接続には、VNC を介した Mac の標準の画面共有サービスが使用されます。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verbindingen gebruiken de standaard Scherm delen-service van de Mac via VNC."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As conexões usam o serviço de compartilhamento de tela padrão do Mac em VNC."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "连接使用通过 VNC 的 Mac 标准屏幕共享服务。"
           }
         }
       }
@@ -11603,46 +11481,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "密码不能包含控制字符或换行符。"
-          }
-        }
-      }
-    },
-    "Per Machine" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pro Computer"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Por equipo"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コンピュータごと"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Per computer"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Por computador"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每台计算机"
           }
         }
       }

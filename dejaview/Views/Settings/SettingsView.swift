@@ -41,19 +41,6 @@ struct SettingsView: View {
                 }
             }
 
-            Section {
-                LabeledContent {
-                    Text("Per Machine")
-                        .foregroundStyle(.secondary)
-                } label: {
-                    Label("Connection Method", systemImage: "arrow.triangle.branch")
-                }
-            } header: {
-                Text("Connections")
-            } footer: {
-                Text(connectionMethodDescription)
-            }
-
             Section("Getting Started") {
                 NavigationLink {
                     OnboardingView()
@@ -117,14 +104,6 @@ struct SettingsView: View {
             String(localized: "Active")
         } else {
             String(localized: "Free")
-        }
-    }
-
-    private var connectionMethodDescription: String {
-        if FeatureFlags.isGlassyStreamEnabled {
-            String(localized: "Choose VNC or the faster Glassy Stream when you add or edit a machine. Glassy Stream requires Glassy Host and its pairing code or configured password; for remote access, save the Mac's Tailscale name or address.")
-        } else {
-            String(localized: "Connections use the Mac's standard Screen Sharing service over VNC.")
         }
     }
 
