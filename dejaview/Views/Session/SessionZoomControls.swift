@@ -84,16 +84,6 @@ struct SessionZoomControls: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(isOn.wrappedValue ? .green : .white)
                 .frame(width: 44, height: 44)
-                .background {
-                    Circle()
-                        .fill(isOn.wrappedValue ? .white.opacity(0.18) : .clear)
-                }
-                .overlay {
-                    if isOn.wrappedValue {
-                        Circle()
-                            .stroke(.white.opacity(0.28), lineWidth: 1)
-                    }
-                }
                 .contentShape(Circle())
         }
         .toggleStyle(.button)
