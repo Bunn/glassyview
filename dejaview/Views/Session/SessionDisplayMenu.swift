@@ -18,13 +18,11 @@ struct SessionDisplayMenu<Session: RemoteSessionControlling>: View {
             Label("Display", systemImage: "rectangle.split.2x1")
                 .labelStyle(.iconOnly)
                 .font(.body.weight(.medium))
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
-        .padding(5)
-        .liquidGlass(in: Circle())
         .accessibilityHint("Chooses which remote display to show.")
     }
 

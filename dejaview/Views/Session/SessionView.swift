@@ -83,7 +83,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                !showsInputBar,
                !isExternalControllerActive {
                 sessionBottomControls
-                    .padding(.horizontal, horizontalSizeClass == .compact ? 8 : 20)
+                    .padding(.horizontal, horizontalSizeClass == .compact ? 4 : 20)
                     .padding(.bottom, 28)
             }
         }
@@ -254,60 +254,67 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
     @ViewBuilder
     private var sessionBottomControls: some View {
-        GlassEffectContainer(spacing: 12) {
-            if horizontalSizeClass == .compact {
-                VStack(spacing: 10) {
-                    if !areBottomControlsCollapsed {
-                        HStack {
-                            sessionZoomControls
-                                .glassEffectTransition(.materialize)
-                            Spacer(minLength: 0)
-                        }
-                        .transition(sessionControlsSlideTransition)
-                    }
+        HStack(spacing: 0) {
+            sessionControlsVisibilityButton
 
-                    HStack {
-                        sessionControlsVisibilityButton
-                        Spacer(minLength: 0)
-
-                        if !areBottomControlsCollapsed {
-                            sessionMenuControls
-                                .glassEffectTransition(.materialize)
-                                .transition(sessionControlsSlideTransition)
-                        }
-                    }
+            if !areBottomControlsCollapsed {
+                ViewThatFits(in: .horizontal) {
+                    sessionBottomControlContent(showsDisplayMenu: true,
+                                                showsResetZoom: true,
+                                                showsZoomModes: true)
+                    sessionBottomControlContent(showsDisplayMenu: false,
+                                                showsResetZoom: true,
+                                                showsZoomModes: true)
+                    sessionBottomControlContent(showsDisplayMenu: false,
+                                                showsResetZoom: false,
+                                                showsZoomModes: true)
+                    sessionBottomControlContent(showsDisplayMenu: false,
+                                                showsResetZoom: false,
+                                                showsZoomModes: false)
                 }
-            } else {
-                HStack(spacing: 12) {
-                    sessionControlsVisibilityButton
-
-                    if !areBottomControlsCollapsed {
-                        sessionZoomControls
-                            .glassEffectTransition(.materialize)
-                            .transition(sessionControlsSlideTransition)
-                    }
-
-                    Spacer(minLength: 12)
-
-                    if !areBottomControlsCollapsed {
-                        sessionMenuControls
-                            .glassEffectTransition(.materialize)
-                            .transition(sessionControlsSlideTransition)
-                    }
-                }
+                .transition(sessionControlsTransition)
             }
+        }
+        .padding(2)
+        .liquidGlass(in: Capsule())
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func sessionBottomControlContent(
+        showsDisplayMenu: Bool,
+        showsResetZoom: Bool,
+        showsZoomModes: Bool
+    ) -> some View {
+        HStack(spacing: 0) {
+            sessionZoomControls(showsResetZoom: showsResetZoom,
+                                showsZoomModes: showsZoomModes)
+
+            sessionMenuControls(showsDisplayMenu: showsDisplayMenu,
+                                includesResetZoom: !showsResetZoom,
+                                includesZoomModes: !showsZoomModes)
         }
     }
 
-    private var sessionZoomControls: some View {
+    private func sessionZoomControls(
+        showsResetZoom: Bool,
+        showsZoomModes: Bool
+    ) -> some View {
         SessionZoomControls(zoomScale: $streamZoomScale,
                             followsCursor: $followsCursorWhenZoomed,
-                            pansViewportWithTwoFingers: $pansViewportWithTwoFingers)
+                            pansViewportWithTwoFingers: $pansViewportWithTwoFingers,
+                            showsResetZoom: showsResetZoom,
+                            showsZoomModes: showsZoomModes)
     }
 
-    private var sessionMenuControls: some View {
-        HStack(spacing: 10) {
-            if glassyStream == nil, session.displayOptions.count > 1 {
+    private func sessionMenuControls(
+        showsDisplayMenu: Bool,
+        includesResetZoom: Bool,
+        includesZoomModes: Bool
+    ) -> some View {
+        HStack(spacing: 0) {
+            if showsDisplayMenu,
+               glassyStream == nil,
+               session.displayOptions.count > 1 {
                 SessionDisplayMenu(session: session)
             }
 
@@ -315,7 +322,13 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                sessionTitle: sessionTitle,
                                externalDisplayCoordinator: externalDisplayCoordinator,
                                showsTrackpadCursorDot: $preferences.showsTrackpadCursorDot,
-                               usesGlassyStream: glassyStream != nil)
+                               zoomScale: $streamZoomScale,
+                               followsCursor: $followsCursorWhenZoomed,
+                               pansViewportWithTwoFingers: $pansViewportWithTwoFingers,
+                               usesGlassyStream: glassyStream != nil,
+                               includesDisplayPicker: !showsDisplayMenu,
+                               includesResetZoom: includesResetZoom,
+                               includesZoomModes: includesZoomModes)
         }
     }
 
@@ -329,8 +342,6 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
-        .padding(5)
-        .liquidGlass(in: Circle())
         .accessibilityLabel(
             areBottomControlsCollapsed
                 ? "Expand session controls"
@@ -430,12 +441,10 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         AppLog.ui.info("Session display controls state; reason=\(reason, privacy: .public) status=\(self.session.status.logDescription, privacy: .public) displayCount=\(displayCount, privacy: .public) selection=\(self.session.displaySelection.logDescription, privacy: .public) bottomControlsVisible=\(bottomControlsVisible, privacy: .public) bottomControlsCollapsed=\(self.areBottomControlsCollapsed, privacy: .public) displayControlVisible=\(displayControlVisible, privacy: .public) displayOptionCount=\(displayOptionCount, privacy: .public) displayOptions=\(optionDescription, privacy: .public) inputBarVisible=\(self.showsInputBar, privacy: .public) layout=\(layoutDescription, privacy: .public)")
     }
 
-    private var sessionControlsSlideTransition: AnyTransition {
+    private var sessionControlsTransition: AnyTransition {
         guard !accessibilityReduceMotion else { return .opacity }
 
-        let slide = AnyTransition.move(edge: .leading)
-        let soften = AnyTransition.scale(scale: 0.97, anchor: .leading)
-        return slide.combined(with: soften)
+        return .opacity.combined(with: .scale(scale: 0.98, anchor: .leading))
     }
 
     private func updatePreference<Value: Equatable>(
@@ -614,7 +623,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         withAnimation(
             accessibilityReduceMotion
                 ? nil
-                : .smooth(duration: 0.5)
+                : .smooth(duration: 0.22)
         ) {
             areBottomControlsCollapsed = willCollapse
         }

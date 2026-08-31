@@ -4,6 +4,8 @@ struct SessionZoomControls: View {
     @Binding var zoomScale: CGFloat
     @Binding var followsCursor: Bool
     @Binding var pansViewportWithTwoFingers: Bool
+    var showsResetZoom = true
+    var showsZoomModes = true
 
     private let minimumZoomScale: CGFloat = 1
     private let maximumZoomScale: CGFloat = 4
@@ -14,7 +16,7 @@ struct SessionZoomControls: View {
     }
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 0) {
             zoomButton(String(localized: "Zoom Out"),
                        systemImage: "minus.magnifyingglass",
                        action: zoomOut)
@@ -23,7 +25,9 @@ struct SessionZoomControls: View {
             Text("\(zoomPercent)%")
                 .font(.subheadline.monospacedDigit().weight(.medium))
                 .foregroundStyle(.white)
-                .frame(width: 58)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: 50)
                 .accessibilityLabel("Zoom \(zoomPercent) percent")
 
             zoomButton(String(localized: "Zoom In"),
@@ -31,32 +35,29 @@ struct SessionZoomControls: View {
                        action: zoomIn)
                 .disabled(zoomScale >= maximumZoomScale)
 
-            Divider()
-                .frame(height: 24)
-                .overlay(.white.opacity(0.32))
-                .padding(.horizontal, 4)
+            if showsResetZoom {
+                zoomButton(String(localized: "Reset Zoom"),
+                           systemImage: "arrow.counterclockwise",
+                           action: resetZoom)
+                    .disabled(zoomScale == minimumZoomScale)
+            }
 
-            zoomButton(String(localized: "Reset Zoom"),
-                       systemImage: "arrow.counterclockwise",
-                       action: resetZoom)
-                .disabled(zoomScale == minimumZoomScale)
+            if showsZoomModes {
+                modeToggle(String(localized: "Keep Cursor Visible"),
+                           systemImage: "scope",
+                           isOn: $followsCursor,
+                           hint: followsCursor
+                               ? String(localized: "Moves the zoomed view when the cursor approaches an edge.")
+                               : String(localized: "Leaves the zoomed view fixed as the cursor moves."))
 
-            modeToggle(String(localized: "Keep Cursor Visible"),
-                       systemImage: "scope",
-                       isOn: $followsCursor,
-                       hint: followsCursor
-                           ? String(localized: "Moves the zoomed view when the cursor approaches an edge.")
-                           : String(localized: "Leaves the zoomed view fixed as the cursor moves."))
-
-            modeToggle(String(localized: "Pan View with Two Fingers"),
-                       systemImage: "hand.draw",
-                       isOn: $pansViewportWithTwoFingers,
-                       hint: pansViewportWithTwoFingers
-                           ? String(localized: "Two-finger swipes move the zoomed view.")
-                           : String(localized: "Two-finger swipes scroll the remote Mac."))
+                modeToggle(String(localized: "Pan View with Two Fingers"),
+                           systemImage: "hand.draw",
+                           isOn: $pansViewportWithTwoFingers,
+                           hint: pansViewportWithTwoFingers
+                               ? String(localized: "Two-finger swipes move the zoomed view.")
+                               : String(localized: "Two-finger swipes scroll the remote Mac."))
+            }
         }
-        .padding(5)
-        .liquidGlass(in: Capsule())
     }
 
     private func zoomButton(_ title: String,
@@ -65,7 +66,7 @@ struct SessionZoomControls: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.body.weight(.medium))
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -82,7 +83,7 @@ struct SessionZoomControls: View {
                 .font(.body.weight(.medium))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(isOn.wrappedValue ? .green : .white)
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .background {
                     Circle()
                         .fill(isOn.wrappedValue ? .white.opacity(0.18) : .clear)

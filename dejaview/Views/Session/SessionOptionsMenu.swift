@@ -9,10 +9,42 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
     let sessionTitle: String
     @Bindable var externalDisplayCoordinator: ExternalDisplayCoordinator
     @Binding var showsTrackpadCursorDot: Bool
+    @Binding var zoomScale: CGFloat
+    @Binding var followsCursor: Bool
+    @Binding var pansViewportWithTwoFingers: Bool
     var usesGlassyStream = false
+    var includesDisplayPicker = false
+    var includesResetZoom = false
+    var includesZoomModes = false
 
     var body: some View {
         Menu {
+            if includesDisplayPicker,
+               !usesGlassyStream,
+               session.displayOptions.count > 1 {
+                Picker("Display", selection: displayBinding) {
+                    ForEach(session.displayOptions) { option in
+                        Label(option.title, systemImage: option.systemImage)
+                            .tag(option.selection)
+                    }
+                }
+                .pickerStyle(.inline)
+            }
+
+            if includesResetZoom {
+                Button("Reset Zoom", systemImage: "arrow.counterclockwise") {
+                    zoomScale = 1
+                }
+                .disabled(zoomScale == 1)
+            }
+
+            if includesZoomModes {
+                Toggle("Keep Cursor Visible", systemImage: "scope",
+                       isOn: $followsCursor)
+                Toggle("Pan View with Two Fingers", systemImage: "hand.draw",
+                       isOn: $pansViewportWithTwoFingers)
+            }
+
             if session.supportedQualities.count > 1 {
                 Picker("Requested Quality", selection: qualityBinding) {
                     ForEach(session.supportedQualities) { quality in
@@ -69,14 +101,20 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
             Label("Session Options", systemImage: "slider.horizontal.3")
                 .labelStyle(.iconOnly)
                 .font(.body.weight(.medium))
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
-        .padding(5)
-        .liquidGlass(in: Circle())
         .accessibilityHint("Shows available session controls.")
+    }
+
+    private var displayBinding: Binding<RemoteDisplaySelection> {
+        Binding {
+            session.displaySelection
+        } set: { selection in
+            session.setDisplaySelection(selection)
+        }
     }
 
     private var qualityBinding: Binding<RemoteSessionQuality> {
