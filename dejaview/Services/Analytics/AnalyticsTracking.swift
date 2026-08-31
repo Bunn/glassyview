@@ -181,6 +181,69 @@ struct NoOpAnalyticsTracker: AnalyticsTracking {
     func flush() {}
 }
 
+#if DEBUG
+@MainActor
+final class DebugConsoleAnalyticsTracker: AnalyticsTracking {
+    typealias EventLogger = @MainActor @Sendable (
+        AnalyticsEventName,
+        AnalyticsEventContext?
+    ) -> Void
+
+    private let logEvent: EventLogger
+    private var isCollectionEnabled = false
+
+    init(
+        logEvent: @escaping EventLogger = DebugConsoleAnalyticsTracker.logToConsole
+    ) {
+        self.logEvent = logEvent
+    }
+
+    func setCollectionEnabled(_ enabled: Bool) {
+        isCollectionEnabled = enabled
+        AppLog.analytics.info(
+            "Debug analytics collection changed; enabled=\(enabled, privacy: .public) sent=false"
+        )
+    }
+
+    func disableCollectionAfterTrackingOptOut() async {
+        guard isCollectionEnabled else { return }
+
+        track(
+            .analyticsDisabled,
+            context: AnalyticsEventContext(source: .settings, outcome: .success)
+        )
+        setCollectionEnabled(false)
+    }
+
+    func track(_ event: AnalyticsEventName, context: AnalyticsEventContext?) {
+        guard isCollectionEnabled else {
+            AppLog.analytics.info(
+                "Debug analytics event skipped; name=\(event.rawValue, privacy: .public) reason=collection_disabled sent=false"
+            )
+            return
+        }
+
+        logEvent(event, context)
+    }
+
+    func flush() {
+        AppLog.analytics.info("Debug analytics flush skipped; sent=false")
+    }
+
+    private static func logToConsole(
+        _ event: AnalyticsEventName,
+        _ context: AnalyticsEventContext?
+    ) {
+        let source = context?.source?.rawValue ?? "none"
+        let outcome = context?.outcome?.rawValue ?? "none"
+        let reason = context?.reason?.rawValue ?? "none"
+        AppLog.analytics.info(
+            "Debug analytics event; name=\(event.rawValue, privacy: .public) source=\(source, privacy: .public) outcome=\(outcome, privacy: .public) reason=\(reason, privacy: .public) sent=false"
+        )
+    }
+}
+#endif
+
 private struct AnalyticsTrackerKey: EnvironmentKey {
     static let defaultValue: any AnalyticsTracking = NoOpAnalyticsTracker()
 }
@@ -192,20 +255,58 @@ extension EnvironmentValues {
     }
 }
 
+nonisolated enum AnalyticsBuildFlavor: Sendable {
+    case debug
+    case release
+
+    static var current: AnalyticsBuildFlavor {
+        #if DEBUG
+        .debug
+        #else
+        .release
+        #endif
+    }
+}
+
+nonisolated enum AnalyticsRuntimeMode: Sendable {
+    case disabled
+    case console
+    case production
+}
+
 nonisolated enum AnalyticsRuntime {
     static var isUnitTestHost: Bool {
         NSClassFromString("XCTestCase") != nil
     }
 
     static var isUITestingLaunch: Bool {
-        #if DEBUG
         ProcessInfo.processInfo.arguments.contains("--uitesting")
-        #else
-        false
-        #endif
+    }
+
+    static var mode: AnalyticsRuntimeMode {
+        resolveMode(
+            buildFlavor: .current,
+            isUnitTestHost: isUnitTestHost,
+            isUITestingLaunch: isUITestingLaunch
+        )
+    }
+
+    static func resolveMode(
+        buildFlavor: AnalyticsBuildFlavor,
+        isUnitTestHost: Bool,
+        isUITestingLaunch: Bool
+    ) -> AnalyticsRuntimeMode {
+        guard !isUnitTestHost, !isUITestingLaunch else { return .disabled }
+
+        return switch buildFlavor {
+        case .debug:
+            .console
+        case .release:
+            .production
+        }
     }
 
     static var shouldRunProductionAnalytics: Bool {
-        !isUnitTestHost && !isUITestingLaunch
+        mode == .production
     }
 }

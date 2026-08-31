@@ -49,7 +49,8 @@ struct RemoteSessionTextField: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ textField: TextField, coordinator: Coordinator) {
-        textField.setFocused(false)
+        coordinator.cancelPendingFocusUpdate()
+        textField.deactivate()
     }
 
     func makeCoordinator() -> Coordinator {
@@ -81,56 +82,127 @@ struct RemoteSessionTextField: UIViewRepresentable {
     }
 
     final class TextField: UITextField {
+        private var isActive = true
         private var wantsFocus = false
+        private var focusTask: Task<Void, Never>?
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
-            synchronizeFocus()
+
+            if window == nil {
+                focusTask?.cancel()
+                focusTask = nil
+            } else {
+                scheduleFocusUpdate()
+            }
         }
 
         func setFocused(_ isFocused: Bool) {
+            guard isActive else { return }
+
             wantsFocus = isFocused
-            synchronizeFocus()
+            scheduleFocusUpdate()
         }
 
-        private func synchronizeFocus() {
-            if wantsFocus {
-                guard window != nil, !isFirstResponder else { return }
+        func deactivate() {
+            isActive = false
+            wantsFocus = false
+            focusTask?.cancel()
+            focusTask = nil
+            delegate = nil
 
-                Task { @MainActor [weak self] in
-                    await Task.yield()
-                    guard let self, self.wantsFocus, self.window != nil else { return }
-                    self.becomeFirstResponder()
+            Task { @MainActor [textField = self] in
+                await Task.yield()
+
+                if textField.isFirstResponder {
+                    textField.resignFirstResponder()
                 }
-            } else if isFirstResponder {
-                resignFirstResponder()
+            }
+        }
+
+        private func scheduleFocusUpdate() {
+            guard isActive,
+                  window != nil,
+                  wantsFocus != isFirstResponder,
+                  focusTask == nil else {
+                return
+            }
+
+            focusTask = Task { @MainActor [weak self] in
+                await Task.yield()
+
+                guard let self else { return }
+                self.focusTask = nil
+
+                guard !Task.isCancelled,
+                      self.isActive,
+                      self.window != nil else {
+                    return
+                }
+
+                if self.wantsFocus {
+                    guard !self.isFirstResponder else { return }
+                    self.becomeFirstResponder()
+                } else if self.isFirstResponder {
+                    self.resignFirstResponder()
+                }
             }
         }
     }
 
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: RemoteSessionTextField
+        private var pendingFocus: Bool?
+        private var focusUpdateTask: Task<Void, Never>?
 
         init(parent: RemoteSessionTextField) {
             self.parent = parent
         }
 
         @objc func textDidChange(_ textField: UITextField) {
-            parent.text = textField.text ?? ""
+            let updatedText = textField.text ?? ""
+            guard parent.text != updatedText else { return }
+            parent.text = updatedText
         }
 
         func textFieldDidBeginEditing(_ textField: UITextField) {
-            parent.isFocused = true
+            reportFocus(true)
         }
 
         func textFieldDidEndEditing(_ textField: UITextField) {
-            parent.isFocused = false
+            reportFocus(false)
         }
 
         func textFieldShouldReturn(_ textField: UITextField) -> Bool {
             parent.onSubmit()
-            parent.isFocused = true
             return false
+        }
+
+        func cancelPendingFocusUpdate() {
+            pendingFocus = nil
+            focusUpdateTask?.cancel()
+            focusUpdateTask = nil
+        }
+
+        private func reportFocus(_ focused: Bool) {
+            pendingFocus = focused
+            guard focusUpdateTask == nil else { return }
+
+            focusUpdateTask = Task { @MainActor [weak self] in
+                await Task.yield()
+
+                guard let self else { return }
+                self.focusUpdateTask = nil
+
+                guard !Task.isCancelled,
+                      let pendingFocus = self.pendingFocus else {
+                    return
+                }
+
+                self.pendingFocus = nil
+                guard self.parent.isFocused != pendingFocus else { return }
+                self.parent.isFocused = pendingFocus
+            }
         }
     }
 }

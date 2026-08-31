@@ -36,6 +36,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
     var acceptsHardwareKeyboardInput: Bool
     var acceptsPointerInput: Bool = true
     var showsFramebuffer: Bool = true
+    var showsCursorOverlay: Bool = true
+    var showsTrackpadCursorDot: Bool = false
     var allowsZoom: Bool = true
     var touchModeOverride: RemoteTouchMode?
     var glassyStreamRenderer: GlassyStreamVideoRenderer?
@@ -46,6 +48,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         view.setAcceptsHardwareKeyboardInput(acceptsHardwareKeyboardInput)
         view.setAcceptsPointerInput(acceptsPointerInput)
         view.setShowsFramebuffer(showsFramebuffer)
+        view.setShowsCursorOverlay(showsCursorOverlay)
+        view.setShowsTrackpadCursorDot(showsTrackpadCursorDot)
         view.setAllowsZoom(allowsZoom)
         view.setPansViewportWithTwoFingers(pansViewportWithTwoFingers)
         view.setTouchModeOverride(touchModeOverride)
@@ -86,6 +90,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         uiView.setAcceptsHardwareKeyboardInput(acceptsHardwareKeyboardInput)
         uiView.setAcceptsPointerInput(acceptsPointerInput)
         uiView.setShowsFramebuffer(showsFramebuffer)
+        uiView.setShowsCursorOverlay(showsCursorOverlay)
+        uiView.setShowsTrackpadCursorDot(showsTrackpadCursorDot)
         uiView.setAllowsZoom(allowsZoom)
         uiView.setPansViewportWithTwoFingers(pansViewportWithTwoFingers)
         uiView.setTouchModeOverride(touchModeOverride)
@@ -128,6 +134,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private let framebufferView = FramebufferImageView()
         private var glassyStreamView: GlassyStreamDisplayView?
         private let cursorLayer = CALayer()
+        private let fallbackCursorLayer = CALayer()
         private var remoteCursor: RemoteCursor?
         private weak var pointerScrollPan: UIPanGestureRecognizer?
         private weak var pointerWheelScrollPan: UIPanGestureRecognizer?
@@ -141,6 +148,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private let hardwareKeyboardInputView = UIView(frame: .zero)
         private var acceptsHardwareKeyboardInput = true
         private var showsFramebuffer = true
+        private var showsCursorOverlay = true
+        private var showsTrackpadCursorDot = false
         private var allowsZoom = true
         private var pansViewportWithTwoFingers = false
         private var touchModeOverride: RemoteTouchMode?
@@ -183,6 +192,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private let pressDebounce: TimeInterval = 0.05
         private let minimumZoomScale: CGFloat = 1
         private let maximumZoomScale: CGFloat = 4
+        private let fallbackCursorDiameter: CGFloat = 12
+        private let minimumTrackpadCursorLength: CGFloat = 24
 
         private final class FramebufferImageView: UIView {
             private var image: CGImage?
@@ -301,12 +312,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             if accepts {
                 requestKeyboardFocus()
             } else {
-                keyboardFocusTask?.cancel()
-                keyboardFocusTask = nil
-
-                if isFirstResponder {
-                    resignFirstResponder()
-                }
+                requestKeyboardBlur()
             }
         }
 
@@ -320,6 +326,20 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             self.showsFramebuffer = showsFramebuffer
             backgroundColor = showsFramebuffer ? .black : .clear
             framebufferView.isHidden = !showsFramebuffer
+            updateCursorLayerFrame()
+        }
+
+        func setShowsCursorOverlay(_ showsCursorOverlay: Bool) {
+            guard self.showsCursorOverlay != showsCursorOverlay else { return }
+
+            self.showsCursorOverlay = showsCursorOverlay
+            updateCursorLayerFrame()
+        }
+
+        func setShowsTrackpadCursorDot(_ showsTrackpadCursorDot: Bool) {
+            guard self.showsTrackpadCursorDot != showsTrackpadCursorDot else { return }
+
+            self.showsTrackpadCursorDot = showsTrackpadCursorDot
             updateCursorLayerFrame()
         }
 
@@ -338,6 +358,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
         func setTouchModeOverride(_ touchMode: RemoteTouchMode?) {
             touchModeOverride = touchMode
+            updateCursorLayerFrame()
         }
 
         private func requestKeyboardFocus() {
@@ -353,6 +374,33 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             }
         }
 
+        /// Resigning first responder can ask the hosting view for its next
+        /// responder. Defer that query until after SwiftUI finishes the current
+        /// representable update to avoid re-entering its AttributeGraph.
+        private func requestKeyboardBlur() {
+            keyboardFocusTask?.cancel()
+
+            guard isFirstResponder else {
+                keyboardFocusTask = nil
+                return
+            }
+
+            keyboardFocusTask = Task { @MainActor [weak self] in
+                await Task.yield()
+
+                guard let self else { return }
+                self.keyboardFocusTask = nil
+
+                guard !Task.isCancelled,
+                      !self.acceptsHardwareKeyboardInput,
+                      self.isFirstResponder else {
+                    return
+                }
+
+                self.resignFirstResponder()
+            }
+        }
+
         override init(frame: CGRect) {
             super.init(frame: frame)
 
@@ -365,6 +413,17 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             cursorLayer.minificationFilter = .nearest
             cursorLayer.isHidden = true
             layer.addSublayer(cursorLayer)
+
+            fallbackCursorLayer.backgroundColor = UIColor.white.cgColor
+            fallbackCursorLayer.borderColor = UIColor.black.cgColor
+            fallbackCursorLayer.borderWidth = 2
+            fallbackCursorLayer.cornerRadius = fallbackCursorDiameter / 2
+            fallbackCursorLayer.shadowColor = UIColor.black.cgColor
+            fallbackCursorLayer.shadowOpacity = 0.65
+            fallbackCursorLayer.shadowRadius = 2
+            fallbackCursorLayer.shadowOffset = .zero
+            fallbackCursorLayer.isHidden = true
+            layer.addSublayer(fallbackCursorLayer)
             isMultipleTouchEnabled = true
 
             let pinch = UIPinchGestureRecognizer(target: self,
@@ -966,32 +1025,113 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         private func updateCursorLayerFrame() {
-            guard showsFramebuffer,
-                  let remoteCursor,
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            defer { CATransaction.commit() }
+
+            guard showsCursorOverlay,
                   let localCursor = localCursorLocation(),
-                  remoteCursor.size.width > 0,
-                  remoteCursor.size.height > 0,
                   framebufferView.frame.width > 0,
                   framebufferView.frame.height > 0 else {
-                cursorLayer.isHidden = true
-                cursorLayer.frame = .zero
+                hideCursorLayers()
                 return
             }
 
             let scale = effectiveScale
-            let cursorSize = CGSize(width: remoteCursor.size.width * scale,
-                                    height: remoteCursor.size.height * scale)
-            let hotspot = CGPoint(x: remoteCursor.hotspot.x * scale,
-                                  y: remoteCursor.hotspot.y * scale)
-            let cursorOrigin = CGPoint(x: framebufferView.frame.minX + localCursor.x * scale - hotspot.x,
-                                       y: framebufferView.frame.minY + localCursor.y * scale - hotspot.y)
+            let cursorLocation = CGPoint(
+                x: framebufferView.frame.minX + localCursor.x * scale,
+                y: framebufferView.frame.minY + localCursor.y * scale
+            )
 
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            cursorLayer.isHidden = false
-            cursorLayer.frame = CGRect(origin: cursorOrigin, size: cursorSize)
-            CATransaction.commit()
+            if let remoteCursor = renderableRemoteCursor {
+                let remoteCursorScale: CGFloat
+                if effectiveTouchMode == .trackpad {
+                    // A desktop-sized framebuffer can otherwise shrink the
+                    // remote pointer to only a few points on iPhone.
+                    let longestSide = max(remoteCursor.size.width,
+                                          remoteCursor.size.height)
+                    remoteCursorScale = max(
+                        scale,
+                        minimumTrackpadCursorLength / longestSide
+                    )
+                } else {
+                    remoteCursorScale = scale
+                }
+
+                let cursorSize = CGSize(
+                    width: remoteCursor.size.width * remoteCursorScale,
+                    height: remoteCursor.size.height * remoteCursorScale
+                )
+                let hotspot = CGPoint(
+                    x: remoteCursor.hotspot.x * remoteCursorScale,
+                    y: remoteCursor.hotspot.y * remoteCursorScale
+                )
+                let cursorOrigin = CGPoint(
+                    x: cursorLocation.x - hotspot.x,
+                    y: cursorLocation.y - hotspot.y
+                )
+
+                fallbackCursorLayer.isHidden = true
+                fallbackCursorLayer.frame = .zero
+                cursorLayer.isHidden = false
+                cursorLayer.frame = CGRect(origin: cursorOrigin,
+                                           size: cursorSize)
+                return
+            }
+
+            guard effectiveTouchMode == .trackpad,
+                  showsTrackpadCursorDot else {
+                hideCursorLayers()
+                return
+            }
+
+            // Optional local position marker for transports that do not publish
+            // cursor shapes. The host cursor remains the default presentation.
+            cursorLayer.isHidden = true
+            cursorLayer.frame = .zero
+            fallbackCursorLayer.isHidden = false
+            fallbackCursorLayer.frame = CGRect(
+                x: cursorLocation.x - fallbackCursorDiameter / 2,
+                y: cursorLocation.y - fallbackCursorDiameter / 2,
+                width: fallbackCursorDiameter,
+                height: fallbackCursorDiameter
+            )
         }
+
+        private var renderableRemoteCursor: RemoteCursor? {
+            guard let remoteCursor,
+                  remoteCursor.size.width.isFinite,
+                  remoteCursor.size.height.isFinite,
+                  remoteCursor.hotspot.x.isFinite,
+                  remoteCursor.hotspot.y.isFinite,
+                  remoteCursor.size.width > 0,
+                  remoteCursor.size.height > 0 else {
+                return nil
+            }
+
+            return remoteCursor
+        }
+
+        private func hideCursorLayers() {
+            cursorLayer.isHidden = true
+            cursorLayer.frame = .zero
+            fallbackCursorLayer.isHidden = true
+            fallbackCursorLayer.frame = .zero
+        }
+
+#if DEBUG
+        var debugCursorIsVisible: Bool {
+            !cursorLayer.isHidden || !fallbackCursorLayer.isHidden
+        }
+
+        var debugUsesFallbackCursor: Bool {
+            !fallbackCursorLayer.isHidden
+        }
+
+        var debugCursorFrame: CGRect {
+            fallbackCursorLayer.isHidden ? cursorLayer.frame : fallbackCursorLayer.frame
+        }
+#endif
 
         private func cursorLocationDidChange() {
             let previousCursor = lastLocalCursorLocation

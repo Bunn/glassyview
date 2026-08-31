@@ -57,6 +57,17 @@ actor SuspendedAnalyticsTransport: AnalyticsTransporting {
     }
 }
 
+#if DEBUG
+@MainActor
+private final class DebugAnalyticsEventLogSpy {
+    private(set) var entries: [(AnalyticsEventName, AnalyticsEventContext?)] = []
+
+    func record(_ event: AnalyticsEventName, context: AnalyticsEventContext?) {
+        entries.append((event, context))
+    }
+}
+#endif
+
 @MainActor
 @Suite("Privacy-preserving analytics", .serialized)
 struct AnalyticsTests {
@@ -291,4 +302,65 @@ struct AnalyticsTests {
         #expect(AnalyticsRuntime.isUnitTestHost)
         #expect(!AnalyticsRuntime.shouldRunProductionAnalytics)
     }
+
+    @Test("Debug uses console analytics while Release uses production analytics")
+    func buildFlavorSelectsAnalyticsDestination() {
+        #expect(AnalyticsRuntime.resolveMode(
+            buildFlavor: .debug,
+            isUnitTestHost: false,
+            isUITestingLaunch: false
+        ) == .console)
+        #expect(AnalyticsRuntime.resolveMode(
+            buildFlavor: .release,
+            isUnitTestHost: false,
+            isUITestingLaunch: false
+        ) == .production)
+    }
+
+    @Test("Tests never select an analytics destination")
+    func testsDisableAnalyticsDestinations() {
+        for buildFlavor in [AnalyticsBuildFlavor.debug, .release] {
+            #expect(AnalyticsRuntime.resolveMode(
+                buildFlavor: buildFlavor,
+                isUnitTestHost: true,
+                isUITestingLaunch: false
+            ) == .disabled)
+            #expect(AnalyticsRuntime.resolveMode(
+                buildFlavor: buildFlavor,
+                isUnitTestHost: false,
+                isUITestingLaunch: true
+            ) == .disabled)
+        }
+    }
+
+    #if DEBUG
+    @Test("Debug analytics prints events without queueing a delivery")
+    func debugAnalyticsIsConsoleOnly() async {
+        let log = DebugAnalyticsEventLogSpy()
+        let tracker = DebugConsoleAnalyticsTracker { event, context in
+            log.record(event, context: context)
+        }
+        let context = AnalyticsEventContext(
+            source: .sessionLimit,
+            outcome: .cancelled,
+            reason: .unknown
+        )
+
+        tracker.setCollectionEnabled(true)
+        tracker.track(.paywallDismissed, context: context)
+        tracker.flush()
+
+        #expect(log.entries.count == 1)
+        #expect(log.entries.first?.0 == .paywallDismissed)
+        #expect(log.entries.first?.1 == context)
+
+        await tracker.disableCollectionAfterTrackingOptOut()
+        tracker.track(.purchaseStarted)
+
+        #expect(log.entries.map(\.0) == [
+            .paywallDismissed,
+            .analyticsDisabled,
+        ])
+    }
+    #endif
 }

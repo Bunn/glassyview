@@ -6,6 +6,7 @@ struct SessionPreferences: Codable, Equatable, Sendable {
     var zoomScale = 1.0
     var followsCursor = true
     var pansViewportWithTwoFingers = false
+    var showsTrackpadCursorDot = false
     var frameRate: RemoteFrameRate = .balanced
     var quality: RemoteSessionQuality = .best
 
@@ -23,6 +24,7 @@ struct SessionPreferences: Codable, Equatable, Sendable {
         case zoomScale
         case followsCursor
         case pansViewportWithTwoFingers
+        case showsTrackpadCursorDot
         case frameRate
         case quality
     }
@@ -32,6 +34,7 @@ struct SessionPreferences: Codable, Equatable, Sendable {
          zoomScale: Double = 1,
          followsCursor: Bool = true,
          pansViewportWithTwoFingers: Bool = false,
+         showsTrackpadCursorDot: Bool = false,
          frameRate: RemoteFrameRate = .balanced,
          quality: RemoteSessionQuality = .best) {
         self.touchMode = touchMode
@@ -39,6 +42,7 @@ struct SessionPreferences: Codable, Equatable, Sendable {
         self.zoomScale = zoomScale
         self.followsCursor = followsCursor
         self.pansViewportWithTwoFingers = pansViewportWithTwoFingers
+        self.showsTrackpadCursorDot = showsTrackpadCursorDot
         self.frameRate = frameRate
         self.quality = quality
     }
@@ -52,6 +56,10 @@ struct SessionPreferences: Codable, Equatable, Sendable {
         pansViewportWithTwoFingers = try container.decodeIfPresent(
             Bool.self,
             forKey: .pansViewportWithTwoFingers
+        ) ?? false
+        showsTrackpadCursorDot = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .showsTrackpadCursorDot
         ) ?? false
         frameRate = try container.decodeIfPresent(RemoteFrameRate.self, forKey: .frameRate) ?? .balanced
         quality = try container.decodeIfPresent(RemoteSessionQuality.self, forKey: .quality) ?? .best

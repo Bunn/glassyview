@@ -19,6 +19,21 @@ private final class RevenueCatAttributeWriterSpy: RevenueCatAttributeWriting {
 @MainActor
 @Suite("RevenueCat analytics funnel")
 struct FunnelMilestoneTrackingTests {
+    #if DEBUG
+    @Test("Debug funnel attributes are printed without reaching RevenueCat")
+    func debugFunnelAttributesAreConsoleOnly() {
+        var loggedAttributes: [[String: String]] = []
+        let writer = DebugConsoleRevenueCatAttributeWriter { attributes in
+            loggedAttributes.append(attributes)
+        }
+
+        writer.setAttributes(["gv_ms_purchase_started": "1"])
+
+        #expect(writer.isConfigured)
+        #expect(loggedAttributes == [["gv_ms_purchase_started": "1"]])
+    }
+    #endif
+
     @Test("A fixed milestone is written only once")
     func recordsMilestoneOnlyOnce() {
         let revenueCat = RevenueCatAttributeWriterSpy()

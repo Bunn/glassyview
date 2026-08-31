@@ -35,7 +35,9 @@ struct ExternalRemoteDisplayView: View {
                           zoomScale: $zoomScale,
                           followsCursor: false,
                           acceptsHardwareKeyboardInput: false,
-                          acceptsPointerInput: false)
+                          acceptsPointerInput: false,
+                          // The iPhone always controls this surface as a trackpad.
+                          touchModeOverride: .trackpad)
             .id(session.displaySelection.id)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea()

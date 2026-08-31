@@ -9,6 +9,7 @@ struct SessionShortcutStrip<Session: RemoteSessionInputControlling>: View {
     private let primaryActions: [SessionShortcutAction] = [
         .key(id: "escape", title: "Esc", keyCode: .escape),
         .key(id: "tab", title: "Tab", keyCode: .tab),
+        .key(id: "backspace", title: "Backspace", systemImage: "delete.left", keyCode: .delete),
         .key(id: "left", title: "Left", systemImage: "arrow.left", keyCode: .leftArrow),
         .key(id: "up", title: "Up", systemImage: "arrow.up", keyCode: .upArrow),
         .key(id: "down", title: "Down", systemImage: "arrow.down", keyCode: .downArrow),
@@ -34,7 +35,7 @@ struct SessionShortcutStrip<Session: RemoteSessionInputControlling>: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 2) {
                 ForEach(RemoteModifierKey.allCases) { modifier in
                     modifierButton(for: modifier)
                 }
@@ -50,11 +51,9 @@ struct SessionShortcutStrip<Session: RemoteSessionInputControlling>: View {
 
                 functionKeysMenu
             }
-            .padding(.horizontal, 4)
         }
-        .scrollClipDisabled()
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 4)
         .liquidGlass(in: Capsule())
     }
 
@@ -66,8 +65,9 @@ struct SessionShortcutStrip<Session: RemoteSessionInputControlling>: View {
         } label: {
             Text(modifier.title)
                 .font(.caption.weight(.semibold))
-                .frame(minWidth: 42, minHeight: 30)
-                .padding(.horizontal, 8)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(width: 44, height: 44)
                 .background {
                     if isActive {
                         Capsule()
@@ -107,13 +107,14 @@ struct SessionShortcutStrip<Session: RemoteSessionInputControlling>: View {
         if let systemImage = action.systemImage {
             Image(systemName: systemImage)
                 .font(.callout.weight(.semibold))
-                .frame(width: 38, height: 30)
+                .frame(width: 44, height: 44)
                 .contentShape(Capsule())
         } else {
             Text(action.title)
                 .font(.caption.weight(.semibold))
-                .frame(minWidth: action.minimumWidth, minHeight: 30)
-                .padding(.horizontal, 10)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(minWidth: max(44, action.minimumWidth), minHeight: 44)
                 .contentShape(Capsule())
         }
     }
@@ -128,8 +129,7 @@ struct SessionShortcutStrip<Session: RemoteSessionInputControlling>: View {
         } label: {
             Text("Fn")
                 .font(.caption.weight(.semibold))
-                .frame(minWidth: 34, minHeight: 30)
-                .padding(.horizontal, 10)
+                .frame(width: 44, height: 44)
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)

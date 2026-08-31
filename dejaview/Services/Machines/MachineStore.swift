@@ -74,13 +74,13 @@ final class MachineStore: MachineStoring {
 
     func sessionPreferences(for machine: SavedMachine) -> SessionPreferences {
         let preferences = repository.sessionPreferences(for: machine.id)
-        AppLog.storage.info("Loaded session preferences for '\(machine.displayName, privacy: .public)'; touchMode=\(preferences.touchMode.rawValue, privacy: .public) display=\(preferences.displaySelection.logDescription, privacy: .public) zoom=\(preferences.zoomScale, privacy: .public) followsCursor=\(preferences.followsCursor, privacy: .public) frameRate=\(preferences.frameRate.rawValue, privacy: .public) quality=\(preferences.quality.rawValue, privacy: .public)")
+        AppLog.storage.info("Loaded session preferences for '\(machine.displayName, privacy: .public)'; touchMode=\(preferences.touchMode.rawValue, privacy: .public) trackpadDot=\(preferences.showsTrackpadCursorDot, privacy: .public) display=\(preferences.displaySelection.logDescription, privacy: .public) zoom=\(preferences.zoomScale, privacy: .public) followsCursor=\(preferences.followsCursor, privacy: .public) frameRate=\(preferences.frameRate.rawValue, privacy: .public) quality=\(preferences.quality.rawValue, privacy: .public)")
         return preferences
     }
 
     func setSessionPreferences(_ preferences: SessionPreferences, for machine: SavedMachine) {
         let preferences = preferences.normalized
-        AppLog.storage.info("Saving session preferences for '\(machine.displayName, privacy: .public)'; touchMode=\(preferences.touchMode.rawValue, privacy: .public) display=\(preferences.displaySelection.logDescription, privacy: .public) zoom=\(preferences.zoomScale, privacy: .public) followsCursor=\(preferences.followsCursor, privacy: .public) frameRate=\(preferences.frameRate.rawValue, privacy: .public) quality=\(preferences.quality.rawValue, privacy: .public)")
+        AppLog.storage.info("Saving session preferences for '\(machine.displayName, privacy: .public)'; touchMode=\(preferences.touchMode.rawValue, privacy: .public) trackpadDot=\(preferences.showsTrackpadCursorDot, privacy: .public) display=\(preferences.displaySelection.logDescription, privacy: .public) zoom=\(preferences.zoomScale, privacy: .public) followsCursor=\(preferences.followsCursor, privacy: .public) frameRate=\(preferences.frameRate.rawValue, privacy: .public) quality=\(preferences.quality.rawValue, privacy: .public)")
         repository.setSessionPreferences(preferences, for: machine.id)
     }
 

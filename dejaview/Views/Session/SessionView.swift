@@ -154,10 +154,6 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
         .onChange(of: showsInputBar) { _, _ in
             logDisplayControlState(reason: "inputBarVisibilityChanged")
-            if !showsInputBar {
-                inputFocused = false
-                releaseHeldModifierKeys()
-            }
         }
         .onChange(of: subscriptionStore.hasProAccess) { _, hasProAccess in
             if hasProAccess {
@@ -204,6 +200,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                      zoomScale: $streamZoomScale,
                                      followsCursor: followsCursorWhenZoomed,
                                      pansViewportWithTwoFingers: pansViewportWithTwoFingers,
+                                     showsTrackpadCursorDot: preferences.showsTrackpadCursorDot,
                                      acceptsHardwareKeyboardInput: acceptsRemoteHardwareKeyboardInput,
                                      glassyStream: glassyStream)
             }
@@ -214,6 +211,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                  zoomScale: $streamZoomScale,
                                  followsCursor: followsCursorWhenZoomed,
                                  pansViewportWithTwoFingers: pansViewportWithTwoFingers,
+                                 showsTrackpadCursorDot: preferences.showsTrackpadCursorDot,
                                  acceptsHardwareKeyboardInput: false,
                                  glassyStream: glassyStream)
 
@@ -316,6 +314,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
             SessionOptionsMenu(session: session,
                                sessionTitle: sessionTitle,
                                externalDisplayCoordinator: externalDisplayCoordinator,
+                               showsTrackpadCursorDot: $preferences.showsTrackpadCursorDot,
                                usesGlassyStream: glassyStream != nil)
         }
     }
@@ -600,14 +599,13 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
     private func toggleInputBar() {
         showsInputBar.toggle()
+        inputFocused = showsInputBar
 
         if !showsInputBar {
-            inputFocused = false
             releaseHeldModifierKeys()
         }
 
         AppLog.ui.info("Software input bar visibility changed; visible=\(self.showsInputBar, privacy: .public)")
-        inputFocused = showsInputBar
     }
 
     private func toggleBottomControls() {

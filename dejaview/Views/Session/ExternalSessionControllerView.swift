@@ -102,6 +102,7 @@ struct ExternalSessionControllerView<Session: RemoteSessionControlling>: View {
                               followsCursor: false,
                               acceptsHardwareKeyboardInput: false,
                               showsFramebuffer: false,
+                              showsCursorOverlay: false,
                               touchModeOverride: .trackpad)
                 .clipShape(.rect(cornerRadius: 28))
 

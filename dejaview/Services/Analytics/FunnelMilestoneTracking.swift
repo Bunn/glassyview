@@ -119,6 +119,37 @@ struct LiveRevenueCatAttributeWriter: RevenueCatAttributeWriting {
     }
 }
 
+#if DEBUG
+@MainActor
+struct DebugConsoleRevenueCatAttributeWriter: RevenueCatAttributeWriting {
+    typealias AttributeLogger = @MainActor @Sendable ([String: String]) -> Void
+
+    let isConfigured = true
+    private let logAttributes: AttributeLogger
+
+    init(
+        logAttributes: @escaping AttributeLogger =
+            DebugConsoleRevenueCatAttributeWriter.logToConsole
+    ) {
+        self.logAttributes = logAttributes
+    }
+
+    func setAttributes(_ attributes: [String: String]) {
+        logAttributes(attributes)
+    }
+
+    private static func logToConsole(_ attributes: [String: String]) {
+        let fields = attributes
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: ",")
+        AppLog.analytics.info(
+            "Debug analytics funnel attributes; values=\(fields, privacy: .public) sent=false"
+        )
+    }
+}
+#endif
+
 @MainActor
 final class RevenueCatFunnelMilestoneTracker: FunnelMilestoneTracking {
     private enum StorageKey {
@@ -224,6 +255,21 @@ final class RevenueCatFunnelMilestoneTracker: FunnelMilestoneTracking {
     private func persistenceKey(for milestone: FunnelMilestone) -> String {
         "analytics.revenuecat.\(milestone.revenueCatAttributeKey)"
     }
+
+    #if DEBUG
+    static func consoleOnly() -> RevenueCatFunnelMilestoneTracker {
+        let suiteName = "dev.bunn.glassydesk.debug-analytics"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            preconditionFailure("Could not create Debug analytics defaults")
+        }
+
+        return RevenueCatFunnelMilestoneTracker(
+            revenueCat: DebugConsoleRevenueCatAttributeWriter(),
+            defaults: defaults,
+            productionAnalyticsEnabled: { true }
+        )
+    }
+    #endif
 }
 
 @MainActor

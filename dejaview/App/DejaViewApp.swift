@@ -16,10 +16,19 @@ struct DejaViewApp: App {
     init() {
         RevenueCatConfiguration.configure()
 
-        if AnalyticsRuntime.shouldRunProductionAnalytics {
+        switch AnalyticsRuntime.mode {
+        case .production:
             analytics = CloudflareAnalyticsTracker.live()
             funnelMilestones = RevenueCatFunnelMilestoneTracker()
-        } else {
+        case .console:
+            #if DEBUG
+            analytics = DebugConsoleAnalyticsTracker()
+            funnelMilestones = RevenueCatFunnelMilestoneTracker.consoleOnly()
+            #else
+            analytics = NoOpAnalyticsTracker()
+            funnelMilestones = NoOpFunnelMilestoneTracker()
+            #endif
+        case .disabled:
             analytics = NoOpAnalyticsTracker()
             funnelMilestones = NoOpFunnelMilestoneTracker()
         }

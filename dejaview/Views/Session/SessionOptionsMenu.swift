@@ -8,6 +8,7 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
     @ObservedObject var session: Session
     let sessionTitle: String
     @Bindable var externalDisplayCoordinator: ExternalDisplayCoordinator
+    @Binding var showsTrackpadCursorDot: Bool
     var usesGlassyStream = false
 
     var body: some View {
@@ -33,6 +34,10 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
 
             Toggle("Trackpad Mode", systemImage: "cursorarrow.motionlines",
                    isOn: trackpadBinding)
+
+            Toggle("Show Trackpad Dot", systemImage: "circle.fill",
+                   isOn: $showsTrackpadCursorDot)
+                .disabled(session.touchMode != .trackpad)
 
             if !usesGlassyStream {
                 Picker("Frame Rate", selection: frameRateBinding) {

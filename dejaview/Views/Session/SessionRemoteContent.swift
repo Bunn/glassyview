@@ -6,6 +6,7 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
     @Binding var zoomScale: CGFloat
     let followsCursor: Bool
     var pansViewportWithTwoFingers = false
+    var showsTrackpadCursorDot = false
     let acceptsHardwareKeyboardInput: Bool
     var acceptsPointerInput: Bool = true
     var glassyStream: GlassyStreamSessionController?
@@ -21,9 +22,10 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                                   acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
                                   acceptsPointerInput: acceptsPointerInput,
                                   showsFramebuffer: false,
+                                  showsTrackpadCursorDot: showsTrackpadCursorDot,
                                   allowsZoom: true,
                                   glassyStreamRenderer: glassyStream.renderer)
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(.container)
 
                 if reconnectState == nil {
                     GlassyStreamStatusOverlay(controller: glassyStream)
@@ -36,9 +38,10 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                                   followsCursor: followsCursor,
                                   pansViewportWithTwoFingers: pansViewportWithTwoFingers,
                                   acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
-                                  acceptsPointerInput: acceptsPointerInput)
+                                  acceptsPointerInput: acceptsPointerInput,
+                                  showsTrackpadCursorDot: showsTrackpadCursorDot)
                     .id(session.displaySelection.id)
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(.container)
             }
 
             if let reconnectState {
