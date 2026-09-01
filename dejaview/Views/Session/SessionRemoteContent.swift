@@ -6,6 +6,7 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
     @Binding var zoomScale: CGFloat
     let followsCursor: Bool
     var pansViewportWithTwoFingers = false
+    var keyboardAvoidanceActive = false
     var showsTrackpadCursorDot = false
     let acceptsHardwareKeyboardInput: Bool
     var acceptsPointerInput: Bool = true
@@ -17,15 +18,17 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                 RemoteDesktopView(session: session,
                                   selectedFramebufferFrame: nil,
                                   zoomScale: $zoomScale,
+                                  fitsContentToWindow: true,
                                   followsCursor: followsCursor,
                                   pansViewportWithTwoFingers: pansViewportWithTwoFingers,
+                                  keyboardAvoidanceActive: keyboardAvoidanceActive,
                                   acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
                                   acceptsPointerInput: acceptsPointerInput,
                                   showsFramebuffer: false,
                                   showsTrackpadCursorDot: showsTrackpadCursorDot,
                                   allowsZoom: true,
                                   glassyStreamRenderer: glassyStream.renderer)
-                    .ignoresSafeArea(.container)
+                    .ignoresSafeArea(.container, edges: ignoredContainerSafeAreaEdges)
 
                 if reconnectState == nil {
                     GlassyStreamStatusOverlay(controller: glassyStream)
@@ -35,13 +38,15 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                 RemoteDesktopView(session: session,
                                   selectedFramebufferFrame: session.selectedDisplayFrame,
                                   zoomScale: $zoomScale,
+                                  fitsContentToWindow: true,
                                   followsCursor: followsCursor,
                                   pansViewportWithTwoFingers: pansViewportWithTwoFingers,
+                                  keyboardAvoidanceActive: keyboardAvoidanceActive,
                                   acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
                                   acceptsPointerInput: acceptsPointerInput,
                                   showsTrackpadCursorDot: showsTrackpadCursorDot)
                     .id(session.displaySelection.id)
-                    .ignoresSafeArea(.container)
+                    .ignoresSafeArea(.container, edges: ignoredContainerSafeAreaEdges)
             }
 
             if let reconnectState {
@@ -54,6 +59,10 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                                         cancel: session.cancelReconnect)
             }
         }
+    }
+
+    private var ignoredContainerSafeAreaEdges: Edge.Set {
+        keyboardAvoidanceActive ? [.top, .leading, .trailing] : .all
     }
 }
 

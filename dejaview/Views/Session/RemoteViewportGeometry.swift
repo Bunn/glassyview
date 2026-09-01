@@ -14,7 +14,7 @@ enum RemoteViewportGeometry {
         static let vertical = PannableAxes(rawValue: 1 << 1)
     }
 
-    enum GestureIntent {
+    enum GestureIntent: Equatable {
         case undecided
         case viewportPan
         case remoteScroll
@@ -44,8 +44,9 @@ enum RemoteViewportGeometry {
     }
 
     static func gestureIntent(pannableAxes: PannableAxes,
-                              pansViewportWithTwoFingers: Bool) -> GestureIntent {
-        pansViewportWithTwoFingers && !pannableAxes.isEmpty
+                              pansViewportWithTwoFingers: Bool,
+                              forcesViewportPan: Bool = false) -> GestureIntent {
+        (pansViewportWithTwoFingers || forcesViewportPan) && !pannableAxes.isEmpty
             ? .viewportPan
             : .remoteScroll
     }

@@ -25,6 +25,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @State private var showsInputBar = false
     @State private var textToSend = ""
     @State private var streamZoomScale: CGFloat = 1
+    @State private var zoomScaleBeforeInputBar: CGFloat?
     @State private var followsCursorWhenZoomed = true
     @State private var pansViewportWithTwoFingers = false
     @State private var networkPathObserver = NetworkPathObserver()
@@ -73,7 +74,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                     .padding(.leading, 20)
             }
         }
-        .overlay(alignment: .bottom) {
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             if showsInputBar && session.status == .connected && !isExternalControllerActive {
                 inputBar
             }
@@ -144,6 +145,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
             updatePreference(\.quality, to: quality)
         }
         .onChange(of: streamZoomScale) { _, zoomScale in
+            guard !showsInputBar else { return }
             updatePreference(\.zoomScale, to: Double(zoomScale))
         }
         .onChange(of: followsCursorWhenZoomed) { _, followsCursor in
@@ -200,6 +202,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                      zoomScale: $streamZoomScale,
                                      followsCursor: followsCursorWhenZoomed,
                                      pansViewportWithTwoFingers: pansViewportWithTwoFingers,
+                                     keyboardAvoidanceActive: showsInputBar,
                                      showsTrackpadCursorDot: preferences.showsTrackpadCursorDot,
                                      acceptsHardwareKeyboardInput: acceptsRemoteHardwareKeyboardInput,
                                      glassyStream: glassyStream)
@@ -607,7 +610,16 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     }
 
     private func toggleInputBar() {
-        showsInputBar.toggle()
+        if showsInputBar {
+            showsInputBar = false
+            if let zoomScaleBeforeInputBar {
+                streamZoomScale = zoomScaleBeforeInputBar
+                self.zoomScaleBeforeInputBar = nil
+            }
+        } else {
+            zoomScaleBeforeInputBar = streamZoomScale
+            showsInputBar = true
+        }
         inputFocused = showsInputBar
 
         if !showsInputBar {
