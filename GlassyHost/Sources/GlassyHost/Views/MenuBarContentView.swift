@@ -4,6 +4,7 @@ import SwiftUI
 struct MenuBarContentView: View {
     @Environment(\.openWindow) private var openWindow
     let controller: HostController
+    let updater: HostUpdateController
 
     var body: some View {
         Text(controller.runState.title)
@@ -35,6 +36,13 @@ struct MenuBarContentView: View {
         Button("Open Glassy Host") {
             openWindow(id: "main")
             NSApp.activate(ignoringOtherApps: true)
+        }
+
+        Divider()
+
+        CheckForUpdatesView(updater: updater)
+        if updater.isInstallationDeferred {
+            Text("Update waits for disconnect")
         }
 
         Divider()

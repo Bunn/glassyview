@@ -51,4 +51,15 @@ The package is intentionally separate from the iOS Xcode project so both apps re
 
 The build script prefers an Apple Development identity and uses Keychain for the long-lived pairing credential in that case. If no development identity is installed, it creates an ad-hoc signed app and keeps the 256-bit host credential in an owner-only Application Support file. The optional reusable password credential never uses that fallback: it is stored only in the macOS login Keychain, and an access failure leaves rotating-code pairing available. Ad-hoc rebuilds can require Screen Recording permission to be granted again and may not retain Keychain access because their signing identity is not stable.
 
-The script embeds and signs Sparkle and its helpers with the host's signing identity. Local ad-hoc builds use a separate entitlement to disable library validation so they can load Sparkle without a team identity; development-signed builds retain library validation. Both keep the hardened runtime enabled. Sparkle is linked, but update checks are not configured yet.
+The script embeds and signs Sparkle and its helpers with the host's signing identity. Local ad-hoc builds use a separate entitlement to disable library validation so they can load Sparkle without a team identity; development-signed builds retain library validation. Both keep the hardened runtime enabled.
+
+## Software updates
+
+**Check for Updates…** is available in the application menu and the menu bar extra. The shared updater starts only when `Support/Info.plist` contains both:
+
+- `SUFeedURL`: an absolute HTTPS appcast URL with a host, without embedded credentials or a fragment.
+- `SUPublicEDKey`: the base64-encoded, 32-byte Ed25519 public key produced by Sparkle's `generate_keys` tool. Never add its private signing key to the app or repository.
+
+These settings are deliberately absent until the real feed and signing key are ready. Missing or invalid settings leave the menu action disabled and Sparkle entirely stopped, without update requests or permission prompts. Startup errors are logged and also leave the menu action disabled. Once configured, Sparkle manages update-check permission and scheduling using its standard preferences.
+
+A requested install-and-relaunch waits while authenticated remote sessions are connected, then resumes after the last client disconnects, even with the dashboard and menus closed. A canceled update discards its pending installation. Explicitly quitting the app remains allowed; Sparkle retains its standard install-on-quit behavior. No download hosting or release-signing workflow is configured yet.
