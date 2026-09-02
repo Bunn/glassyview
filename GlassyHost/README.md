@@ -50,3 +50,5 @@ The package is intentionally separate from the iOS Xcode project so both apps re
 ## Signing
 
 The build script prefers an Apple Development identity and uses Keychain for the long-lived pairing credential in that case. If no development identity is installed, it creates an ad-hoc signed app and keeps the 256-bit host credential in an owner-only Application Support file. The optional reusable password credential never uses that fallback: it is stored only in the macOS login Keychain, and an access failure leaves rotating-code pairing available. Ad-hoc rebuilds can require Screen Recording permission to be granted again and may not retain Keychain access because their signing identity is not stable.
+
+The script embeds and signs Sparkle and its helpers with the host's signing identity. Local ad-hoc builds use a separate entitlement to disable library validation so they can load Sparkle without a team identity; development-signed builds retain library validation. Both keep the hardened runtime enabled. Sparkle is linked, but update checks are not configured yet.

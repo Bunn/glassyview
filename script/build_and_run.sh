@@ -14,6 +14,8 @@ INSTALLED_APP_BUNDLE="/Applications/$DISPLAY_NAME.app"
 APP_CONTENTS="$STAGED_APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
+APP_FRAMEWORKS="$APP_CONTENTS/Frameworks"
+SPARKLE_FRAMEWORK="$APP_FRAMEWORKS/Sparkle.framework"
 STAGED_APP_BINARY="$APP_MACOS/$APP_NAME"
 INSTALLED_APP_BINARY="$INSTALLED_APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
@@ -23,10 +25,12 @@ swift build --package-path "$PACKAGE_DIR" --product "$APP_NAME"
 BUILD_DIR="$(swift build --package-path "$PACKAGE_DIR" --show-bin-path)"
 
 rm -rf "$STAGED_APP_BUNDLE"
-mkdir -p "$APP_MACOS" "$APP_RESOURCES"
+mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$APP_FRAMEWORKS"
 cp "$BUILD_DIR/$APP_NAME" "$STAGED_APP_BINARY"
 cp "$PACKAGE_DIR/Support/Info.plist" "$APP_CONTENTS/Info.plist"
 cp "$PACKAGE_DIR/Resources/GlassyHostAppIcon.icns" "$APP_RESOURCES/GlassyHostAppIcon.icns"
+# Preserve Sparkle's framework symlinks and helper executable permissions.
+/usr/bin/ditto "$BUILD_DIR/Sparkle.framework" "$SPARKLE_FRAMEWORK"
 chmod +x "$STAGED_APP_BINARY"
 
 CODESIGN_IDENTITY="${GLASSY_HOST_CODESIGN_IDENTITY:-}"
@@ -44,7 +48,9 @@ if [[ -z "$CODESIGN_IDENTITY" ]]; then
 fi
 if [[ -z "$CODESIGN_IDENTITY" ]]; then
   CODESIGN_IDENTITY="-"
-  echo "warning: no Apple Development identity for B2RUA6XMHC; using ad-hoc signing" >&2
+fi
+if [[ "$CODESIGN_IDENTITY" == "-" ]]; then
+  echo "warning: using ad-hoc signing for local development" >&2
   echo "warning: Screen Recording permission may need to be granted again after rebuilds" >&2
 else
   /usr/libexec/PlistBuddy \
@@ -52,12 +58,33 @@ else
     "$APP_CONTENTS/Info.plist"
 fi
 
+CODESIGN_ENTITLEMENTS="$PACKAGE_DIR/Support/GlassyHost.entitlements"
+if [[ "$CODESIGN_IDENTITY" == "-" ]]; then
+  # Local ad-hoc builds have no team identity for hardened library validation.
+  CODESIGN_ENTITLEMENTS="$PACKAGE_DIR/Support/GlassyHostAdHoc.entitlements"
+fi
+
+# Sign nested code inside-out with the host's identity before sealing the app.
+for sparkle_code in \
+  "$SPARKLE_FRAMEWORK/Versions/Current/Autoupdate" \
+  "$SPARKLE_FRAMEWORK/Versions/Current/Updater.app" \
+  "$SPARKLE_FRAMEWORK/Versions/Current/XPCServices/Downloader.xpc" \
+  "$SPARKLE_FRAMEWORK/Versions/Current/XPCServices/Installer.xpc" \
+  "$SPARKLE_FRAMEWORK"; do
+  /usr/bin/codesign \
+    --force \
+    --sign "$CODESIGN_IDENTITY" \
+    --options runtime \
+    --preserve-metadata=entitlements \
+    "$sparkle_code" >/dev/null
+done
+
 /usr/bin/codesign \
   --force \
   --sign "$CODESIGN_IDENTITY" \
   --identifier "$BUNDLE_ID" \
   --options runtime \
-  --entitlements "$PACKAGE_DIR/Support/GlassyHost.entitlements" \
+  --entitlements "$CODESIGN_ENTITLEMENTS" \
   "$STAGED_APP_BUNDLE" >/dev/null
 
 install_app() {
