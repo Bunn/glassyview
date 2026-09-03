@@ -39,6 +39,8 @@ SECRET_ENV = {
     "NOTARY_PRIVATE_KEY", "NOTARY_KEY_PATH", "CODESIGN_P12_BASE64", "CODESIGN_P12_PASSWORD",
     "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_PASSWORD", "ASC_PRIVATE_KEY",
 }
+XCODE_NOTARY_POLL_ATTEMPTS = 41
+XCODE_NOTARY_POLL_INTERVAL = 30
 
 
 class ReleaseError(Exception):
@@ -81,11 +83,17 @@ def clean_environment() -> dict[str, str]:
     return environment
 
 
+def is_ci_environment() -> bool:
+    return any(os.environ.get(name, "").lower() not in ("", "0", "false", "no")
+               for name in ("CI", "GITHUB_ACTIONS"))
+
+
 class Runner:
     def __init__(self, work: Path):
         self.work = work
 
-    def run(self, args, label, *, stdin=None, env=None, timeout=1800, sensitive=False, allow_failure=False):
+    def run(self, args, label, *, stdin=None, env=None, timeout=1800, sensitive=False,
+            allow_failure=False, include_status=False):
         print(f"→ {label}", flush=True)
         try:
             result = subprocess.run([str(a) for a in args], input=stdin,
@@ -102,13 +110,14 @@ class Runner:
                 write_private(log, result.stdout + result.stderr)
                 raise ReleaseError(f"{label} failed; details: {log}")
             raise ReleaseError(f"{label} failed (credential-tool output withheld).")
+        if include_status:
+            return result.stdout, result.stderr, result.returncode
         return result.stdout, result.stderr
 
 
 class Secrets:
     def __init__(self):
-        self.ci = any(os.environ.get(name, "").lower() not in ("", "0", "false", "no")
-                      for name in ("CI", "GITHUB_ACTIONS"))
+        self.ci = is_ci_environment()
         self.store = None
 
     def get(self, account, variables, *, required=True, strip=True):
@@ -372,6 +381,94 @@ def notarize(state, work, run, auth, save):
         raise ReleaseError(f"Apple has not accepted this app. Submission ID: {state['notary_id']}. Inspect it with notarytool log.")
 
 
+def xcode_signing_certificate(identity, run):
+    if re.fullmatch(r"[A-Fa-f0-9]{40}", identity):
+        return identity.upper()
+    output, _ = run.run(
+        ["/usr/bin/security", "find-identity", "-v", "-p", "codesigning"],
+        "Resolve the Xcode notarization signing certificate", sensitive=True,
+    )
+    pattern = re.compile(r'^\s*\d+\)\s+([A-Fa-f0-9]{40})\s+"([^"]+)"$', re.MULTILINE)
+    matches = [fingerprint.upper() for fingerprint, name in pattern.findall(output.decode(errors="replace"))
+               if name == identity]
+    if len(matches) != 1:
+        raise ReleaseError("The exact Developer ID signing certificate is unavailable for Xcode notarization.")
+    return matches[0]
+
+
+def xcode_notarize(state, work, config, run, save, *,
+                    poll_attempts=XCODE_NOTARY_POLL_ATTEMPTS,
+                    poll_interval=XCODE_NOTARY_POLL_INTERVAL,
+                    max_wait=20 * 60, clock=time.monotonic, sleep=time.sleep):
+    """Use Xcode's signed-in local account to upload and retrieve a notarized app."""
+    if state.get("notary_status") == "Accepted":
+        return
+    archive_text = state.get("package_archive")
+    if not archive_text:
+        raise ReleaseError("The packaging receipt has no Xcode archive path; start a new release.")
+    archive = Path(archive_text)
+    if not archive.is_dir() or not (archive / "Info.plist").is_file():
+        raise ReleaseError("The packaged Xcode archive is missing; restore it before resuming.")
+
+    if not state.get("xcode_notary_submitted"):
+        signing_certificate = xcode_signing_certificate(state["identity"], run)
+        export_options = {
+            "destination": "upload",
+            "manageAppVersionAndBuildNumber": False,
+            "method": "developer-id",
+            "signingCertificate": signing_certificate,
+            "signingStyle": "manual",
+            "teamID": config["team_id"],
+        }
+        options_path = work / "ExportOptions.plist"
+        write_private(options_path, plistlib.dumps(export_options, fmt=plistlib.FMT_XML))
+        upload_path = work / f"xcode-notary-upload-{uuid.uuid4().hex}"
+        run.run([
+            "xcodebuild", "-exportArchive", "-archivePath", archive,
+            "-exportPath", upload_path, "-exportOptionsPlist", options_path,
+            "-allowProvisioningUpdates",
+        ], "Submit archive through the signed-in Xcode account", sensitive=True, timeout=1800)
+        state["xcode_notary_submitted"] = True
+        state["notary_status"] = "In Progress"
+        save()
+
+    attempts = max(1, poll_attempts)
+    deadline = clock() + max_wait
+    for attempt in range(attempts):
+        remaining = deadline - clock()
+        if remaining <= 0:
+            break
+        export_path = work / f"xcode-notarized-{uuid.uuid4().hex}"
+        _, _, status = run.run([
+            "xcodebuild", "-exportNotarizedApp", "-archivePath", archive,
+            "-exportPath", export_path,
+        ], "Check for the notarized app from Xcode", sensitive=True,
+            allow_failure=True, include_status=True, timeout=max(1, min(180, remaining)))
+        if status == 0:
+            entries = list(export_path.iterdir()) if export_path.is_dir() else []
+            if len(entries) != 1 or entries[0].name != "Glassy Host.app" or not entries[0].is_dir():
+                raise ReleaseError("Xcode returned an unexpected notarized-app export.")
+            replacement = work / ".xcode-notarized-Glassy Host.app"
+            if replacement.exists():
+                shutil.rmtree(replacement)
+            run.run(["ditto", entries[0], replacement], "Stage the notarized app returned by Xcode")
+            validate_app(replacement, config, state, run)
+            staged_app = work / "Glassy Host.app"
+            if staged_app.exists():
+                shutil.rmtree(staged_app)
+            os.replace(replacement, staged_app)
+            state["notary_status"] = "Accepted"
+            save()
+            shutil.rmtree(export_path)
+            return
+        if export_path.exists():
+            shutil.rmtree(export_path)
+        remaining = deadline - clock()
+        if attempt + 1 < attempts and remaining > 0:
+            sleep(min(poll_interval, remaining))
+    raise ReleaseError("Apple has not returned the notarized app within 20 minutes. Resume this release to continue checking.")
+
+
 def finalize(state, work, config, run, sparkle_key, save):
     archive = work / f"GlassyHost-{state['version']}.zip"
     if state.get("notary_status") != "Accepted":
@@ -538,8 +635,9 @@ def execute(args):
         state = json.loads((work / "state.json").read_text())
         if state.get("schema") != 1 or state["config"] != config:
             raise ReleaseError("The resume receipt uses a different release configuration or schema.")
-        if args.notes or args.identity or args.work_dir:
-            raise ReleaseError("--resume cannot be combined with --notes, --identity, or --work-dir.")
+        if args.notes or args.identity or args.work_dir or getattr(args, "xcode_notarization", False):
+            raise ReleaseError("--resume cannot be combined with --notes, --identity, --work-dir, or --xcode-notarization.")
+        state.setdefault("notarization_mode", "notarytool")
         if state.get("complete"):
             print(f"Already released: {state['release_url']}")
             return
@@ -552,20 +650,29 @@ def execute(args):
         state = {"schema": 1, "config": config, "id": str(uuid.uuid4()), **metadata,
                  "notes": args.notes.read_text().strip(),
                  "pub_date": email.utils.format_datetime(dt.datetime.now(dt.timezone.utc)),
-                 "identity": args.identity or os.environ.get("GLASSY_HOST_CODESIGN_IDENTITY") or config["identity"]}
+                 "identity": args.identity or os.environ.get("GLASSY_HOST_CODESIGN_IDENTITY") or config["identity"],
+                 "notarization_mode": "xcode" if getattr(args, "xcode_notarization", False) else "notarytool"}
         state["tag"] = f"v{state['version']}"
         state["release_url"] = f"https://github.com/{config['repository']}/releases/tag/{state['tag']}"
         state["download_url"] = f"https://github.com/{config['repository']}/releases/download/{state['tag']}/GlassyHost-{state['version']}.zip"
         work = args.work_dir.resolve() if args.work_dir else ROOT / "dist" / f"publish-{state['version']}-{state['id'][:8]}"
+    if state.get("notarization_mode") not in ("notarytool", "xcode"):
+        raise ReleaseError("The release receipt has an unsupported notarization mode.")
+    if state["notarization_mode"] == "xcode" and is_ci_environment():
+        raise ReleaseError("--xcode-notarization is local-only and cannot run in CI.")
     if args.dry_run:
         print(f"Glassy Host {state['version']} ({state['build']}) → {config['repository']}")
-        print("Compile arm64 + x86_64 → Developer ID sign → notarize → staple → Sparkle sign → GitHub → Pages")
+        notary_label = "signed-in Xcode account" if state["notarization_mode"] == "xcode" else "notarytool API key"
+        print(f"Compile arm64 + x86_64 → Developer ID sign → notarize ({notary_label}) → staple → Sparkle sign → GitHub → Pages")
         print(f"Workspace: {work}\nFeed: {config['feed_url']}")
         print("Dry run: local configuration only; no credentials, compilation, uploads, or remote checks.")
         return
     if sys.platform != "darwin":
         raise ReleaseError("Releasing requires macOS with Xcode, Python 3, and Node/npm.")
-    for tool in ("swift", "xcrun", "security", "npx"):
+    tools = ["swift", "xcrun", "security", "npx"]
+    if state["notarization_mode"] == "xcode":
+        tools.append("xcodebuild")
+    for tool in tools:
         if not shutil.which(tool):
             raise ReleaseError(f"Required release tool is missing: {tool}.")
     if not args.resume:
@@ -600,7 +707,10 @@ def execute(args):
             state["distribution_base"] = ref["object"]["sha"]
             save()
         run = Runner(work)
-        auth_context = notary_auth(credentials) if state.get("notary_status") != "Accepted" else contextlib.nullcontext([])
+        uses_xcode_notary = state["notarization_mode"] == "xcode"
+        auth_context = (notary_auth(credentials)
+                        if not uses_xcode_notary and state.get("notary_status") != "Accepted"
+                        else contextlib.nullcontext([]))
         with auth_context as auth:
             if not state.get("packaged"):
                 manifest = work / "package.json"
@@ -616,14 +726,22 @@ def execute(args):
                     shutil.rmtree(app)
                 run.run(["ditto", source_app, app], "Stage app for notarization")
                 shutil.copyfile(package["submission_zip"], work / "submission.zip")
+                package_archive = package.get("archive")
+                if uses_xcode_notary and not package_archive:
+                    raise ReleaseError("The packaging manifest has no Xcode archive path.")
                 state.update(packaged=True, sparkle_tools=package["sparkle_tools"],
                              submission_sha256=digest(work / "submission.zip"))
+                if package_archive:
+                    state["package_archive"] = str(Path(package_archive).resolve())
                 save()
             if not state.get("sha256"):
-                if digest(work / "submission.zip") != state["submission_sha256"]:
-                    raise ReleaseError("The notarization submission ZIP changed since packaging.")
                 validate_app(work / "Glassy Host.app", config, state, run)
-                notarize(state, work, run, auth, save)
+                if uses_xcode_notary:
+                    xcode_notarize(state, work, config, run, save)
+                else:
+                    if digest(work / "submission.zip") != state["submission_sha256"]:
+                        raise ReleaseError("The notarization submission ZIP changed since packaging.")
+                    notarize(state, work, run, auth, save)
         archive = finalize(state, work, config, run, sparkle_key, save)
         # Recheck immediately before publication in case another release advanced the feed.
         feed, _ = github.content(config["feed_path"])
@@ -645,6 +763,8 @@ def main(argv=None):
     parser.add_argument("--work-dir", type=Path, help="New directory for artifacts and resumable state")
     parser.add_argument("--resume", type=Path, help="Continue an existing release without rebuilding")
     parser.add_argument("--dry-run", action="store_true", help="Inspect the local release plan without side effects")
+    parser.add_argument("--xcode-notarization", action="store_true",
+                        help="Local only: notarize through the developer account signed into Xcode")
     parser.add_argument("--config", type=Path, default=ROOT / "script/host-release.json")
     args = parser.parse_args(argv)
     try:

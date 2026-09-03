@@ -36,7 +36,15 @@ Use a fine-grained GitHub PAT or GitHub App token with **Contents: write** on `B
 
 The Cloudflare token needs **Account → Cloudflare Pages → Edit**, scoped to the account hosting `glassydesk-host`. Supply `CLOUDFLARE_ACCOUNT_ID` through local configuration or a CI variable. See [Cloudflare's CI direct-upload guide](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/).
 
-For notarization, provide the `.p8` private key plus `NOTARY_KEY_ID`. Team API keys also require `NOTARY_ISSUER_ID`; omit the issuer for individual API keys. Locally, `NOTARY_KEY_PATH` can point to the private PEM file instead of supplying its contents. An existing `NOTARY_KEYCHAIN_PROFILE`, with optional `NOTARY_KEYCHAIN`, is another local option if it is already accessible without an authentication dialog. CI should supply the API key through its secret environment. Apple documents the submission process in [Notarization with notarytool](https://developer.apple.com/documentation/technotes/tn3147-migrating-to-the-latest-notarization-tool).
+For notarization, provide the `.p8` private key plus `NOTARY_KEY_ID`. Team API keys also require `NOTARY_ISSUER_ID`; omit the issuer for individual API keys. Locally, `NOTARY_KEY_PATH` can point to the private PEM file instead of supplying its contents. An existing `NOTARY_KEYCHAIN_PROFILE`, with optional `NOTARY_KEYCHAIN`, is another local option if it is already accessible without an authentication dialog. This `notarytool` path is the default and is required in CI. Apple documents the submission process in [Notarization with notarytool](https://developer.apple.com/documentation/technotes/tn3147-migrating-to-the-latest-notarization-tool).
+
+On a development Mac that is already signed into the correct Apple developer account in Xcode, a local fallback can use that account without a `.p8` key:
+
+```sh
+./script/release_host.sh --notes /path/to/release-notes.md --xcode-notarization
+```
+
+This mode creates a private `ExportOptions.plist`, submits the packaged archive with `xcodebuild -exportArchive`, and checks for the notarized app for up to 20 minutes before asking you to resume. It is local-only: the script rejects it whenever `CI` or `GITHUB_ACTIONS` is enabled. The account must already be authenticated in Xcode, and the exact Developer ID certificate used to package the app must remain available. Use an API key for repeatable CI releases.
 
 ### Save local credentials once
 
@@ -110,7 +118,7 @@ If a run stops after packaging completed, correct the reported problem and resum
 ./script/release_host.sh --resume /path/to/existing-release-workspace
 ```
 
-Resume uses the saved release state and the same artifact; it never recompiles. Keep the workspace contents and release configuration intact, and make the credentials needed for the remaining stages available again. Do not combine `--resume` with `--notes`, `--identity`, or `--work-dir`.
+Resume uses the saved release state and the same artifact; it never recompiles. Keep the workspace contents, the packaged `.xcarchive`, and the release configuration intact, and make the credentials needed for the remaining stages available again. The receipt remembers whether the run uses `notarytool` or the signed-in Xcode account, so resume without repeating `--xcode-notarization`. Do not combine `--resume` with `--notes`, `--identity`, `--work-dir`, or `--xcode-notarization`.
 
 If credentials, preflight, or compilation failed before a completed packaging receipt (`package.json`) was created, resume refuses to continue. Correct the problem and start a new run with `--notes` and a new workspace. Once an artifact is published, use resume to finish that release; do not replace its signed asset or start a separate release under the same version. Subsequent source changes require a new version and build.
 

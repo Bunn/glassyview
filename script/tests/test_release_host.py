@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -381,6 +382,106 @@ class NotarizationTests(SyntheticCase):
         self.assertEqual(self.saved[-1]["notary_status"], "Invalid")
 
 
+class XcodeNotarizationTests(SyntheticCase):
+    def prepare_xcode_state(self, *, submitted=False):
+        archive = self.work / "GlassyHost.xcarchive"
+        archive.mkdir()
+        (archive / "Info.plist").write_bytes(plistlib.dumps({"ArchiveVersion": 2}))
+        (self.work / "Glassy Host.app").mkdir()
+        self.state.update(
+            notarization_mode="xcode",
+            package_archive=str(archive),
+            xcode_notary_submitted=submitted,
+            notary_status="In Progress" if submitted else None,
+        )
+        return archive
+
+    def successful_runner(self, events):
+        identity = CONFIG["identity"]
+        fingerprint = "A" * 40
+
+        def command(args, label, **kwargs):
+            events.append(label)
+            if label == "Resolve the Xcode notarization signing certificate":
+                return f'  1) {fingerprint} "{identity}"\n'.encode(), b""
+            if label == "Check for the notarized app from Xcode":
+                export_path = Path(args[args.index("-exportPath") + 1])
+                (export_path / "Glassy Host.app").mkdir(parents=True)
+                return b"", b"", 0
+            if label == "Stage the notarized app returned by Xcode":
+                shutil.copytree(Path(args[1]), Path(args[2]))
+            return b"", b""
+
+        runner = Mock()
+        runner.run.side_effect = command
+        return runner
+
+    def test_xcode_submission_then_export_precede_acceptance(self):
+        archive = self.prepare_xcode_state()
+        events = []
+        runner = self.successful_runner(events)
+        with patch.object(release, "validate_app", side_effect=lambda *a: events.append("Validate returned app")):
+            release.xcode_notarize(self.state, self.work, CONFIG, runner, self.save,
+                                   poll_attempts=1, poll_interval=0)
+
+        self.assertEqual(events, [
+            "Resolve the Xcode notarization signing certificate",
+            "Submit archive through the signed-in Xcode account",
+            "Check for the notarized app from Xcode",
+            "Stage the notarized app returned by Xcode",
+            "Validate returned app",
+        ])
+        submit = runner.run.call_args_list[1].args[0]
+        self.assertEqual(submit[:4], ["xcodebuild", "-exportArchive", "-archivePath", archive])
+        self.assertIn("-allowProvisioningUpdates", submit)
+        options = plistlib.loads((self.work / "ExportOptions.plist").read_bytes())
+        self.assertEqual(options, {
+            "destination": "upload", "manageAppVersionAndBuildNumber": False,
+            "method": "developer-id", "signingCertificate": "A" * 40,
+            "signingStyle": "manual", "teamID": CONFIG["team_id"],
+        })
+        self.assertTrue(self.state["xcode_notary_submitted"])
+        self.assertEqual(self.state["notary_status"], "Accepted")
+
+    def test_resume_after_submission_never_submits_again(self):
+        self.prepare_xcode_state(submitted=True)
+        events = []
+        runner = self.successful_runner(events)
+        with patch.object(release, "validate_app"):
+            release.xcode_notarize(self.state, self.work, CONFIG, runner, self.save,
+                                   poll_attempts=1, poll_interval=0)
+        self.assertNotIn("Submit archive through the signed-in Xcode account", events)
+        self.assertNotIn("Resolve the Xcode notarization signing certificate", events)
+        self.assertEqual(events[0], "Check for the notarized app from Xcode")
+
+    def test_failed_export_stays_resumable_and_cannot_finalize(self):
+        self.prepare_xcode_state(submitted=True)
+        runner = Mock()
+        runner.run.return_value = (b"", b"synthetic pending", 1)
+        with self.assertRaisesRegex(release.ReleaseError, "Resume"):
+            release.xcode_notarize(self.state, self.work, CONFIG, runner, self.save,
+                                   poll_attempts=1, poll_interval=0)
+        self.assertEqual(self.state["notary_status"], "In Progress")
+        self.assertFalse(any(call.args[1] == "Stage the notarized app returned by Xcode"
+                             for call in runner.run.call_args_list))
+        with self.assertRaisesRegex(release.ReleaseError, "accepted"):
+            release.finalize(self.state, self.work, CONFIG, FakeRunner(), PRIVATE_KEY, self.save)
+
+    def test_ci_rejects_saved_xcode_mode_before_credentials_or_commands(self):
+        self.prepare_xcode_state()
+        self.state["packaged"] = True
+        (self.work / "state.json").write_text(json.dumps(self.state))
+        args = argparse.Namespace(config=Path("synthetic-config"), resume=self.work, notes=None,
+                                  identity=None, work_dir=None, dry_run=False,
+                                  xcode_notarization=False)
+        with patch.dict(os.environ, {"CI": "true"}), \
+             patch.object(release, "read_config", return_value=CONFIG), \
+             patch.object(release, "Secrets", side_effect=AssertionError("credentials accessed")):
+            with self.assertRaisesRegex(release.ReleaseError, "local-only"):
+                release.execute(args)
+        self.process.assert_not_called()
+
+
 class AssetPublicationTests(SyntheticCase):
     def test_unknown_existing_release_is_never_modified(self):
         github = FakeGitHub(self.state, body="A release created outside this run")
@@ -561,6 +662,8 @@ class EnvironmentAndDryRunTests(SyntheticCase):
                                            "--work-dir", str(output_work)])
         self.assertEqual(status, 0, output.getvalue())
         self.assertIn("Dry run", output.getvalue())
+        self.assertIn("notarytool API key", output.getvalue())
+        self.assertNotIn("signed-in Xcode account", output.getvalue())
         self.assertFalse(output_work.exists())
         self.process.assert_not_called()
         self.keychain.assert_not_called()
