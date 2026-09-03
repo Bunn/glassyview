@@ -57,30 +57,13 @@ The script embeds and signs Sparkle and its helpers with the host's signing iden
 
 ### Package a release
 
-From the private source repository, increment `CFBundleShortVersionString` and `CFBundleVersion` in `GlassyHost/Support/Info.plist`, run the host tests, then package using an exact Developer ID Application identity:
+Follow [Release Glassy Host](../docs/macos-release.md) for credential setup, versioning, recovery, and a manual CI example. From the source repository, the release command builds and signs the universal app, notarizes and staples it, signs the final archive with Sparkle, and publishes the GitHub release and Cloudflare Pages feed:
 
 ```sh
-bash script/package_host_release.sh "Developer ID Application: Fernando Bunn (B2RUA6XMHC)"
+./script/release_host.sh --notes /path/to/release-notes.md
 ```
 
-The script builds a universal Apple silicon/Intel app for macOS 14+, signs the app and Sparkle helpers with hardened runtime and secure timestamps, and verifies their signatures. Each run creates a new `dist/host-release.*` directory containing `GlassyHost.xcarchive` and a `*-notarization.zip` submission archive. It uses Keychain pairing storage and includes Sparkle's license. It does not install, launch, notarize, or publish anything.
-
-Open the `.xcarchive` in Xcode Organizer, choose **Distribute App → Direct Distribution**, and submit with the signed-in developer account. Wait until Xcode reports **Ready to distribute**, then export into a new directory. Only proceed after notarization succeeds; the packaging script's ZIP is not a finished release.
-
-Staple and verify the exported app, then create a fresh ZIP from that app (replace the example paths and version/build):
-
-```sh
-xcrun stapler staple "/path/to/export/Glassy Host.app"
-xcrun stapler validate "/path/to/export/Glassy Host.app"
-codesign --verify --deep --strict --verbose=2 "/path/to/export/Glassy Host.app"
-spctl --assess --type execute --verbose=2 "/path/to/export/Glassy Host.app"
-ditto -c -k --sequesterRsrc --keepParent "/path/to/export/Glassy Host.app" "/path/to/GlassyHost-0.1.2.zip"
-GlassyHost/.build/artifacts/sparkle/Sparkle/bin/sign_update --account dev.bunn.glassydesk.host "/path/to/GlassyHost-0.1.2.zip"
-```
-
-Upload that exact, final ZIP to a versioned GitHub Release in `Bunn/GlassyDesk-Host`. The appcast enclosure must use its version-specific asset URL, for example `https://github.com/Bunn/GlassyDesk-Host/releases/download/v0.1.2/GlassyHost-0.1.2.zip`, along with the final archive's Sparkle signature and byte length. Never replace the ZIP after signing it or use a moving `latest` URL. `generate_appcast` can also generate entries using the same `--account dev.bunn.glassydesk.host` Keychain account.
-
-Publish and verify the binary download before updating the public repository's `glassy-host/appcast.xml`. Then deploy the public repository's two-file site directly to Cloudflare Pages project `glassydesk-host` and verify the live feed; a Git push alone does not deploy this direct-upload Pages project. Keep these developer instructions, source code, certificates, and private keys out of the public distribution repository.
+Increment both version and build in `Support/Info.plist` before a new release. The automation does not bump versions or commit or push source changes. The lower-level `package_host_release.sh` remains available for packaging only; its notarization ZIP is not a finished release.
 
 ## Software updates
 
@@ -101,4 +84,4 @@ The production feed is published in the public distribution repository at `glass
 
 The public distribution repository is `Bunn/GlassyDesk-Host`. It contains only `glassy-host/appcast.xml` and `_headers`. Signed, notarized app archives belong in that repository's GitHub Releases, not its Git tree, and the feed must reference version-specific release asset URLs. Keep source code and private signing keys out of the public repository. Back up the signing Keychain securely before distributing releases.
 
-A requested install-and-relaunch waits while authenticated remote sessions are connected, then resumes after the last client disconnects, even with the dashboard and menus closed. A canceled update discards its pending installation. Explicitly quitting the app remains allowed; Sparkle retains its standard install-on-quit behavior. Hosting uses Cloudflare Pages and GitHub Releases; R2 is not required. Pages currently uses direct uploads, so pushing the public repository alone does not deploy feed changes. Release packaging, notarization, and publication remain a manual workflow as described above.
+A requested install-and-relaunch waits while authenticated remote sessions are connected, then resumes after the last client disconnects, even with the dashboard and menus closed. A canceled update discards its pending installation. Explicitly quitting the app remains allowed; Sparkle retains its standard install-on-quit behavior. Hosting uses Cloudflare Pages and GitHub Releases; R2 is not required. Pages uses direct uploads, so pushing the public repository alone does not deploy feed changes. The [release automation](../docs/macos-release.md) handles packaging, notarization, publication, and direct deployment.

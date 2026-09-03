@@ -11,6 +11,10 @@ Starter iOS client for macOS Screen Sharing (VNC/RFB), built on [RoyalVNC](https
 
 On the target Mac: System Settings → General → Sharing → enable **Screen Sharing**.
 
+## macOS companion
+
+[Glassy Host](GlassyHost/README.md) provides authenticated Glassy Stream connections. See [Release Glassy Host](docs/macos-release.md) for the one-command build, notarization, Sparkle signing, and publication workflow, including local credentials and a manual CI example.
+
 ## What's included
 
 - **Bonjour discovery** of `_rfb._tcp` services. Each discovered Mac is eagerly resolved to an IPv4 address (shown in the row); tapping fills host + port.

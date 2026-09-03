@@ -1,0 +1,13 @@
+{
+  "bundle_id": "dev.bunn.glassydesk.host",
+  "team_id": "B2RUA6XMHC",
+  "identity": "Developer ID Application: Fernando Bunn (B2RUA6XMHC)",
+  "sparkle_public_key": "ipAMEzRnoCI5mU96B1X14pX/XJJFShB7NlVpJwIG+Yg=",
+  "repository": "Bunn/GlassyDesk-Host",
+  "branch": "main",
+  "feed_path": "glassy-host/appcast.xml",
+  "feed_url": "https://glassydesk-host.pages.dev/glassy-host/appcast.xml",
+  "pages_project": "glassydesk-host",
+  "cloudflare_account_id": "",
+  "wrangler_version": "4.128.0"
+}

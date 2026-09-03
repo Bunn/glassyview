@@ -1,27 +1,75 @@
 #!/usr/bin/env bash
+set +x
 set -euo pipefail
 
 # Prepare a Developer ID-signed universal app for notarization. This script never
 # installs, launches, notarizes, publishes, or removes an existing artifact.
 usage() {
-  printf 'Usage: %s [Developer ID Application identity name or SHA-1]\n' "$0"
+  printf 'Usage: %s [--output-manifest PATH] [Developer ID Application identity name or SHA-1]\n' "$0"
   printf 'Alternatively set GLASSY_HOST_CODESIGN_IDENTITY. Outputs go into a new dist/host-release.* directory.\n'
+  printf 'Set GLASSY_HOST_KEYCHAIN to use one explicit signing keychain without changing the search list.\n'
+  printf 'The optional JSON manifest is created after successful packaging; its parent must exist and the file must not.\n'
 }
 
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-  usage
-  exit 0
-fi
-if [[ "$#" -gt 1 ]]; then
-  usage >&2
-  exit 2
-fi
+OUTPUT_MANIFEST=""
+POSITIONAL_IDENTITY=""
+HAS_POSITIONAL_IDENTITY=false
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --output-manifest)
+      if [[ "$#" -lt 2 || -z "$2" || "$2" == --* || -n "$OUTPUT_MANIFEST" ]]; then
+        printf 'Provide exactly one nonempty PATH after --output-manifest.\n' >&2
+        exit 2
+      fi
+      OUTPUT_MANIFEST="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      if [[ "$#" -gt 1 || ( "$#" -eq 1 && "$HAS_POSITIONAL_IDENTITY" == true ) ]]; then
+        usage >&2
+        exit 2
+      fi
+      if [[ "$#" -eq 1 ]]; then
+        POSITIONAL_IDENTITY="$1"
+        HAS_POSITIONAL_IDENTITY=true
+        shift
+      fi
+      ;;
+    -*)
+      printf 'Unknown option: %s\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      if [[ "$HAS_POSITIONAL_IDENTITY" == true ]]; then
+        usage >&2
+        exit 2
+      fi
+      POSITIONAL_IDENTITY="$1"
+      HAS_POSITIONAL_IDENTITY=true
+      shift
+      ;;
+  esac
+done
 
-REQUESTED_IDENTITY="${1:-${GLASSY_HOST_CODESIGN_IDENTITY:-}}"
+REQUESTED_IDENTITY="${POSITIONAL_IDENTITY:-${GLASSY_HOST_CODESIGN_IDENTITY:-}}"
 if [[ -z "$REQUESTED_IDENTITY" ]]; then
   printf 'A Developer ID Application signing identity is required.\n' >&2
   usage >&2
   exit 2
+fi
+if [[ -n "$OUTPUT_MANIFEST" ]]; then
+  MANIFEST_PARENT="$(dirname "$OUTPUT_MANIFEST")"
+  if [[ ! -d "$MANIFEST_PARENT" || -e "$OUTPUT_MANIFEST" || -L "$OUTPUT_MANIFEST" || "$OUTPUT_MANIFEST" == */ ]]; then
+    printf 'The output manifest must be a new file in an existing directory.\n' >&2
+    exit 2
+  fi
+  OUTPUT_MANIFEST="$(cd "$MANIFEST_PARENT" && pwd)/$(basename "$OUTPUT_MANIFEST")"
 fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -35,7 +83,18 @@ ICON="$PACKAGE_DIR/Resources/GlassyHostAppIcon.icns"
 
 # Resolve only an exact, usable Developer ID Application identity. Never fall
 # back to development or ad-hoc signing, and sign by hash to avoid ambiguity.
-VALID_IDENTITIES="$(/usr/bin/security find-identity -v -p codesigning)"
+IDENTITY_COMMAND=(/usr/bin/security find-identity -v -p codesigning)
+SIGNING_COMMAND=(/usr/bin/codesign)
+if [[ -n "${GLASSY_HOST_KEYCHAIN:-}" ]]; then
+  if [[ ! -f "$GLASSY_HOST_KEYCHAIN" ]]; then
+    printf 'GLASSY_HOST_KEYCHAIN must name an existing keychain file.\n' >&2
+    exit 2
+  fi
+  KEYCHAIN_PATH="$(cd "$(dirname "$GLASSY_HOST_KEYCHAIN")" && pwd)/$(basename "$GLASSY_HOST_KEYCHAIN")"
+  IDENTITY_COMMAND+=("$KEYCHAIN_PATH")
+  SIGNING_COMMAND+=(--keychain "$KEYCHAIN_PATH")
+fi
+VALID_IDENTITIES="$("${IDENTITY_COMMAND[@]}")"
 IDENTITY_PATTERN='^[[:space:]]*[0-9]+\)[[:space:]]+([[:xdigit:]]{40})[[:space:]]+"(Developer ID Application: .+)"$'
 REQUESTED_HASH="$(printf '%s' "$REQUESTED_IDENTITY" | /usr/bin/tr '[:lower:]' '[:upper:]')"
 IDENTITY_COUNT=0
@@ -135,7 +194,7 @@ for sparkle_code in \
   "$SPARKLE_FRAMEWORK/Versions/Current/XPCServices/Downloader.xpc" \
   "$SPARKLE_FRAMEWORK/Versions/Current/XPCServices/Installer.xpc" \
   "$SPARKLE_FRAMEWORK"; do
-  /usr/bin/codesign \
+  "${SIGNING_COMMAND[@]}" \
     --force \
     --sign "$SIGNING_IDENTITY" \
     --options runtime \
@@ -144,7 +203,7 @@ for sparkle_code in \
     "$sparkle_code"
   /usr/bin/codesign --verify --strict "$sparkle_code"
 done
-/usr/bin/codesign \
+"${SIGNING_COMMAND[@]}" \
   --force \
   --sign "$SIGNING_IDENTITY" \
   --identifier "$BUNDLE_ID" \
@@ -194,5 +253,22 @@ if [[ -d "$BUILD_DIR/$APP_NAME.dSYM" ]]; then
 fi
 
 /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$SUBMISSION_ZIP"
+if [[ -n "$OUTPUT_MANIFEST" ]]; then
+  # Build JSON through plutil so paths with quotes or Unicode remain valid.
+  # Publish without overwriting a manifest created by a concurrent invocation.
+  MANIFEST_TEMP="$(mktemp "$OUTPUT_MANIFEST.tmp.XXXXXX")"
+  trap 'rm -f "$MANIFEST_TEMP"' EXIT
+  /usr/bin/plutil -create xml1 "$MANIFEST_TEMP"
+  /usr/bin/plutil -insert app -string "$APP_BUNDLE" "$MANIFEST_TEMP"
+  /usr/bin/plutil -insert archive -string "$ARCHIVE" "$MANIFEST_TEMP"
+  /usr/bin/plutil -insert submission_zip -string "$SUBMISSION_ZIP" "$MANIFEST_TEMP"
+  /usr/bin/plutil -insert version -string "$VERSION" "$MANIFEST_TEMP"
+  /usr/bin/plutil -insert build -string "$BUILD_NUMBER" "$MANIFEST_TEMP"
+  /usr/bin/plutil -insert sparkle_tools -string "$SPARKLE_ARTIFACT/bin" "$MANIFEST_TEMP"
+  /usr/bin/plutil -convert json "$MANIFEST_TEMP"
+  ln -h "$MANIFEST_TEMP" "$OUTPUT_MANIFEST"
+  rm -f "$MANIFEST_TEMP"
+  trap - EXIT
+fi
 printf '\nSigned app: %s\nXcode archive: %s\nNotarization submission ZIP: %s\n' "$APP_BUNDLE" "$ARCHIVE" "$SUBMISSION_ZIP"
 printf 'Not yet notarized or ready to publish. After acceptance, staple and validate the app, then create and Sparkle-sign a fresh download ZIP.\n'
