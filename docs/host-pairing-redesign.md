@@ -11,6 +11,8 @@ Glassy Host now uses a native macOS sidebar with Connections and Display & Contr
 
 The custom QR code uses an opaque, high-contrast surface, rounded modules, a small display mark, and a four-module quiet zone. Before presentation, Vision verifies that the image decodes to the exact invitation; simpler QR styles are fallback options. Codes refresh automatically every minute. Credentials are passed through the existing authenticated, encrypted handshake and are never logged by the QR flow.
 
+If an older Glassy Desk build reports that the QR code is invalid, enable **Older Glassy Desk** below the QR code on the Mac. This generates a version 1 invitation over the preferred active route; when Tailscale is available, its address is preferred. Current clients should use the default QR so they can validate the Mac identity and choose automatically among LAN and VPN routes.
+
 The versioned invitation is `glassydesk://pair`. Version 2 includes `v`, `host`, `port`, `name`, `code`, `expires`, and `id` (the 16-byte host identifier in canonical base64), plus up to seven repeated `alt` host fields. Addresses share the advertised port. The client strictly validates fields, host identity, address count, total size, and expiry; it continues accepting version 1 invitations. Scanning stays inside the app and requires an explicit connection confirmation; the invitation is not registered as a system URL handler.
 
 ## Local networks and VPNs

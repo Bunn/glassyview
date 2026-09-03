@@ -29,6 +29,41 @@ struct GlassyHostPairingInvitationTests {
         #expect(invitation.host == host)
     }
 
+    @Test
+    func parsesCurrentHostVersionTwoPayloadAcrossLANAndTailscale() throws {
+        let identifier = Data([0xfb, 0xff, 0xfb, 0xff, 0xfb, 0xff, 0xfb, 0xff,
+                               0xfb, 0xff, 0xfb, 0xff, 0xfb, 0xff, 0xfb, 0xff])
+        let invitation = try GlassyHostPairingInvitation(
+            scannedValue: versionTwo(
+                identifier: identifier.base64EncodedString(),
+                host: "100.102.22.80",
+                alternates: ["192.168.1.24", "fd7a:115c:a1e0::2", "Studio-Mac.local"]
+            ),
+            now: now
+        )
+
+        #expect(invitation.expectedHostIdentifier == identifier)
+        #expect(invitation.addresses.map(\.host) == [
+            "100.102.22.80", "192.168.1.24", "fd7a:115c:a1e0::2", "Studio-Mac.local"
+        ])
+    }
+
+    @Test(arguments: ["3", "42", "18446744073709551615"])
+    func reportsUnsupportedPairingVersions(version: String) {
+        let value = valid.replacingOccurrences(of: "v=1", with: "v=\(version)")
+        #expect(throws: GlassyHostPairingInvitation.ValidationError.unsupportedVersion) {
+            try GlassyHostPairingInvitation(scannedValue: value, now: now)
+        }
+    }
+
+    @Test(arguments: ["0", "03", "-1", "+3", "three", "18446744073709551616"])
+    func malformedPairingVersionsRemainInvalid(version: String) {
+        let value = valid.replacingOccurrences(of: "v=1", with: "v=\(version)")
+        #expect(throws: GlassyHostPairingInvitation.ValidationError.invalidCode) {
+            try GlassyHostPairingInvitation(scannedValue: value, now: now)
+        }
+    }
+
     @Test(arguments: [
         "v=2", "host=mac.local&host=other.local", "host=", "host=mac.local:51515",
         "host=bad%2Fpath", "host=bad%40address", "host=-invalid.local", "host=bad..local",
@@ -146,12 +181,20 @@ struct GlassyHostPairingInvitationTests {
         }
     }
 
-    private func versionTwo(identifier: String = "AAAAAAAAAAAAAAAAAAAAAA==", alternates: [String] = []) -> String {
+    private func versionTwo(identifier: String = "AAAAAAAAAAAAAAAAAAAAAA==",
+                            host: String = "Studio-Mac.local",
+                            alternates: [String] = []) -> String {
         var components = URLComponents(string: valid)!
         components.queryItems = components.queryItems!.map {
-            $0.name == "v" ? URLQueryItem(name: "v", value: "2") : $0
+            switch $0.name {
+            case "v": URLQueryItem(name: "v", value: "2")
+            case "host": URLQueryItem(name: "host", value: host)
+            default: $0
+            }
         } + [URLQueryItem(name: "id", value: identifier)]
             + alternates.map { URLQueryItem(name: "alt", value: $0) }
+        components.percentEncodedQuery = components.percentEncodedQuery?
+            .replacingOccurrences(of: "+", with: "%2B")
         return components.url!.absoluteString
     }
 }

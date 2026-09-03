@@ -17,6 +17,7 @@ struct GlassyHostPairingInvitation: Equatable, Sendable {
     enum ValidationError: LocalizedError, Equatable {
         case invalidCode
         case expired
+        case unsupportedVersion
 
         var errorDescription: String? {
             switch self {
@@ -24,6 +25,8 @@ struct GlassyHostPairingInvitation: Equatable, Sendable {
                 String(localized: "This isn’t a valid Glassy Host pairing QR code. Scan the code displayed in Glassy Host on your Mac.")
             case .expired:
                 String(localized: "This pairing code has expired. Scan the current QR code on your Mac.")
+            case .unsupportedVersion:
+                String(localized: "This Glassy Host uses a newer pairing format. Update Glassy Desk, then scan the QR code again.")
             }
         }
     }
@@ -46,8 +49,13 @@ struct GlassyHostPairingInvitation: Equatable, Sendable {
 
         let versionItems = items.filter { $0.name == "v" }
         guard versionItems.count == 1,
-              let version = versionItems[0].value,
-              version == "1" || version == "2" else { throw ValidationError.invalidCode }
+              let version = versionItems[0].value else { throw ValidationError.invalidCode }
+        guard version == "1" || version == "2" else {
+            guard Self.isCanonicalPositiveInteger(version) else {
+                throw ValidationError.invalidCode
+            }
+            throw ValidationError.unsupportedVersion
+        }
         let requiredKeys: Set<String> = version == "1"
             ? ["v", "host", "port", "name", "code", "expires"]
             : ["v", "host", "port", "name", "code", "expires", "id"]
@@ -134,6 +142,13 @@ struct GlassyHostPairingInvitation: Equatable, Sendable {
 
     private static func isASCIIDigits(_ value: String) -> Bool {
         !value.isEmpty && value.utf8.allSatisfy { (48...57).contains($0) }
+    }
+
+    private static func isCanonicalPositiveInteger(_ value: String) -> Bool {
+        guard value.utf8.count <= 20,
+              isASCIIDigits(value),
+              let number = UInt64(value), number > 0 else { return false }
+        return String(number) == value
     }
 
     private static func isValidHost(_ host: String) -> Bool {

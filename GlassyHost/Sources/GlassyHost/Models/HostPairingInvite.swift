@@ -26,12 +26,32 @@ struct HostPairingInvite: Equatable, Sendable {
     /// Versioned URL understood by the client's in-app pairing scanner.
     /// Invalid fields fail closed instead of producing a partially usable invite.
     var urlString: String? {
-        let hosts = [host] + alternateHosts
+        urlString(format: .current)
+    }
+
+    /// Version 1 uses only the preferred route so Glassy Desk releases that
+    /// predate multi-route invitations can still scan the current pairing code.
+    var legacyURLString: String? {
+        urlString(format: .legacy)
+    }
+
+    private enum Format {
+        case current, legacy
+
+        var version: String {
+            switch self {
+            case .current: "2"
+            case .legacy: "1"
+            }
+        }
+    }
+
+    private func urlString(format: Format) -> String? {
+        let hosts = format == .current ? [host] + alternateHosts : [host]
         let normalizedHosts = hosts.compactMap(HostPairingHostAddress.normalized)
         guard hosts.count <= HostPairingAddressPolicy.maximumAddresses,
               normalizedHosts.count == hosts.count,
               Set(normalizedHosts).count == hosts.count,
-              hostIdentifier.count == HostProtocol.identifierLength,
               port > 0,
               !name.isEmpty,
               name == name.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -51,18 +71,30 @@ struct HostPairingInvite: Equatable, Sendable {
         guard expiration.isFinite, expiration > 0,
               expiration < Double(Int64.max) else { return nil }
 
+        if format == .current,
+           hostIdentifier.count != HostProtocol.identifierLength {
+            return nil
+        }
+
         var components = URLComponents()
         components.scheme = "glassydesk"
         components.host = "pair"
         components.queryItems = [
-            URLQueryItem(name: "v", value: "2"),
+            URLQueryItem(name: "v", value: format.version),
             URLQueryItem(name: "host", value: normalizedHosts[0]),
             URLQueryItem(name: "port", value: String(port)),
             URLQueryItem(name: "name", value: name),
             URLQueryItem(name: "code", value: code),
-            URLQueryItem(name: "expires", value: String(Int64(expiration))),
-            URLQueryItem(name: "id", value: hostIdentifier.base64EncodedString())
-        ] + normalizedHosts.dropFirst().map { URLQueryItem(name: "alt", value: $0) }
+            URLQueryItem(name: "expires", value: String(Int64(expiration)))
+        ]
+        if format == .current {
+            components.queryItems?.append(
+                URLQueryItem(name: "id", value: hostIdentifier.base64EncodedString())
+            )
+            components.queryItems?.append(contentsOf: normalizedHosts.dropFirst().map {
+                URLQueryItem(name: "alt", value: $0)
+            })
+        }
         // Preserve standard base64 even if a QR handoff passes through a
         // query decoder that treats an unescaped plus as a form-style space.
         components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")

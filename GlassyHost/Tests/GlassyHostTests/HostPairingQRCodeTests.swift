@@ -30,6 +30,46 @@ func pairingInviteURLRoundTrip() throws {
     #expect(fields.count == 7)
 }
 
+@Test("Default pairing invitations remain version 2 with every route")
+func pairingInviteDefaultRemainsVersionTwo() throws {
+    let invite = HostPairingInvite(
+        host: "100.102.22.80", port: 51_515, name: "Studio Mac",
+        code: "ABCDEFGH2345", expiresAt: inviteExpiry,
+        hostIdentifier: inviteHostIdentifier,
+        alternateHosts: ["192.168.1.42", "studio.local"]
+    )
+    let url = try #require(invite.urlString)
+    let items = try #require(URLComponents(string: url)?.queryItems)
+
+    #expect(items.first { $0.name == "v" }?.value == "2")
+    #expect(items.first { $0.name == "id" }?.value == inviteHostIdentifier.base64EncodedString())
+    #expect(items.filter { $0.name == "alt" }.compactMap(\.value) == ["192.168.1.42", "studio.local"])
+}
+
+@Test("Legacy pairing invitations use exactly the six version 1 fields and remain camera-readable")
+func legacyPairingInviteRoundTrip() throws {
+    let invite = HostPairingInvite(
+        host: "100.102.22.80", port: 51_515, name: "Áine’s Mac + Display",
+        code: "ABCDEFGH2345", expiresAt: inviteExpiry,
+        hostIdentifier: inviteHostIdentifier,
+        alternateHosts: ["192.168.1.42", "fd7a:115c:a1e0::42", "studio.local"]
+    )
+    let url = try #require(invite.legacyURLString)
+    let items = try #require(URLComponents(string: url)?.queryItems)
+    let fields = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value) })
+
+    #expect(items.map(\.name) == ["v", "host", "port", "name", "code", "expires"])
+    #expect(fields["v"] == "1")
+    #expect(fields["host"] == "100.102.22.80")
+    #expect(fields["port"] == "51515")
+    #expect(fields["name"] == invite.name)
+    #expect(fields["code"] == invite.code)
+    #expect(fields["expires"] == "2000000000")
+    #expect(fields["id"] == nil)
+    #expect(fields["alt"] == nil)
+    try expectDecodablePairingQR(url)
+}
+
 @Test("Pairing invitations reject unusable endpoint and credential fields")
 func pairingInviteValidation() {
     func invite(host: String = "studio.local", port: UInt16 = 51_515, name: String = "Studio Mac", code: String = "ABCDEFGH2345", expiresAt: Date = inviteExpiry) -> HostPairingInvite {

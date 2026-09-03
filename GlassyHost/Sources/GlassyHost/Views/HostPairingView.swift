@@ -8,6 +8,7 @@ struct HostPairingView: View {
     let controller: HostController
     @State private var method: Method = .qr
     @State private var qrImage: NSImage?
+    @State private var usesLegacyQRCode = false
     @State private var hasCopiedCode = false
     @State private var startingDeviceIDs: Set<Data> = []
     @State private var connectedDeviceName: String?
@@ -104,6 +105,18 @@ struct HostPairingView: View {
                 .frame(height: 268)
             }
             expirationLabel
+
+            VStack(spacing: 6) {
+                Toggle("Older Glassy Desk", isOn: $usesLegacyQRCode)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .accessibilityHint("Shows a QR code compatible with older Glassy Desk releases")
+                Text("Use this if Glassy Desk says the QR code isn’t valid. Update Glassy Desk for automatic Wi-Fi and VPN route selection.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
     }
@@ -157,11 +170,12 @@ struct HostPairingView: View {
               let hostIdentifier = controller.pairingHostIdentifier,
               let port = controller.serverPort,
               let expiration = controller.pairingCodeExpiresAt else { return nil }
-        return HostPairingInvite(
+        let invite = HostPairingInvite(
             host: host, port: port, name: HostIdentity.name,
             code: controller.pairingCode, expiresAt: expiration,
             hostIdentifier: hostIdentifier,
             alternateHosts: Array(controller.pairingAddresses.dropFirst())
-        ).urlString
+        )
+        return usesLegacyQRCode ? invite.legacyURLString : invite.urlString
     }
 }
