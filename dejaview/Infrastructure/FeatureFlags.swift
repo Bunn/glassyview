@@ -1,4 +1,4 @@
 enum FeatureFlags {
-    /// Flip this to `true` when Glassy Host is ready to ship.
-    static let isGlassyStreamEnabled = false
+    /// QR pairing and saved-host reconnection use Glassy Stream end to end.
+    static let isGlassyStreamEnabled = true
 }

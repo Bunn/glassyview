@@ -12,11 +12,13 @@ From the repository root:
 
 The script builds and signs `dist/Glassy Host.app`, installs a verified copy at `/Applications/Glassy Host.app`, then opens the installed app. You can also use the repository's Codex **Run** action.
 
-Grant Screen Recording and Accessibility access locally, then leave Glassy Host running. Its lightweight `_glassydesk._tcp` listener remains available without recording the screen. Capture starts automatically after a Glassy Desk device completes the authenticated pairing or resume handshake, then stops five seconds after the final device disconnects. **Start Streaming Continuously** is available as an explicit always-on override.
+Grant Screen Recording and Accessibility access locally, then leave Glassy Host running. Its lightweight `_glassydesk._tcp` listener remains available without recording the screen. Capture starts automatically after a Glassy Desk device completes the authenticated pairing or resume handshake, then stops five seconds after the final device disconnects. **Share Continuously** in Display & Control is available as an explicit always-on override.
 
-### Pair new devices with a code or password
+### Pair new devices with a QR code, code, or password
 
-The rotating 12-symbol code shown by Glassy Host is the default and is always available. If copying that code is inconvenient for a remote Tailscale Mac, choose **Set Password…** in the pairing section. A new Glassy Desk device can then explicitly choose Password while using the Mac's Tailscale `100.64.0.0/10` address, Tailscale IPv6 address, or full `.ts.net` MagicDNS name. Before pairing, confirm Tailscale is connected on both devices and the selected tailnet peer is the intended Mac. Glassy Desk checks for a recognizable Tailscale address and an active VPN route, and intentionally requires the one-time code for Nearby, ordinary LAN, and other raw TCP routes. This is an operational trust requirement: the password handshake is not a PAKE, so the rotating code remains the safer choice whenever the route or peer is uncertain. Devices that are already paired continue using their device- and host-bound resume credential, so they do not need the code or password again.
+Choose **Add Device** in Connections, then **Scan QR Code** in Glassy Desk on an iPhone or iPad on the same local network. Review the Mac on the device and choose **Pair & Connect**. The custom QR refreshes every minute and includes the connection address. **Enter Code** provides a camera-free alternative. Device names, last connection times, and access controls appear in Connections; existing paired devices populate the list the next time they connect. Revoking a device invalidates its saved credential, and **Allow connections** can pause access entirely.
+
+The rotating 12-symbol code shown by Glassy Host is available whenever connections are allowed. If copying that code is inconvenient for a remote Tailscale Mac, choose **Set Password…** in Settings → Security. A new Glassy Desk device can then explicitly choose Password while using the Mac's Tailscale `100.64.0.0/10` address, Tailscale IPv6 address, or full `.ts.net` MagicDNS name. Before pairing, confirm Tailscale is connected on both devices and the selected tailnet peer is the intended Mac. Glassy Desk checks for a recognizable Tailscale address and an active VPN route, and intentionally requires the one-time code for Nearby, ordinary LAN, and other raw TCP routes. This is an operational trust requirement: the password handshake is not a PAKE, so the rotating code remains the safer choice whenever the route or peer is uncertain. Devices that are already paired continue using their device- and host-bound resume credential, so they do not need the code or password again.
 
 Pairing passwords must contain 15–128 characters. Spaces are allowed and significant; line breaks and control characters are not. Use a long, unique passphrase for a remotely reachable Mac. Glassy Host applies NFC normalization and 600,000 rounds of PBKDF2-HMAC-SHA256, then saves only the resulting 32-byte, host-bound credential in the encrypted macOS login Keychain without enabling iCloud synchronization. The plaintext password is never stored, logged, or displayed.
 
@@ -53,6 +55,33 @@ The build script prefers an Apple Development identity and uses Keychain for the
 
 The script embeds and signs Sparkle and its helpers with the host's signing identity. Local ad-hoc builds use a separate entitlement to disable library validation so they can load Sparkle without a team identity; development-signed builds retain library validation. Both keep the hardened runtime enabled.
 
+### Package a release
+
+From the private source repository, increment `CFBundleShortVersionString` and `CFBundleVersion` in `GlassyHost/Support/Info.plist`, run the host tests, then package using an exact Developer ID Application identity:
+
+```sh
+bash script/package_host_release.sh "Developer ID Application: Fernando Bunn (B2RUA6XMHC)"
+```
+
+The script builds a universal Apple silicon/Intel app for macOS 14+, signs the app and Sparkle helpers with hardened runtime and secure timestamps, and verifies their signatures. Each run creates a new `dist/host-release.*` directory containing `GlassyHost.xcarchive` and a `*-notarization.zip` submission archive. It uses Keychain pairing storage and includes Sparkle's license. It does not install, launch, notarize, or publish anything.
+
+Open the `.xcarchive` in Xcode Organizer, choose **Distribute App → Direct Distribution**, and submit with the signed-in developer account. Wait until Xcode reports **Ready to distribute**, then export into a new directory. Only proceed after notarization succeeds; the packaging script's ZIP is not a finished release.
+
+Staple and verify the exported app, then create a fresh ZIP from that app (replace the example paths and version/build):
+
+```sh
+xcrun stapler staple "/path/to/export/Glassy Host.app"
+xcrun stapler validate "/path/to/export/Glassy Host.app"
+codesign --verify --deep --strict --verbose=2 "/path/to/export/Glassy Host.app"
+spctl --assess --type execute --verbose=2 "/path/to/export/Glassy Host.app"
+ditto -c -k --sequesterRsrc --keepParent "/path/to/export/Glassy Host.app" "/path/to/GlassyHost-0.1.2.zip"
+GlassyHost/.build/artifacts/sparkle/Sparkle/bin/sign_update --account dev.bunn.glassydesk.host "/path/to/GlassyHost-0.1.2.zip"
+```
+
+Upload that exact, final ZIP to a versioned GitHub Release in `Bunn/GlassyDesk-Host`. The appcast enclosure must use its version-specific asset URL, for example `https://github.com/Bunn/GlassyDesk-Host/releases/download/v0.1.2/GlassyHost-0.1.2.zip`, along with the final archive's Sparkle signature and byte length. Never replace the ZIP after signing it or use a moving `latest` URL. `generate_appcast` can also generate entries using the same `--account dev.bunn.glassydesk.host` Keychain account.
+
+Publish and verify the binary download before updating the public repository's `glassy-host/appcast.xml`. Then deploy the public repository's two-file site directly to Cloudflare Pages project `glassydesk-host` and verify the live feed; a Git push alone does not deploy this direct-upload Pages project. Keep these developer instructions, source code, certificates, and private keys out of the public distribution repository.
+
 ## Software updates
 
 **Check for Updates…** is available in the application menu and the menu bar extra. The shared updater starts only when `Support/Info.plist` contains both:
@@ -60,6 +89,16 @@ The script embeds and signs Sparkle and its helpers with the host's signing iden
 - `SUFeedURL`: an absolute HTTPS appcast URL with a host, without embedded credentials or a fragment.
 - `SUPublicEDKey`: the base64-encoded, 32-byte Ed25519 public key produced by Sparkle's `generate_keys` tool. Never add its private signing key to the app or repository.
 
-These settings are deliberately absent until the real feed and signing key are ready. Missing or invalid settings leave the menu action disabled and Sparkle entirely stopped, without update requests or permission prompts. Startup errors are logged and also leave the menu action disabled. Once configured, Sparkle manages update-check permission and scheduling using its standard preferences.
+The production feed URL and public signing key are configured. Newly built app bundles use `https://glassydesk-host.pages.dev/glassy-host/appcast.xml` directly; no custom domain or DNS setup is required. Missing or invalid settings leave the menu action disabled and Sparkle entirely stopped, without update requests or permission prompts. Startup errors are logged and also leave the menu action disabled. Sparkle manages update-check permission and scheduling using its standard preferences.
 
-A requested install-and-relaunch waits while authenticated remote sessions are connected, then resumes after the last client disconnects, even with the dashboard and menus closed. A canceled update discards its pending installation. Explicitly quitting the app remains allowed; Sparkle retains its standard install-on-quit behavior. No download hosting or release-signing workflow is configured yet.
+The private signing key is stored in the macOS login Keychain under the Sparkle account `dev.bunn.glassydesk.host`; it is not stored in this repository. Use `--account dev.bunn.glassydesk.host` with Sparkle's `generate_keys`, `sign_update`, and `generate_appcast` tools. To retrieve only the public key:
+
+```sh
+GlassyHost/.build/artifacts/sparkle/Sparkle/bin/generate_keys --account dev.bunn.glassydesk.host -p
+```
+
+The production feed is published in the public distribution repository at `glassy-host/appcast.xml`. Its first release is version `0.1.2` (build `3`), a Developer ID-signed, Apple-notarized universal app for macOS 14 or later, available from [GitHub Releases](https://github.com/Bunn/GlassyDesk-Host/releases/tag/v0.1.2). The ZIP contains the stapled notarization ticket and is signed with the configured Sparkle key. Cloudflare Pages project `glassydesk-host` serves the feed at `https://glassydesk-host.pages.dev/glassy-host/appcast.xml` with `Content-Type: application/rss+xml; charset=utf-8` and `Cache-Control: no-cache, max-age=0, must-revalidate, no-transform`.
+
+The public distribution repository is `Bunn/GlassyDesk-Host`. It contains only `glassy-host/appcast.xml` and `_headers`. Signed, notarized app archives belong in that repository's GitHub Releases, not its Git tree, and the feed must reference version-specific release asset URLs. Keep source code and private signing keys out of the public repository. Back up the signing Keychain securely before distributing releases.
+
+A requested install-and-relaunch waits while authenticated remote sessions are connected, then resumes after the last client disconnects, even with the dashboard and menus closed. A canceled update discards its pending installation. Explicitly quitting the app remains allowed; Sparkle retains its standard install-on-quit behavior. Hosting uses Cloudflare Pages and GitHub Releases; R2 is not required. Pages currently uses direct uploads, so pushing the public repository alone does not deploy feed changes. Release packaging, notarization, and publication remain a manual workflow as described above.

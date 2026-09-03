@@ -6,16 +6,20 @@ import Foundation
 /// All mutable input state is serialized so button and modifier transitions stay
 /// ordered even when Network.framework delivers messages rapidly.
 final class RemoteInputService: @unchecked Sendable {
-    private let queue = DispatchQueue(
-        label: "dev.bunn.glassydesk.host.remote-input",
-        qos: .userInteractive
-    )
+    private let queue: DispatchQueue
 
     private var selectedDisplayID: CGDirectDisplayID?
     private var isEnabled = false
     private var pressedButtons: HostProtocol.PointerButtonMask = []
     private var pressedModifierKeysyms: Set<UInt32> = []
     private var lastPointerLocation: CGPoint?
+
+    init(inputQueue: DispatchQueue = DispatchQueue(
+        label: "dev.bunn.glassydesk.host.remote-input",
+        qos: .userInteractive
+    )) {
+        queue = inputQueue
+    }
 
     static var isAccessibilityGranted: Bool {
         AXIsProcessTrusted()
@@ -62,10 +66,13 @@ final class RemoteInputService: @unchecked Sendable {
     }
 
     /// Prevents a disconnected client from leaving a synthetic button or
-    /// modifier logically pressed on the Mac.
+    /// modifier logically pressed on the Mac. Returning is a barrier: all
+    /// earlier input and its reset have completed before revocation can report
+    /// success or a replacement transport can submit input.
     func releasePressedInput() {
-        queue.async { [weak self] in
-            self?.releasePressedInputLocked()
+        dispatchPrecondition(condition: .notOnQueue(queue))
+        queue.sync {
+            releasePressedInputLocked()
         }
     }
 

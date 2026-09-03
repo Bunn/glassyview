@@ -23,6 +23,21 @@ func validHostUpdateConfiguration() throws {
     )
 }
 
+@Test("The host bundle settings configure the production Pages update feed")
+func productionHostUpdateConfiguration() throws {
+    let packageURL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let data = try Data(contentsOf: packageURL.appendingPathComponent("Support/Info.plist"))
+    let infoDictionary = try #require(
+        PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
+    )
+    let configuration = try #require(HostUpdateConfiguration(infoDictionary: infoDictionary))
+
+    #expect(configuration.feedURL.absoluteString == "https://glassydesk-host.pages.dev/glassy-host/appcast.xml")
+}
+
 @Test("Missing or non-string update settings leave updates unconfigured")
 func missingHostUpdateConfiguration() throws {
     let feed = "https://downloads.example.com/appcast.xml"

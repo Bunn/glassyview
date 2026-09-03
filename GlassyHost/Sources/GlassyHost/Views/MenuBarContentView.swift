@@ -13,12 +13,12 @@ struct MenuBarContentView: View {
             Text("\(controller.clientCount) connected")
         }
 
-        Text(controller.captureStatusText)
+        Text(controller.isStreaming ? "Screen sharing is active" : "Screen sharing is idle")
 
         Divider()
 
         if controller.isOnDemandStreaming {
-            Button("Keep Streaming After Disconnect") {
+            Button("Keep Sharing") {
                 Task {
                     await controller.keepStreamingAfterDisconnect()
                 }
@@ -26,12 +26,12 @@ struct MenuBarContentView: View {
             .disabled(controller.isTransitioning)
         }
 
-        Button(controller.isStreaming ? "Stop Streaming" : "Start Streaming Continuously") {
+        Button(controller.isStreaming ? "Stop Sharing" : "Share Continuously") {
             Task {
                 await controller.toggleStreaming()
             }
         }
-        .disabled(controller.isTransitioning || controller.runState == .starting)
+        .disabled(!controller.allowsConnections || controller.serverPort == nil || controller.isTransitioning)
 
         Button("Open Glassy Host") {
             openWindow(id: "main")

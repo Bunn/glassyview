@@ -10,6 +10,7 @@ final class HostController {
         case authenticatedClientCount(Int)
         case status(HostServer.Status)
         case streamQuality(HostProtocol.StreamQuality)
+        case pairedDevices([HostPairedDevice])
     }
 
     private(set) var runState: HostRunState = .stopped
@@ -20,7 +21,12 @@ final class HostController {
     private(set) var clientCount = 0
     private(set) var pairingCode = "Starting…"
     private(set) var pairingCodeRemainingSeconds = 0
+    private(set) var pairingCodeExpiresAt: Date?
+    private(set) var pairedDevices: [HostPairedDevice] = []
+    private(set) var allowsConnections = true
+    private(set) var isUpdatingConnectionAccess = false
     private(set) var isPairingPasswordConfigured = false
+    private(set) var isLoadingPairingPassword = false
     private(set) var isUpdatingPairingPassword = false
     private(set) var pairingPasswordError: String?
     private(set) var serverPort: UInt16?
@@ -78,7 +84,16 @@ final class HostController {
     @ObservationIgnored
     private var hostIdentifier: Data?
 
+    @ObservationIgnored
+    private var pairingPasswordLoadTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var pairingPasswordLoadState = HostPairingPasswordLoadState()
+
     private var pipelineReconciliation = HostPipelineReconciliationState()
+
+    @ObservationIgnored
+    private var pipelineReconciliationWaiters: [CheckedContinuation<Void, Never>] = []
 
     @ObservationIgnored
     private var pendingPipelineFailure: HostPendingPipelineFailure?
@@ -120,6 +135,11 @@ final class HostController {
     private static let initialOnDemandStartDelay: Duration = .milliseconds(200)
     private static let pipelineRetryStabilityInterval: Duration = .seconds(10)
 
+    init() {
+        allowsConnections = hostServer.allowsConnections
+        pairedDevices = hostServer.pairedDevices
+    }
+
     var isTransitioning: Bool {
         pipelineReconciliation.hasOwner
     }
@@ -148,6 +168,9 @@ final class HostController {
     }
 
     var captureStatusText: String {
+        if !allowsConnections {
+            return "Connections are off. Enable them to connect a device."
+        }
         if isPipelineRetryDeferred {
             return "Recovering screen stream…"
         }
@@ -184,6 +207,7 @@ final class HostController {
         initialOnDemandStartTask?.cancel()
         pipelineRetryTask?.cancel()
         pipelineRetryStabilityTask?.cancel()
+        pairingPasswordLoadTask?.cancel()
         serverEventContinuation?.finish()
         serverEventTask?.cancel()
         remoteInputService.setEnabled(false)
@@ -211,30 +235,12 @@ final class HostController {
             let identifier = HostServer.makeHostIdentifier(from: pairingSecret.keyData)
             hostIdentifier = identifier
 
-            let passwordStore = pairingPasswordStore
-            let passwordCredential: Data?
-            do {
-                passwordCredential = try await Task.detached(priority: .userInitiated) {
-                    try passwordStore.credential(for: identifier)
-                }.value
-                isPairingPasswordConfigured = passwordCredential != nil
-                pairingPasswordError = nil
-            } catch {
-                // A problem with an optional password must not make the
-                // rotating-code listener unavailable.
-                passwordCredential = nil
-                isPairingPasswordConfigured = false
-                pairingPasswordError = error.localizedDescription
-                HostLog.security.error(
-                    "Could not load the optional pairing password credential"
-                )
-            }
-
             startServer(
                 pairingSecret: pairingSecret,
-                pairingPasswordCredential: passwordCredential
+                pairingPasswordCredential: nil
             )
             startPairingCodeRefresh()
+            loadPairingPassword(for: identifier)
         } catch {
             fail(with: error)
             return
@@ -243,6 +249,40 @@ final class HostController {
         if screenRecordingAuthorization == .granted {
             await refreshDisplays()
         }
+    }
+
+    private func loadPairingPassword(for identifier: Data) {
+        let request = pairingPasswordLoadState.begin(for: identifier)
+        let passwordStore = pairingPasswordStore
+        isLoadingPairingPassword = true
+        pairingPasswordLoadTask = Task { @MainActor [weak self] in
+            let result = await Task.detached(priority: .utility) {
+                Result { try passwordStore.credential(for: identifier) }
+            }.value
+            guard let self, !Task.isCancelled,
+                  pairingPasswordLoadState.accepts(request, hostIdentifier: hostIdentifier) else { return }
+            isLoadingPairingPassword = false
+            pairingPasswordLoadTask = nil
+            switch result {
+            case .success(let credential):
+                hostServer.setPairingPasswordCredential(credential)
+                isPairingPasswordConfigured = credential != nil
+                pairingPasswordError = nil
+            case .failure(let error):
+                // Keychain may fail or remain busy. Neither outcome blocks
+                // QR/code pairing, Bonjour, or display discovery.
+                isPairingPasswordConfigured = false
+                pairingPasswordError = error.localizedDescription
+                HostLog.security.error("Could not load the optional pairing password credential")
+            }
+        }
+    }
+
+    private func invalidatePairingPasswordLoad() {
+        pairingPasswordLoadState.invalidate()
+        pairingPasswordLoadTask?.cancel()
+        pairingPasswordLoadTask = nil
+        isLoadingPairingPassword = false
     }
 
     func toggleStreaming() async {
@@ -256,6 +296,7 @@ final class HostController {
     /// Explicit user start. Unlike authenticated on-demand capture, this keeps
     /// recording active until the user explicitly stops it.
     func startStreaming() async {
+        guard allowsConnections else { return }
         let effects = streamingDemand.requestManualStart()
         applyStreamingDemandEffects(effects)
         updateInitialOnDemandStartCoalescing()
@@ -263,6 +304,7 @@ final class HostController {
     }
 
     func keepStreamingAfterDisconnect() async {
+        guard allowsConnections else { return }
         let effects = streamingDemand.requestManualStart()
         applyStreamingDemandEffects(effects)
         updateInitialOnDemandStartCoalescing()
@@ -276,11 +318,72 @@ final class HostController {
         await reconcileCapturePipeline()
     }
 
+    func setAllowsConnections(_ allowsConnections: Bool) async {
+        guard !isUpdatingConnectionAccess, self.allowsConnections != allowsConnections else { return }
+        isUpdatingConnectionAccess = true
+        let previousValue = self.allowsConnections
+        let previousServerReady = isServerReady
+        let previousServerPort = serverPort
+        self.allowsConnections = allowsConnections
+        defer { isUpdatingConnectionAccess = false }
+
+        if !allowsConnections {
+            // Close the local input gate before suspending. Buffered listener
+            // callbacks must not revive capture while shutdown is in progress.
+            remoteInputService.setEnabled(false)
+            isServerReady = false
+            serverPort = nil
+            refreshPairingCode()
+        }
+        do {
+            try await hostServer.setAllowsConnections(allowsConnections)
+            if !allowsConnections {
+                cancelPendingStreamQualityUpgrade(settleRequestedQuality: true)
+                cancelInitialOnDemandStartDelay()
+                let effects = streamingDemand.forceStop()
+                applyStreamingDemandEffects(effects)
+                await handleAuthenticatedClientCountChange(0)
+                await reconcileCapturePipeline()
+                if pipelineReconciliation.hasOwner {
+                    await withCheckedContinuation { continuation in
+                        pipelineReconciliationWaiters.append(continuation)
+                    }
+                }
+                runState = .stopped
+            }
+            lastError = nil
+        } catch {
+            self.allowsConnections = previousValue
+            lastError = "Could not save connection access: \(error.localizedDescription)"
+            if previousValue {
+                // A failed atomic write leaves the server running with its
+                // original permissions. Restore the local presentation/gate.
+                isServerReady = previousServerReady
+                serverPort = previousServerPort
+                remoteInputService.setEnabled(previousServerReady && isStreaming)
+            }
+        }
+        refreshPairingCode()
+    }
+
+    func revokeDevice(id: Data) async {
+        guard !isUpdatingConnectionAccess else { return }
+        isUpdatingConnectionAccess = true
+        defer { isUpdatingConnectionAccess = false }
+        do {
+            try await hostServer.revokeDevice(id: id)
+            pairedDevices.removeAll { $0.id == id }
+            lastError = nil
+        } catch {
+            lastError = "Could not revoke device access: \(error.localizedDescription)"
+        }
+    }
+
     private func startCapturePipeline(
         quality: HostProtocol.StreamQuality
     ) async -> HostCapturePipelineStartResult {
         guard !isStreaming else { return .started }
-        guard isServerReady else {
+        guard allowsConnections, isServerReady else {
             lastError = "The authenticated local streaming service is not ready yet."
             return .terminalFailure
         }
@@ -306,6 +409,9 @@ final class HostController {
         runState = .starting
         lastError = nil
         await refreshDisplays()
+        guard allowsConnections, isServerReady, streamingDemand.wantsCapture else {
+            return .superseded
+        }
 
         let pipelineGeneration = pipelineGenerations.begin()
         let server = hostServer
@@ -389,7 +495,7 @@ final class HostController {
 
             isStreaming = true
             activeStreamQuality = quality
-            remoteInputService.setEnabled(true)
+            remoteInputService.setEnabled(allowsConnections && isServerReady)
             if isServerReady {
                 runState = .ready
             }
@@ -531,6 +637,7 @@ final class HostController {
             return false
         }
 
+        invalidatePairingPasswordLoad()
         isUpdatingPairingPassword = true
         defer { isUpdatingPairingPassword = false }
         do {
@@ -564,6 +671,7 @@ final class HostController {
             return false
         }
 
+        invalidatePairingPasswordLoad()
         isUpdatingPairingPassword = true
         defer { isUpdatingPairingPassword = false }
         do {
@@ -585,6 +693,7 @@ final class HostController {
 
     func replacePairingKey() async {
         guard !isUpdatingPairingPassword else { return }
+        invalidatePairingPasswordLoad()
         isUpdatingPairingPassword = true
         defer { isUpdatingPairingPassword = false }
 
@@ -638,6 +747,7 @@ final class HostController {
     }
 
     private func handleAuthenticatedClientCountChange(_ count: Int) async {
+        guard allowsConnections || count == 0 else { return }
         let previousCount = clientCount
         let effects = streamingDemand.authenticatedClientCountChanged(to: count)
         clientCount = streamingDemand.authenticatedClientCount
@@ -898,6 +1008,9 @@ final class HostController {
         guard pipelineReconciliation.request() else { return }
         defer {
             pipelineReconciliation.release()
+            let waiters = pipelineReconciliationWaiters
+            pipelineReconciliationWaiters.removeAll()
+            for waiter in waiters { waiter.resume() }
             schedulePendingStreamQualityUpgradeIfNeeded()
         }
 
@@ -986,12 +1099,17 @@ final class HostController {
                     handleServerStatus(status)
                 case .streamQuality(let quality):
                     await handleStreamQualityChange(quality)
+                case .pairedDevices(let devices):
+                    pairedDevices = devices
                 }
             }
         }
 
         hostServer.setStreamQualityHandler { quality in
             continuation.yield(.streamQuality(quality))
+        }
+        hostServer.setPairedDevicesHandler { devices in
+            continuation.yield(.pairedDevices(devices))
         }
 
         hostServer.start(
@@ -1007,6 +1125,14 @@ final class HostController {
     }
 
     private func handleServerStatus(_ status: HostServer.Status) {
+        if !allowsConnections {
+            remoteInputService.setEnabled(false)
+            isServerReady = false
+            serverPort = nil
+            runState = .stopped
+            refreshPairingCode()
+            return
+        }
         switch status {
         case .stopped:
             remoteInputService.setEnabled(false)
@@ -1056,12 +1182,14 @@ final class HostController {
     }
 
     private func refreshPairingCode() {
-        guard let code = hostServer.currentPairingCode() else {
-            pairingCode = "Unavailable"
+        guard allowsConnections, let code = hostServer.currentPairingCode() else {
+            pairingCode = allowsConnections ? "Unavailable" : "Connections off"
             pairingCodeRemainingSeconds = 0
+            pairingCodeExpiresAt = nil
             return
         }
         pairingCode = code.value
+        pairingCodeExpiresAt = code.expiresAt
         pairingCodeRemainingSeconds = max(
             0,
             Int(ceil(code.expiresAt.timeIntervalSinceNow))

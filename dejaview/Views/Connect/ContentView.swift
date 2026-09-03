@@ -118,7 +118,9 @@ struct ContentView<Session: RemoteSessionControlling,
             GlassyStreamPairingView(
                 machine: request.machine,
                 initialErrorMessage: request.initialErrorMessage,
-                fixedCandidate: request.fixedCandidate
+                fixedCandidate: request.fixedCandidate,
+                startsWithScanner: request.startsWithScanner,
+                restrictsScannedEndpoint: store.contains(request.machine)
             ) { candidate, bootstrapCredential in
                 try await pairGlassyStream(
                     candidate: candidate,
@@ -272,7 +274,10 @@ struct ContentView<Session: RemoteSessionControlling,
     private var detailToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
             if currentSection != .recents {
-                Button("Add Host", systemImage: "plus", action: addMachine)
+                Menu("Add Host", systemImage: "plus") {
+                    Button("Scan QR Code", systemImage: "qrcode.viewfinder", action: scanGlassyHost)
+                    Button("Enter Address", systemImage: "keyboard", action: addMachine)
+                }
             }
 
             Menu("More", systemImage: "ellipsis.circle") {
@@ -459,10 +464,18 @@ struct ContentView<Session: RemoteSessionControlling,
     }
 
     private var manualPanel: some View {
-        Button("New Machine", systemImage: "plus", action: addMachine)
-            .font(.headline)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .buttonStyle(.glassProminent)
+        VStack(spacing: 12) {
+            Button("Scan QR Code", systemImage: "qrcode.viewfinder", action: scanGlassyHost)
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .buttonStyle(.glassProminent)
+                .accessibilityHint("Scan the code in Glassy Host on your Mac to pair and connect.")
+                .accessibilityIdentifier("connection.scan-qr-code")
+
+            Button("Enter Address Manually", systemImage: "keyboard", action: addMachine)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .buttonStyle(.glass)
+        }
     }
 
     private var gridColumns: [GridItem] {
@@ -530,6 +543,18 @@ struct ContentView<Session: RemoteSessionControlling,
     }
 
     // MARK: - Actions
+
+    private func scanGlassyHost() {
+        glassyPairingRequest = GlassyStreamPairingRequest(
+            machine: SavedMachine(
+                name: "", host: "", port: GlassyStreamEndpoint.defaultPort,
+                username: "", connectionMode: .glassyStream
+            ),
+            vncPassword: "",
+            startsWithScanner: true,
+            savesNewMachine: true
+        )
+    }
 
     private func addMachine() {
         AppLog.ui.info("Opening New Machine sheet")
@@ -1038,6 +1063,13 @@ struct ContentView<Session: RemoteSessionControlling,
             candidate: candidate,
             vncPassword: request.vncPassword
         )
+        if request.savesNewMachine, !store.contains(authenticatedMachine) {
+            var newMachine = authenticatedMachine
+            newMachine.name = authenticatedMachine.glassyHostName ?? candidate.name
+            store.add(newMachine, password: "")
+            preparedGlassySession = PreparedGlassySession(machine: newMachine)
+            return
+        }
 
         preparedGlassySession = PreparedGlassySession(
             machine: authenticatedMachine
@@ -1557,6 +1589,8 @@ private struct GlassyStreamPairingRequest: Identifiable {
     let vncPassword: String
     var initialErrorMessage: String? = nil
     var fixedCandidate: GlassyStreamEndpointCandidate? = nil
+    var startsWithScanner = false
+    var savesNewMachine = false
 
     var id: UUID { machine.id }
 }

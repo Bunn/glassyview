@@ -4,6 +4,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 
@@ -26,12 +27,20 @@ struct GlassyHostApp: App {
     var body: some Scene {
         dashboardWindow
 
+        Settings {
+            HostSettingsView(controller: controller, updater: updater)
+        }
+
         MenuBarExtra {
             MenuBarContentView(controller: controller, updater: updater)
         } label: {
             Label("Glassy Host", systemImage: controller.menuBarSystemImage)
                 .task {
-                    updater.startIfConfigured()
+                    // Local UI previews must not query the production feed or
+                    // show Sparkle's first-launch preference prompt.
+                    if !isLocalPreview {
+                        updater.startIfConfigured()
+                    }
                     // The listener lifecycle belongs to the menu-bar host, not
                     // to whether the dashboard window happens to be open.
                     await controller.prepare()
@@ -39,16 +48,25 @@ struct GlassyHostApp: App {
         }
     }
 
+    private var isLocalPreview: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--glassy-preview")
+        #else
+        false
+        #endif
+    }
+
     private var dashboardWindow: some Scene {
         WindowGroup("Glassy Host", id: "main") {
             HostDashboardView(controller: controller)
-                .frame(minWidth: 560, minHeight: 500)
+                .frame(minWidth: 820, minHeight: 620)
                 .task {
                     await controller.prepare()
                 }
         }
-        .defaultSize(width: 620, height: 600)
+        .defaultSize(width: 980, height: 760)
         .commands {
+            CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updater: updater)
             }

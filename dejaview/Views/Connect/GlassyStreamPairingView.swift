@@ -23,6 +23,7 @@ struct GlassyStreamPairingView: View {
 
     let machine: SavedMachine
     let fixedCandidate: GlassyStreamEndpointCandidate?
+    let restrictsScannedEndpoint: Bool
     let pairAndConnect: @MainActor (
         GlassyStreamEndpointCandidate,
         GlassyStreamBootstrapCredential
@@ -35,12 +36,18 @@ struct GlassyStreamPairingView: View {
     @State private var pairingCodeText = ""
     @State private var pairingPasswordText = ""
     @State private var isPairing = false
+    @State private var isShowingQRScanner: Bool
+    @State private var scannedInvitation: GlassyHostPairingInvitation?
+    @State private var scanErrorMessage: String?
+    @State private var scannerID = UUID()
     @State private var errorMessage: String?
 
     init(
         machine: SavedMachine,
         initialErrorMessage: String? = nil,
         fixedCandidate: GlassyStreamEndpointCandidate? = nil,
+        startsWithScanner: Bool = false,
+        restrictsScannedEndpoint: Bool = false,
         pairAndConnect: @escaping @MainActor (
             GlassyStreamEndpointCandidate,
             GlassyStreamBootstrapCredential
@@ -48,7 +55,9 @@ struct GlassyStreamPairingView: View {
     ) {
         self.machine = machine
         self.fixedCandidate = fixedCandidate
+        self.restrictsScannedEndpoint = restrictsScannedEndpoint
         self.pairAndConnect = pairAndConnect
+        _isShowingQRScanner = State(initialValue: startsWithScanner)
         _errorMessage = State(initialValue: initialErrorMessage)
         _selectedCandidateID = State(initialValue: fixedCandidate?.id)
 
@@ -70,125 +79,20 @@ struct GlassyStreamPairingView: View {
     var body: some View {
         NavigationStack {
             Form {
-                if fixedCandidate == nil {
+                if isShowingQRScanner {
+                    qrPairingContent
+                } else {
                     Section {
-                        TextField("Host name or IP address", text: $directAddressText)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
-                            .disabled(isPairing)
-                            .accessibilityLabel("Glassy Stream host name or IP address")
-                            .accessibilityIdentifier("connection.glassy-stream.address")
-
-                        TextField("TCP port", text: $directPortText)
-                            .keyboardType(.numberPad)
-                            .disabled(isPairing)
-
-                        if let directInputValidationMessage {
-                            Label(
-                                directInputValidationMessage,
-                                systemImage: "exclamationmark.triangle.fill"
-                            )
-                            .font(.footnote)
-                            .foregroundStyle(.red)
+                        Button("Scan QR Code", systemImage: "qrcode.viewfinder") {
+                            beginScanning()
                         }
-                    } header: {
-                        Text("Connection Address")
+                        .disabled(isPairing)
+                        .accessibilityIdentifier("connection.glassy-stream.scan")
                     } footer: {
-                        if directAddressText.trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        ).isEmpty {
-                            Text("Enter the remote Mac's Tailscale MagicDNS name or 100.x address. Leave the address empty to choose a nearby Mac instead.")
-                        } else {
-                            Text("Glassy Host uses TCP port \(GlassyStreamEndpoint.defaultPort) by default. A port included in the address takes precedence.")
-                        }
+                        Text("Scan the QR code on your Mac to fill in its address and pairing code.")
                     }
-                }
 
-                Section {
-                    if candidates.isEmpty {
-                        ContentUnavailableView(
-                            directInputValidationMessage == nil
-                                ? "No Connection Route"
-                                : "Fix the Connection Address",
-                            systemImage: directInputValidationMessage == nil
-                                ? "macbook.slash"
-                                : "exclamationmark.triangle",
-                            description: Text(
-                                directInputValidationMessage == nil
-                                    ? "Open Glassy Host on the Mac. For remote access, enter its Tailscale name or 100.x address. For nearby access, keep both devices on the same local network."
-                                    : "Correct the address or TCP port before selecting a Mac."
-                            )
-                        )
-                    } else {
-                        Picker("Mac", selection: $selectedCandidateID) {
-                            Text("Choose a Mac")
-                                .tag(String?.none)
-
-                            ForEach(candidates) { candidate in
-                                Text("\(candidate.name) — \(candidate.detail)")
-                                    .tag(Optional(candidate.id))
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Glassy Host")
-                } footer: {
-                    if candidates.contains(where: { $0.source == .direct }) {
-                        Text("Direct uses the saved Tailscale or network address. Nearby Macs are discovered only on the local network.")
-                    } else {
-                        Text("Choose the Mac displaying the pairing code. Nearby discovery works only on the local network.")
-                    }
-                }
-
-                Section {
-                    Picker("Pair Using", selection: $pairingMethod) {
-                        ForEach(PairingMethod.allCases) { method in
-                            Text(method.title).tag(method)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .disabled(isPairing)
-
-                    switch pairingMethod {
-                    case .oneTimeCode:
-                        TextField("12-symbol code", text: $pairingCodeText)
-                            .textInputAutocapitalization(.characters)
-                            .autocorrectionDisabled()
-                            .keyboardType(.asciiCapable)
-                            .textContentType(.oneTimeCode)
-                            .disabled(isPairing)
-
-                        if !pairingCodeText.isEmpty, pairingCode == nil {
-                            credentialValidationLabel(
-                                "Enter the 12 symbols shown by Glassy Host. Dashes are optional."
-                            )
-                        }
-
-                    case .password:
-                        SecureField("Pairing password", text: $pairingPasswordText)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .textContentType(.password)
-                            .privacySensitive()
-                            .disabled(isPairing || !isPasswordPairingRouteAllowed)
-
-                        if let passwordPairingRouteMessage {
-                            credentialValidationLabel(passwordPairingRouteMessage)
-                        } else if !pairingPasswordText.isEmpty,
-                           let passwordValidationMessage {
-                            credentialValidationLabel(passwordValidationMessage)
-                        }
-                    }
-                } header: {
-                    Text("Authentication")
-                } footer: {
-                    switch pairingMethod {
-                    case .oneTimeCode:
-                        Text("Enter the code displayed by Glassy Host. It changes every minute and remains the recommended default for first-time pairing.")
-                    case .password:
-                        Text("Before pairing, confirm Tailscale is connected and the selected peer is your Mac. Glassy Desk also requires a Tailscale IP or full .ts.net name and an active VPN route. Later connections use a random Keychain credential.")
-                    }
+                    manualPairingContent
                 }
 
                 if let errorMessage {
@@ -210,10 +114,12 @@ struct GlassyStreamPairingView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Pair & Connect") {
-                        pair()
+                    if !isShowingQRScanner {
+                        Button("Pair & Connect") {
+                            pair()
+                        }
+                        .disabled(selectedCandidate == nil || bootstrapCredential == nil || isPairing)
                     }
-                    .disabled(selectedCandidate == nil || bootstrapCredential == nil || isPairing)
                 }
             }
             .interactiveDismissDisabled(isPairing)
@@ -237,6 +143,205 @@ struct GlassyStreamPairingView: View {
             .onDisappear {
                 clearBootstrapInputs()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var manualPairingContent: some View {
+        if fixedCandidate == nil {
+            Section {
+                TextField("Host name or IP address", text: $directAddressText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .disabled(isPairing)
+                    .accessibilityLabel("Glassy Stream host name or IP address")
+                    .accessibilityIdentifier("connection.glassy-stream.address")
+
+                TextField("TCP port", text: $directPortText)
+                    .keyboardType(.numberPad)
+                    .disabled(isPairing)
+
+                if let directInputValidationMessage {
+                    Label(
+                        directInputValidationMessage,
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Connection Address")
+            } footer: {
+                if directAddressText.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).isEmpty {
+                    Text("Enter the remote Mac's Tailscale MagicDNS name or 100.x address. Leave the address empty to choose a nearby Mac instead.")
+                } else {
+                    Text("Glassy Host uses TCP port \(GlassyStreamEndpoint.defaultPort) by default. A port included in the address takes precedence.")
+                }
+            }
+        }
+
+        Section {
+            if candidates.isEmpty {
+                ContentUnavailableView(
+                    directInputValidationMessage == nil
+                        ? "No Connection Route"
+                        : "Fix the Connection Address",
+                    systemImage: directInputValidationMessage == nil
+                        ? "macbook.slash"
+                        : "exclamationmark.triangle",
+                    description: Text(
+                        directInputValidationMessage == nil
+                            ? "Open Glassy Host on the Mac. For remote access, enter its Tailscale name or 100.x address. For nearby access, keep both devices on the same local network."
+                            : "Correct the address or TCP port before selecting a Mac."
+                    )
+                )
+            } else {
+                Picker("Mac", selection: $selectedCandidateID) {
+                    Text("Choose a Mac")
+                        .tag(String?.none)
+
+                    ForEach(candidates) { candidate in
+                        Text("\(candidate.name) — \(candidate.detail)")
+                            .tag(Optional(candidate.id))
+                    }
+                }
+            }
+        } header: {
+            Text("Glassy Host")
+        } footer: {
+            if candidates.contains(where: { $0.source == .direct }) {
+                Text("Direct uses the saved Tailscale or network address. Nearby Macs are discovered only on the local network.")
+            } else {
+                Text("Choose the Mac displaying the pairing code. Nearby discovery works only on the local network.")
+            }
+        }
+
+        Section {
+            Picker("Pair Using", selection: $pairingMethod) {
+                ForEach(PairingMethod.allCases) { method in
+                    Text(method.title).tag(method)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(isPairing)
+
+            switch pairingMethod {
+            case .oneTimeCode:
+                TextField("12-symbol code", text: $pairingCodeText)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .keyboardType(.asciiCapable)
+                    .textContentType(.oneTimeCode)
+                    .disabled(isPairing)
+
+                if !pairingCodeText.isEmpty, pairingCode == nil {
+                    credentialValidationLabel(
+                        "Enter the 12 symbols shown by Glassy Host. Dashes are optional."
+                    )
+                }
+
+            case .password:
+                SecureField("Pairing password", text: $pairingPasswordText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textContentType(.password)
+                    .privacySensitive()
+                    .disabled(isPairing || !isPasswordPairingRouteAllowed)
+
+                if let passwordPairingRouteMessage {
+                    credentialValidationLabel(passwordPairingRouteMessage)
+                } else if !pairingPasswordText.isEmpty,
+                   let passwordValidationMessage {
+                    credentialValidationLabel(passwordValidationMessage)
+                }
+            }
+        } header: {
+            Text("Authentication")
+        } footer: {
+            switch pairingMethod {
+            case .oneTimeCode:
+                Text("Enter the code displayed by Glassy Host. It changes every minute and remains the recommended default for first-time pairing.")
+            case .password:
+                Text("Before pairing, confirm Tailscale is connected and the selected peer is your Mac. Glassy Desk also requires a Tailscale IP or full .ts.net name and an active VPN route. Later connections use a random Keychain credential.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var qrPairingContent: some View {
+        if let invitation = scannedInvitation {
+            Section {
+                GlassyPairingReviewView(
+                    invitation: invitation,
+                    isPairing: isPairing,
+                    pair: pair
+                )
+            }
+
+            Section {
+                Button("Scan Again", systemImage: "qrcode.viewfinder", action: beginScanning)
+                    .disabled(isPairing)
+            }
+        } else {
+            Section {
+                if let scanErrorMessage {
+                    ContentUnavailableView(
+                        "Try Scanning Again",
+                        systemImage: "qrcode.viewfinder",
+                        description: Text(scanErrorMessage)
+                    )
+                    Button("Scan Again", action: beginScanning)
+                } else {
+                    GlassyPairingScannerView(onScan: receiveScan)
+                        .id(scannerID)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                }
+            } header: {
+                Text("Scan Your Mac’s QR Code")
+            } footer: {
+                Text("In Glassy Host on your Mac, choose Add Device. Keep both devices on the same network, then point the camera at the QR code. You’ll review the Mac before connecting.")
+            }
+        }
+
+        Section {
+            Button("Enter Code Manually", systemImage: "keyboard") {
+                clearBootstrapInputs()
+                isShowingQRScanner = false
+                errorMessage = nil
+            }
+            .disabled(isPairing)
+        }
+    }
+
+    private func beginScanning() {
+        clearBootstrapInputs()
+        pairingMethod = .oneTimeCode
+        scanErrorMessage = nil
+        errorMessage = nil
+        scannerID = UUID()
+        isShowingQRScanner = true
+    }
+
+    private func receiveScan(_ value: String) {
+        do {
+            let invitation = try GlassyHostPairingInvitation(scannedValue: value)
+            let pinnedIdentifier = machine.glassyHostIdentifier.flatMap { Data(base64Encoded: $0) }
+            if restrictsScannedEndpoint,
+               pinnedIdentifier?.count != GlassyStreamWire.identifierLength,
+               let savedAddress = GlassyStreamEndpoint.directAddress(
+                   from: machine.host,
+                   defaultPort: GlassyStreamEndpoint.effectivePort(for: machine)
+               ), !invitation.matchesAddress(savedAddress) {
+                scanErrorMessage = String(localized: "This QR code uses a different Mac address. To add it without changing your saved Mac, return to Connect and choose Scan QR Code.")
+                return
+            }
+            scannedInvitation = invitation
+            scanErrorMessage = nil
+        } catch {
+            scanErrorMessage = error.localizedDescription
         }
     }
 
@@ -295,6 +400,7 @@ struct GlassyStreamPairingView: View {
     }
 
     private var selectedCandidate: GlassyStreamEndpointCandidate? {
+        if isShowingQRScanner { return scannedInvitation?.candidate }
         guard let selectedCandidateID else { return nil }
         return candidates.first { $0.id == selectedCandidateID }
     }
@@ -323,6 +429,10 @@ struct GlassyStreamPairingView: View {
     }
 
     private var bootstrapCredential: GlassyStreamBootstrapCredential? {
+        if isShowingQRScanner {
+            guard let scannedInvitation, scannedInvitation.expiresAt > .now else { return nil }
+            return .oneTimeCode(scannedInvitation.code.rawValue)
+        }
         switch pairingMethod {
         case .oneTimeCode:
             guard let pairingCode else { return nil }
@@ -339,6 +449,10 @@ struct GlassyStreamPairingView: View {
     }
 
     private func pair() {
+        if isShowingQRScanner, let scannedInvitation, scannedInvitation.expiresAt <= .now {
+            errorMessage = GlassyHostPairingInvitation.ValidationError.expired.localizedDescription
+            return
+        }
         guard let selectedCandidate, let bootstrapCredential else { return }
 
         errorMessage = nil
@@ -381,5 +495,6 @@ struct GlassyStreamPairingView: View {
     private func clearBootstrapInputs() {
         pairingCodeText = ""
         pairingPasswordText = ""
+        scannedInvitation = nil
     }
 }

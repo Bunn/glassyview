@@ -23,6 +23,7 @@ final class HostServer: @unchecked Sendable {
     typealias RemoteInputHandler = @Sendable (HostProtocol.RemoteInputEvent) -> Void
     typealias StreamQualityHandler = @Sendable (HostProtocol.StreamQuality) -> Void
     typealias AuthenticatedClientReplacementHandler = @Sendable () -> Void
+    typealias PairedDevicesHandler = @Sendable ([HostPairedDevice]) -> Void
 
     struct PairingCode: Equatable, Sendable {
         let value: String
@@ -30,11 +31,14 @@ final class HostServer: @unchecked Sendable {
     }
 
     private let core: Core
+    private let deviceAccessStore: HostDeviceAccessStore
     private let pairingCodeSource = PairingCodeSource()
 
     init(serviceName: String = Host.current().localizedName ?? "Glassy Host",
-         port: UInt16 = HostProtocol.defaultPort) {
-        core = Core(serviceName: serviceName, port: port)
+         port: UInt16 = HostProtocol.defaultPort,
+         deviceAccessStore: HostDeviceAccessStore = HostDeviceAccessStore()) {
+        self.deviceAccessStore = deviceAccessStore
+        core = Core(serviceName: serviceName, port: port, deviceAccessStore: deviceAccessStore)
     }
 
     deinit {
@@ -66,6 +70,26 @@ final class HostServer: @unchecked Sendable {
 
     func stop() {
         core.stop()
+    }
+
+    var allowsConnections: Bool { deviceAccessStore.allowsConnections }
+
+    var pairedDevices: [HostPairedDevice] { deviceAccessStore.pairedDevices() }
+
+    /// Persists access before changing the listener. Completion means existing
+    /// transports have been retired when access is disabled.
+    func setAllowsConnections(_ allowsConnections: Bool) async throws {
+        try await core.setAllowsConnections(allowsConnections)
+    }
+
+    /// Completion means the revocation is durable and matching transports are
+    /// disconnected. Fresh code/password pairing can subsequently restore it.
+    func revokeDevice(id: Data) async throws {
+        try await core.revokeDevice(id: id)
+    }
+
+    func setPairedDevicesHandler(_ handler: PairedDevicesHandler?) {
+        core.setPairedDevicesHandler(handler)
     }
 
     /// Rotates the root credential, invalidating all resume secrets, and starts
@@ -247,6 +271,7 @@ private extension HostServer {
                                           qos: .userInteractive)
         private let serviceName: String
         private let listenerPort: UInt16
+        private let deviceAccessStore: HostDeviceAccessStore
 
         private var listener: NWListener?
         private var listenerRetryWorkItem: DispatchWorkItem?
@@ -274,10 +299,12 @@ private extension HostServer {
         private var lastStatus: Status = .stopped
         private var clientCountHandler: ClientCountHandler = { _ in }
         private var statusHandler: StatusHandler = { _ in }
+        private var pairedDevicesHandler: PairedDevicesHandler = { _ in }
 
-        init(serviceName: String, port: UInt16) {
+        init(serviceName: String, port: UInt16, deviceAccessStore: HostDeviceAccessStore) {
             self.serviceName = serviceName
             listenerPort = port
+            self.deviceAccessStore = deviceAccessStore
         }
 
         func start(pairingSecret: Data,
@@ -312,6 +339,56 @@ private extension HostServer {
         func stop() {
             queue.async { [weak self] in
                 self?.stopLocked(publishStopped: true)
+            }
+        }
+
+        func setAllowsConnections(_ allowsConnections: Bool) async throws {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                queue.async { [self] in
+                    do {
+                        try deviceAccessStore.setAllowsConnections(allowsConnections)
+                        if allowsConnections, let rootSecretData {
+                            startLocked(pairingSecret: rootSecretData,
+                                        pairingPasswordCredential: pairingPasswordCredential)
+                        } else if !allowsConnections {
+                            stopLocked(publishStopped: true)
+                        }
+                        continuation.resume()
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        }
+
+        func revokeDevice(id: Data) async throws {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                queue.async { [self] in
+                    do {
+                        try deviceAccessStore.revoke(identifier: id)
+                        let matchingClients = clients.values.filter { $0.clientIdentifier == id }
+                        if !matchingClients.isEmpty {
+                            authenticatedClientReplacementHandler?()
+                        }
+                        for client in matchingClients {
+                            remove(client, publishChanges: false)
+                        }
+                        publishAuthenticatedClientCountIfNeeded()
+                        publishEffectiveStreamQualityIfNeeded()
+                        publishPairedDevices()
+                        continuation.resume()
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        }
+
+        func setPairedDevicesHandler(_ handler: PairedDevicesHandler?) {
+            queue.async { [weak self] in
+                guard let self else { return }
+                pairedDevicesHandler = handler ?? { _ in }
+                publishPairedDevices()
             }
         }
 
@@ -362,10 +439,19 @@ private extension HostServer {
 
         func replacePairingSecretAndRestart(_ pairingSecret: Data) {
             queue.async { [weak self] in
-                self?.startLocked(
+                guard let self else { return }
+                do {
+                    try deviceAccessStore.removeAllDevices()
+                } catch {
+                    // The new root key independently invalidates every old
+                    // credential even if cleaning up display metadata fails.
+                    Self.logger.error("Could not clear the saved device list after credential rotation")
+                }
+                startLocked(
                     pairingSecret: pairingSecret,
                     pairingPasswordCredential: nil
                 )
+                publishPairedDevices()
             }
         }
 
@@ -528,6 +614,10 @@ private extension HostServer {
             hostIdentifier = HostServer.makeHostIdentifier(from: pairingSecret)
             self.pairingPasswordCredential = pairingPasswordCredential
             pairingAttemptLimiter.reset()
+            guard deviceAccessStore.allowsConnections else {
+                publishStatus(.stopped)
+                return
+            }
             publishStatus(.starting)
             startListenerLocked(activeGeneration: activeGeneration)
         }
@@ -630,6 +720,7 @@ private extension HostServer {
             }
             publishAuthenticatedClientCountIfNeeded(force: true)
             publishEffectiveStreamQualityIfNeeded()
+            publishPairedDevices()
         }
 
         private func handleListenerState(_ state: NWListener.State,
@@ -918,7 +1009,6 @@ private extension HostServer {
 
             let authentication: (
                 credential: Data,
-                resumeSecret: Data,
                 sharedSecret: SharedSecret,
                 transcript: Data
             )
@@ -933,11 +1023,6 @@ private extension HostServer {
                     serverHello: context.hello,
                     clientHello: hello
                 )
-                let resumeSecret = try HostProtocol.resumeSecret(
-                    rootSecret: rootSecret,
-                    clientIdentifier: hello.clientIdentifier
-                )
-
                 let credential: Data
                 switch hello.authenticationMethod {
                 case .pairingCode:
@@ -959,7 +1044,10 @@ private extension HostServer {
                     }
                     credential = pairingPasswordCredential
                 case .resumeSecret:
-                    credential = resumeSecret
+                    credential = try deviceAccessStore.resumeSecret(
+                        rootSecret: rootSecret,
+                        identifier: hello.clientIdentifier
+                    )
                 }
 
                 let authenticationKey = HostProtocol.authenticationKey(
@@ -974,7 +1062,7 @@ private extension HostServer {
                 ) else {
                     throw HostProtocol.ProtocolError.invalidAuthentication
                 }
-                authentication = (credential, resumeSecret, sharedSecret, transcript)
+                authentication = (credential, sharedSecret, transcript)
             } catch {
                 if isBootstrapPairing {
                     pairingAttemptLimiter.recordFailureIfAllowed()
@@ -982,6 +1070,15 @@ private extension HostServer {
                 throw error
             }
 
+            try deviceAccessStore.recordAuthentication(
+                identifier: hello.clientIdentifier,
+                name: hello.clientName,
+                isBootstrapPairing: isBootstrapPairing
+            )
+            let resumeSecret = try deviceAccessStore.resumeSecret(
+                rootSecret: rootSecret,
+                identifier: hello.clientIdentifier
+            )
             let material = HostProtocol.sessionMaterial(
                 sharedSecret: authentication.sharedSecret,
                 credential: authentication.credential,
@@ -1005,7 +1102,7 @@ private extension HostServer {
 
             let accepted = HostProtocol.AuthenticationAccepted(
                 clientIdentifier: hello.clientIdentifier,
-                resumeSecret: authentication.resumeSecret,
+                resumeSecret: resumeSecret,
                 serverTimeMilliseconds: UInt64(Date().timeIntervalSince1970 * 1_000),
                 maximumMediaPayloadLength: UInt32(HostProtocol.maximumPayloadLength)
             )
@@ -1027,6 +1124,7 @@ private extension HostServer {
             Self.logger.info("Authenticated a Glassy viewer")
             publishAuthenticatedClientCountIfNeeded()
             publishEffectiveStreamQualityIfNeeded()
+            publishPairedDevices()
             requestKeyFrameIfNeeded(for: [client])
         }
 
@@ -1251,6 +1349,12 @@ private extension HostServer {
             guard publishChanges else { return }
             publishAuthenticatedClientCountIfNeeded()
             publishEffectiveStreamQualityIfNeeded()
+            publishPairedDevices()
+        }
+
+        private func publishPairedDevices() {
+            let connectedIdentifiers = Set(authenticatedClients.compactMap(\.clientIdentifier))
+            pairedDevicesHandler(deviceAccessStore.pairedDevices(connectedIdentifiers: connectedIdentifiers))
         }
 
         private func publishAuthenticatedClientCountIfNeeded(force: Bool = false) {

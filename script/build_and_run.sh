@@ -119,13 +119,18 @@ install_app() {
   return 1
 }
 
-install_app
+if [[ "$MODE" != "--preview" ]]; then
+  install_app
+fi
 
 open_app() {
   /usr/bin/open -n "$INSTALLED_APP_BUNDLE"
 }
 
 case "$MODE" in
+  --preview)
+    /usr/bin/open -n "$STAGED_APP_BUNDLE" --args --glassy-preview
+    ;;
   run)
     open_app
     ;;
@@ -156,7 +161,7 @@ case "$MODE" in
     exit 1
     ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--preview|--debug|--logs|--telemetry|--verify]" >&2
     exit 2
     ;;
 esac
