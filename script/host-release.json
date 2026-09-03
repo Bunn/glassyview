@@ -8,6 +8,6 @@
   "feed_path": "glassy-host/appcast.xml",
   "feed_url": "https://glassydesk-host.pages.dev/glassy-host/appcast.xml",
   "pages_project": "glassydesk-host",
-  "cloudflare_account_id": "",
+  "cloudflare_account_id": "6e73c78f9eaeeaa3298c750113cf498e",
   "wrangler_version": "4.128.0"
 }
