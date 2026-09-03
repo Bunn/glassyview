@@ -596,7 +596,11 @@ def publish_feed(state, work, config, github, run, cloudflare_token, account_id,
     # Deployment propagation is read-only and bounded. A failure remains resumable.
     for attempt in range(6):
         try:
-            request = urllib.request.Request(config["feed_url"], headers={"Cache-Control": "no-cache"})
+            request = urllib.request.Request(config["feed_url"], headers={
+                "Accept": "application/rss+xml",
+                "Cache-Control": "no-cache",
+                "User-Agent": "GlassyHost-Release/1.0",
+            })
             with urllib.request.urlopen(request, timeout=30) as response:
                 live = response.read(4 * 1024 * 1024 + 1)
                 correct_headers = "no-cache" in response.headers.get("Cache-Control", "")

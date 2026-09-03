@@ -158,6 +158,7 @@ class SyntheticCase(unittest.TestCase):
         self.archive.write_bytes(PAYLOAD)
         self.runner = FakeRunner()
         self.saved = []
+        self.live_feed_requests = []
         self.contexts.enter_context(patch.dict(os.environ, {}, clear=True))
         # Any unmocked command, network access, or credential operation fails the test.
         self.process = self.contexts.enter_context(patch.object(release.subprocess, "run", side_effect=AssertionError("Real subprocess forbidden")))
@@ -174,7 +175,11 @@ class SyntheticCase(unittest.TestCase):
             self.state.pop(field, None)
 
     def allow_live_feed(self, github):
-        return patch.object(release.urllib.request, "urlopen", side_effect=lambda *a, **k: Response(github.feed))
+        def respond(request, *args, **kwargs):
+            self.live_feed_requests.append(request)
+            return Response(github.feed)
+
+        return patch.object(release.urllib.request, "urlopen", side_effect=respond)
 
 
 class AppcastTests(SyntheticCase):
@@ -588,6 +593,14 @@ class FeedDeploymentTests(SyntheticCase):
         self.assertTrue(command[2]["sensitive"])
         self.assertNotIn("--json", command[0])
         self.assertIn("--package=wrangler@4.128.0", command[0])
+        self.assertGreaterEqual(len(self.live_feed_requests), 1)
+        live_request = self.live_feed_requests[0]
+        self.assertEqual(live_request.full_url, CONFIG["feed_url"])
+        self.assertEqual(live_request.get_header("User-agent"), "GlassyHost-Release/1.0")
+        self.assertEqual(live_request.get_header("Accept"), "application/rss+xml")
+        self.assertEqual(live_request.get_header("Cache-control"), "no-cache")
+        self.assertIsNone(live_request.get_header("Authorization"))
+        self.assertFalse(any("cloudflare" in name.lower() for name, _ in live_request.header_items()))
         self.assertTrue(self.state["complete"])
         put = next(c for c in github.calls if c[0] == "PUT")
         self.assertEqual(put[2]["sha"], "current-feed-blob")
