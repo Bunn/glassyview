@@ -5,36 +5,36 @@ struct RemoteConnectionInfoView: View {
         Form {
             Section {
                 Label {
-                    Text("For the easiest secure connection outside your local network, use Tailscale on the iPad and the remote Mac.")
+                    Text("Glassy Desk automatically finds a working connection over your local network or a VPN such as Tailscale or WireGuard.")
                 } icon: {
                     Image(systemName: "lock.shield.fill")
                         .foregroundStyle(.blue)
                 }
             }
 
-            Section("Recommended Setup") {
+            Section("Connect from Another Network") {
                 setupStep(
-                    "Install Tailscale",
-                    detail: "Install and open Tailscale on both this device and the remote Mac.",
-                    systemImage: "arrow.down.app.fill"
-                )
-
-                setupStep(
-                    "Join the Same Tailnet",
-                    detail: "Sign in so both devices appear on the same private Tailscale network.",
+                    "Connect Your VPN",
+                    detail: "Connect this device and the Mac with Tailscale or WireGuard so they can reach each other.",
                     systemImage: "network"
                 )
 
                 setupStep(
-                    "Enter the Mac’s Address",
-                    detail: "Add the Mac manually using its Tailscale IP address or full .ts.net name.",
+                    "Open Add Device on the Mac",
+                    detail: "Glassy Host includes the Mac’s current local and VPN addresses in its pairing QR code.",
                     systemImage: "desktopcomputer"
+                )
+
+                setupStep(
+                    "Scan and Connect",
+                    detail: "Choose Scan QR Code in Glassy Desk and approve the Mac. Its saved addresses work automatically when you change networks.",
+                    systemImage: "qrcode.viewfinder"
                 )
             }
 
             Section {
                 Label {
-                    Text("Nearby discovery only finds Macs on the current local network. Tailscale reaches the remote Mac without exposing a public port on your router.")
+                    Text("Nearby discovery finds Macs on your local network. Use a QR code or a saved VPN address to connect from elsewhere. If the Mac’s VPN setup changes after pairing, scan a new QR code to refresh its addresses.")
                 } icon: {
                     Image(systemName: "info.circle.fill")
                         .foregroundStyle(.secondary)

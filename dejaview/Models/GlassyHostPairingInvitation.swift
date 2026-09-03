@@ -9,6 +9,10 @@ struct GlassyHostPairingInvitation: Equatable, Sendable {
     let name: String
     let code: GlassyHostPairingCode
     let expiresAt: Date
+    let expectedHostIdentifier: Data?
+    let addresses: [GlassyStreamDirectAddress]
+
+    var alternateAddresses: [GlassyStreamDirectAddress] { Array(addresses.dropFirst()) }
 
     enum ValidationError: LocalizedError, Equatable {
         case invalidCode
@@ -36,16 +40,27 @@ struct GlassyHostPairingInvitation: Equatable, Sendable {
               components.port == nil,
               components.path.isEmpty,
               components.fragment == nil,
-              let items = components.queryItems,
-              items.count == 6,
-              Set(items.map(\.name)) == ["v", "host", "port", "name", "code", "expires"] else {
+              let items = components.queryItems, items.count <= 14 else {
             throw ValidationError.invalidCode
         }
 
-        // The key count and set check above reject duplicate and unknown keys.
-        let values = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
-        guard values["v"] == "1",
-              let host = values["host"], Self.isValidHost(host),
+        let versionItems = items.filter { $0.name == "v" }
+        guard versionItems.count == 1,
+              let version = versionItems[0].value,
+              version == "1" || version == "2" else { throw ValidationError.invalidCode }
+        let requiredKeys: Set<String> = version == "1"
+            ? ["v", "host", "port", "name", "code", "expires"]
+            : ["v", "host", "port", "name", "code", "expires", "id"]
+        let requiredItems = items.filter { $0.name != "alt" }
+        let alternateItems = items.filter { $0.name == "alt" }
+        guard requiredItems.count == requiredKeys.count,
+              Set(requiredItems.map(\.name)) == requiredKeys,
+              alternateItems.count <= 7,
+              version == "2" || alternateItems.isEmpty else { throw ValidationError.invalidCode }
+
+        // Only `alt` may repeat, and it is unavailable in the legacy format.
+        let values = Dictionary(uniqueKeysWithValues: requiredItems.map { ($0.name, $0.value ?? "") })
+        guard let host = values["host"], Self.isValidHost(host),
               let portText = values["port"], Self.isASCIIDigits(portText),
               let port = UInt16(portText), port > 0,
               let name = values["name"], !name.isEmpty, name.utf8.count <= 255,
@@ -65,11 +80,36 @@ struct GlassyHostPairingInvitation: Equatable, Sendable {
 
         let expiresAt = Date(timeIntervalSince1970: expiration)
         guard expiresAt > now else { throw ValidationError.expired }
+        let expectedHostIdentifier: Data?
+        if version == "2" {
+            guard let encodedIdentifier = values["id"], encodedIdentifier.utf8.count == 24,
+                  let identifier = Data(base64Encoded: encodedIdentifier), identifier.count == 16,
+                  identifier.base64EncodedString() == encodedIdentifier else {
+                throw ValidationError.invalidCode
+            }
+            expectedHostIdentifier = identifier
+        } else {
+            expectedHostIdentifier = nil
+        }
+        var addresses = [GlassyStreamDirectAddress(host: host, port: port)]
+        var identities = Set(addresses.map(\.canonicalIdentity))
+        for item in alternateItems {
+            guard let alternateHost = item.value, Self.isValidHost(alternateHost) else {
+                throw ValidationError.invalidCode
+            }
+            let address = GlassyStreamDirectAddress(host: alternateHost, port: port)
+            guard identities.insert(address.canonicalIdentity).inserted else {
+                throw ValidationError.invalidCode
+            }
+            addresses.append(address)
+        }
         self.host = host
         self.port = port
         self.name = name
         self.code = code
         self.expiresAt = expiresAt
+        self.expectedHostIdentifier = expectedHostIdentifier
+        self.addresses = addresses
     }
 
     var candidate: GlassyStreamEndpointCandidate {
@@ -80,25 +120,16 @@ struct GlassyHostPairingInvitation: Equatable, Sendable {
             detail: address.displayValue,
             source: .direct,
             endpoint: address.endpoint,
-            directAddress: address
+            directAddress: address,
+            expectedHostIdentifier: expectedHostIdentifier,
+            alternateAddresses: alternateAddresses
         )
     }
 
     /// Match only equivalent direct addresses. A display name is not evidence
     /// that an unpaired, saved Mac and the scanned Mac are the same device.
     func matchesAddress(_ address: GlassyStreamDirectAddress) -> Bool {
-        guard port == address.port else { return false }
-        if let lhs = IPv6Address(host), let rhs = IPv6Address(address.host) {
-            return lhs.rawValue == rhs.rawValue
-        }
-        if let lhs = IPv4Address(host), let rhs = IPv4Address(address.host) {
-            return lhs.rawValue == rhs.rawValue
-        }
-        func canonicalHost(_ value: String) -> String {
-            let lowercase = value.lowercased()
-            return lowercase.hasSuffix(".") ? String(lowercase.dropLast()) : lowercase
-        }
-        return canonicalHost(host) == canonicalHost(address.host)
+        addresses.contains { $0.canonicalIdentity == address.canonicalIdentity }
     }
 
     private static func isASCIIDigits(_ value: String) -> Bool {
@@ -107,6 +138,7 @@ struct GlassyHostPairingInvitation: Equatable, Sendable {
 
     private static func isValidHost(_ host: String) -> Bool {
         guard !host.isEmpty, host.utf8.count <= 253,
+              !host.contains("%"),
               host.unicodeScalars.allSatisfy(\.isASCII) else { return false }
         if IPv4Address(host) != nil || IPv6Address(host) != nil { return true }
 

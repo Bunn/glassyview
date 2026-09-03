@@ -17,6 +17,9 @@ struct GlassyHostPairingInvitationTests {
         #expect(invitation.expiresAt.timeIntervalSince(now) == 60)
         #expect(invitation.candidate.directAddress?.host == invitation.host)
         #expect(invitation.candidate.directAddress?.port == invitation.port)
+        #expect(invitation.expectedHostIdentifier == nil)
+        #expect(invitation.addresses.count == 1)
+        #expect(invitation.candidate.fallbackEndpoints.isEmpty)
     }
 
     @Test(arguments: ["192.168.1.24", "100.64.0.2", "fd7a:115c:a1e0::2", "my-mac.tail123.ts.net"])
@@ -80,5 +83,75 @@ struct GlassyHostPairingInvitationTests {
                 try GlassyHostPairingInvitation(scannedValue: value, now: now)
             }
         }
+    }
+
+    @Test
+    func versionTwoCarriesIdentityAndMultipleRoutes() throws {
+        let identifier = Data((0..<16).map(UInt8.init))
+        let invitation = try GlassyHostPairingInvitation(
+            scannedValue: versionTwo(identifier: identifier.base64EncodedString(),
+                                     alternates: ["100.64.0.2", "192.168.1.24", "fd7a:115c:a1e0::2"]),
+            now: now
+        )
+        #expect(invitation.expectedHostIdentifier == identifier)
+        #expect(invitation.addresses.map(\.host) == ["Studio-Mac.local", "100.64.0.2", "192.168.1.24", "fd7a:115c:a1e0::2"])
+        #expect(invitation.candidate.expectedHostIdentifier == identifier)
+        #expect(invitation.candidate.allDirectAddresses == invitation.addresses)
+        #expect(invitation.candidate.fallbackEndpoints.count == 3)
+        #expect(invitation.matchesAddress(GlassyStreamDirectAddress(host: "100.64.0.2", port: 51_515)))
+        #expect(invitation.matchesAddress(GlassyStreamDirectAddress(host: "STUDIO-MAC.local.", port: 51_515)))
+        #expect(!invitation.matchesAddress(GlassyStreamDirectAddress(host: "other.local", port: 51_515)))
+    }
+
+    @Test(arguments: ["", "not-base64", "AAAAAAAAAAAAAAAAAAAAAA", "AAAAAAAAAAAAAAAAAAAAAB==", "AAAAAAAAAAAAAAAAAAAAAAA=", "AAAAAAAAAAAAAAAAAAAAAAA=="])
+    func rejectsMalformedVersionTwoIdentity(identifier: String) {
+        #expect(throws: GlassyHostPairingInvitation.ValidationError.invalidCode) {
+            try GlassyHostPairingInvitation(scannedValue: versionTwo(identifier: identifier), now: now)
+        }
+    }
+
+    @Test(arguments: ["", "bad/path", "mac.local:51515", "tcp://mac.local", "fe80::1%en0", "[fd7a:115c:a1e0::2]", "STUDIO-MAC.local."])
+    func rejectsInvalidOrDuplicateAlternateHosts(host: String) {
+        #expect(throws: GlassyHostPairingInvitation.ValidationError.invalidCode) {
+            try GlassyHostPairingInvitation(scannedValue: versionTwo(alternates: [host]), now: now)
+        }
+    }
+
+    @Test
+    func boundsVersionTwoRoutesAndRejectsRepeatedEndpointSpellings() throws {
+        let alternatives = (1...7).map { "100.64.0.\($0)" }
+        #expect(try GlassyHostPairingInvitation(scannedValue: versionTwo(alternates: alternatives), now: now).addresses.count == 8)
+        for hosts in [alternatives + ["100.64.0.8"],
+                      ["100.64.0.2", "100.64.0.2"],
+                      ["fd7a:115c:a1e0::2", "fd7a:115c:a1e0:0:0:0:0:2"]] {
+            #expect(throws: GlassyHostPairingInvitation.ValidationError.invalidCode) {
+                try GlassyHostPairingInvitation(scannedValue: versionTwo(alternates: hosts), now: now)
+            }
+        }
+    }
+
+    @Test(arguments: ["v", "host", "port", "name", "code", "expires", "id", "unknown"])
+    func versionTwoRejectsDuplicateRequiredAndUnknownFields(key: String) {
+        #expect(throws: GlassyHostPairingInvitation.ValidationError.invalidCode) {
+            try GlassyHostPairingInvitation(scannedValue: versionTwo() + "&\(key)=extra", now: now)
+        }
+    }
+
+    @Test
+    func legacyPayloadCannotSmuggleVersionTwoFields() {
+        for suffix in ["&alt=100.64.0.2", "&id=AAAAAAAAAAAAAAAAAAAAAA=="] {
+            #expect(throws: GlassyHostPairingInvitation.ValidationError.invalidCode) {
+                try GlassyHostPairingInvitation(scannedValue: valid + suffix, now: now)
+            }
+        }
+    }
+
+    private func versionTwo(identifier: String = "AAAAAAAAAAAAAAAAAAAAAA==", alternates: [String] = []) -> String {
+        var components = URLComponents(string: valid)!
+        components.queryItems = components.queryItems!.map {
+            $0.name == "v" ? URLQueryItem(name: "v", value: "2") : $0
+        } + [URLQueryItem(name: "id", value: identifier)]
+            + alternates.map { URLQueryItem(name: "alt", value: $0) }
+        return components.url!.absoluteString
     }
 }

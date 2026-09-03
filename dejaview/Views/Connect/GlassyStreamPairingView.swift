@@ -265,6 +265,10 @@ struct GlassyStreamPairingView: View {
             case .oneTimeCode:
                 Text("Enter the code displayed by Glassy Host. It changes every minute and remains the recommended default for first-time pairing.")
             case .password:
+                if let selectedCandidate, let selectedManualCandidate,
+                   selectedCandidate.endpoint != selectedManualCandidate.endpoint {
+                    Text("Using \(selectedCandidate.detail) for password pairing over Tailscale.")
+                }
                 Text("Before pairing, confirm Tailscale is connected and the selected peer is your Mac. Glassy Desk also requires a Tailscale IP or full .ts.net name and an active VPN route. Later connections use a random Keychain credential.")
             }
         }
@@ -279,6 +283,12 @@ struct GlassyStreamPairingView: View {
                     isPairing: isPairing,
                     pair: pair
                 )
+                if invitation.addresses.count > 1 {
+                    Label("Glassy Desk will find an available Wi-Fi or VPN connection to this Mac.",
+                          systemImage: "network")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section {
@@ -302,7 +312,7 @@ struct GlassyStreamPairingView: View {
             } header: {
                 Text("Scan Your Mac’s QR Code")
             } footer: {
-                Text("In Glassy Host on your Mac, choose Add Device. Keep both devices on the same network, then point the camera at the QR code. You’ll review the Mac before connecting.")
+                Text("In Glassy Host on your Mac, choose Add Device, then point the camera at the QR code. Connect through the same Wi-Fi network or a VPN such as Tailscale. You’ll review the Mac before connecting.")
             }
         }
 
@@ -329,6 +339,12 @@ struct GlassyStreamPairingView: View {
         do {
             let invitation = try GlassyHostPairingInvitation(scannedValue: value)
             let pinnedIdentifier = machine.glassyHostIdentifier.flatMap { Data(base64Encoded: $0) }
+            if let pinnedIdentifier, pinnedIdentifier.count == GlassyStreamWire.identifierLength,
+               let scannedIdentifier = invitation.expectedHostIdentifier,
+               pinnedIdentifier != scannedIdentifier {
+                scanErrorMessage = String(localized: "This QR code belongs to a different Mac. Return to Connect and choose Scan QR Code to add it separately.")
+                return
+            }
             if restrictsScannedEndpoint,
                pinnedIdentifier?.count != GlassyStreamWire.identifierLength,
                let savedAddress = GlassyStreamEndpoint.directAddress(
@@ -401,6 +417,13 @@ struct GlassyStreamPairingView: View {
 
     private var selectedCandidate: GlassyStreamEndpointCandidate? {
         if isShowingQRScanner { return scannedInvitation?.candidate }
+        guard let selectedManualCandidate else { return nil }
+        return pairingMethod == .password
+            ? selectedManualCandidate.passwordPairingCandidate
+            : selectedManualCandidate
+    }
+
+    private var selectedManualCandidate: GlassyStreamEndpointCandidate? {
         guard let selectedCandidateID else { return nil }
         return candidates.first { $0.id == selectedCandidateID }
     }

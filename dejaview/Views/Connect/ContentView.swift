@@ -963,81 +963,71 @@ struct ContentView<Session: RemoteSessionControlling,
             for: machine,
             discoveredHosts: glassyHostBrowser.hosts
         )
-        guard !candidates.isEmpty else {
+        guard let candidate = candidates.first else {
             glassySession.reset()
             showGlassyConnectionFailure(
-                "No route to \(machine.displayName) is available. Edit the machine and enter its Tailscale name or 100.x address, or open Glassy Host while both devices are on the same local network.",
+                "No address for \(machine.displayName) is available. Scan its current Glassy Host QR code, or enter an address reachable through your local network or VPN.",
                 machine: machine
             )
             return
         }
 
         glassyConnectTask = Task { @MainActor in
-            var lastError: Error?
-
-            for candidate in candidates {
+            guard !Task.isCancelled else { return }
+            do {
+                let authentication = try await glassySession.connect(
+                    endpoint: candidate.endpoint,
+                    savedMachineID: machine.id,
+                    bootstrapCredential: nil,
+                    expectedHostIdentifier: expectedHostIdentifier,
+                    desiredQuality: preferences.quality,
+                    fallbackEndpoints: candidates.filter { $0.source == .bonjour }.map(\.endpoint)
+                        + candidates.flatMap { [$0.endpoint] + $0.fallbackEndpoints }
+                )
+                guard !Task.isCancelled else {
+                    glassySession.disconnect()
+                    return
+                }
+                let authenticatedMachine = try saveGlassyHostBinding(
+                    for: machine,
+                    authentication: authentication,
+                    candidate: candidate,
+                    vncPassword: vncPassword,
+                    knownAddresses: candidates.flatMap(\.allDirectAddresses)
+                )
+                glassyConnectTask = nil
+                presentGlassySession(for: authenticatedMachine)
+            } catch is CancellationError {
+                return
+            } catch {
                 guard !Task.isCancelled else { return }
+                glassyConnectTask = nil
+                glassySession.disconnect()
 
-                do {
-                    let authentication = try await glassySession.connect(
+                if shouldPromptForGlassyPairing(after: error) {
+                    let pairingCandidate = GlassyStreamEndpointCandidate(
+                        id: candidate.id,
+                        name: candidate.name,
+                        detail: candidate.detail,
+                        source: candidate.source,
                         endpoint: candidate.endpoint,
-                        savedMachineID: machine.id,
-                        bootstrapCredential: nil,
+                        directAddress: candidate.directAddress,
                         expectedHostIdentifier: expectedHostIdentifier,
-                        desiredQuality: preferences.quality,
-                        fallbackEndpoints: candidates
-                            .filter { $0.id != candidate.id }
-                            .map(\.endpoint)
+                        alternateAddresses: candidates.flatMap(\.allDirectAddresses)
                     )
-                    guard !Task.isCancelled else {
-                        glassySession.disconnect()
-                        return
-                    }
-
-                    let authenticatedMachine = saveGlassyHostBinding(
-                        for: machine,
-                        authentication: authentication,
-                        candidate: candidate,
-                        vncPassword: vncPassword
+                    glassyPairingRequest = GlassyStreamPairingRequest(
+                        machine: machine,
+                        vncPassword: vncPassword,
+                        initialErrorMessage: pairingPromptMessage(for: error),
+                        fixedCandidate: pairingCandidate
                     )
-                    glassyConnectTask = nil
-                    presentGlassySession(for: authenticatedMachine)
-                    return
-                } catch is CancellationError {
-                    return
-                } catch {
-                    lastError = error
-
-                    guard !Task.isCancelled else { return }
-                    guard shouldTryNextGlassyRoute(after: error) else {
-                        glassyConnectTask = nil
-                        glassySession.disconnect()
-
-                        if shouldPromptForGlassyPairing(after: error) {
-                            glassyPairingRequest = GlassyStreamPairingRequest(
-                                machine: machine,
-                                vncPassword: vncPassword,
-                                initialErrorMessage: pairingPromptMessage(for: error),
-                                fixedCandidate: candidate
-                            )
-                        } else {
-                            showGlassyConnectionFailure(
-                                glassyConnectionFailureMessage(for: error),
-                                machine: machine
-                            )
-                        }
-                        return
-                    }
+                } else {
+                    showGlassyConnectionFailure(
+                        glassyConnectionFailureMessage(for: error),
+                        machine: machine
+                    )
                 }
             }
-
-            guard !Task.isCancelled else { return }
-            glassyConnectTask = nil
-            glassySession.disconnect()
-            showGlassyConnectionFailure(
-                glassyConnectionFailureMessage(for: lastError),
-                machine: machine
-            )
         }
     }
 
@@ -1050,14 +1040,21 @@ struct ContentView<Session: RemoteSessionControlling,
             ? store.sessionPreferences(for: request.machine)
             : SessionPreferences.default
         glassySession.applyPreferences(preferences)
+        let pinnedIdentifier = expectedGlassyHostIdentifier(for: request.machine)
+        if let pinnedIdentifier, let invitationIdentifier = candidate.expectedHostIdentifier,
+           pinnedIdentifier != invitationIdentifier {
+            throw GlassyStreamSessionError.transport(.hostIdentityMismatch)
+        }
         let authentication = try await glassySession.connect(
             endpoint: candidate.endpoint,
             savedMachineID: request.machine.id,
             bootstrapCredential: bootstrapCredential,
-            expectedHostIdentifier: expectedGlassyHostIdentifier(for: request.machine),
-            desiredQuality: preferences.quality
+            expectedHostIdentifier: pinnedIdentifier ?? candidate.expectedHostIdentifier,
+            desiredQuality: preferences.quality,
+            fallbackEndpoints: candidate.fallbackEndpoints
         )
-        let authenticatedMachine = saveGlassyHostBinding(
+        try Task.checkCancellation()
+        let authenticatedMachine = try saveGlassyHostBinding(
             for: request.machine,
             authentication: authentication,
             candidate: candidate,
@@ -1101,61 +1098,20 @@ struct ContentView<Session: RemoteSessionControlling,
         for machine: SavedMachine,
         authentication: GlassyStreamAuthentication,
         candidate: GlassyStreamEndpointCandidate,
-        vncPassword: String
-    ) -> SavedMachine {
-        var authenticatedMachine = machine
-        authenticatedMachine.glassyHostIdentifier = authentication.hostIdentifier.base64EncodedString()
-
-        let authenticatedName = authentication.hostName
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        authenticatedMachine.glassyHostName = authenticatedName.isEmpty
-            ? candidate.name
-            : authenticatedName
-
-        // Normalize legacy records and inline host:port input only after that
-        // exact direct route has authenticated as the pinned Glassy Host.
-        if let directAddress = candidate.directAddress {
-            authenticatedMachine.host = directAddress.host
-            authenticatedMachine.port = directAddress.port
-        }
+        vncPassword: String,
+        knownAddresses: [GlassyStreamDirectAddress] = []
+    ) throws -> SavedMachine {
+        let authenticatedMachine = try GlassyStreamHostBinding.applying(
+            authentication,
+            to: machine,
+            via: candidate,
+            knownAddresses: knownAddresses
+        )
 
         if store.contains(machine) {
             store.update(authenticatedMachine, password: vncPassword)
         }
         return authenticatedMachine
-    }
-
-    private func shouldTryNextGlassyRoute(after error: Error) -> Bool {
-        guard let sessionError = error as? GlassyStreamSessionError else {
-            return false
-        }
-
-        switch sessionError {
-        case .connectionEndedBeforeAuthentication:
-            return true
-        case .transport(let clientError):
-            switch clientError {
-            case .connectionFailed, .connectionClosed, .authenticationTimedOut:
-                return true
-            case .alreadyConnecting,
-                 .cancelled,
-                 .pairingCodeRequired,
-                 .invalidPairingCode,
-                 .invalidPairingPassword,
-                 .pairingPasswordRequiresTailscale,
-                 .pairingPasswordUnsupported,
-                 .pairingPasswordDerivationFailed,
-                 .authenticationRejected,
-                 .hostIdentityMismatch,
-                 .directInputUnsupported,
-                 .unsupportedHostVersion,
-                 .protocolViolation,
-                 .credentialStoreFailed:
-                return false
-            }
-        case .cancelled, .videoReadinessTimedOut, .video:
-            return false
-        }
     }
 
     private func shouldPromptForGlassyPairing(after error: Error) -> Bool {
@@ -1174,7 +1130,7 @@ struct ContentView<Session: RemoteSessionControlling,
 
     private func glassyConnectionFailureMessage(for error: Error?) -> String {
         guard let error else {
-            return String(localized: "Could not reach Glassy Host. Check that Tailscale and Glassy Host are running, then try again.")
+            return String(localized: "Could not reach Glassy Host. Keep the Mac awake and connect both devices to the same local network or a VPN such as Tailscale or WireGuard, then try again.")
         }
 
         let description = error.localizedDescription
@@ -1295,9 +1251,10 @@ struct ContentView<Session: RemoteSessionControlling,
                 }
             }
 
-            let status = await MachineReachabilityProber.status(host: machine.host,
-                                                                 port: machine.port,
-                                                                 timeout: .seconds(1))
+            let status = await MachineReachabilityProber.status(
+                addresses: reachabilityAddresses(for: machine),
+                timeout: .seconds(1)
+            )
             machineReachabilityStatuses[machine.id] = status
             AppLog.wakeOnLAN.debug("Wake reachability probe completed; id=\(machine.id.uuidString, privacy: .public) attempt=\(attempt, privacy: .public) status=\(status.title, privacy: .public)")
 
@@ -1367,7 +1324,7 @@ struct ContentView<Session: RemoteSessionControlling,
                 return .reachable
             }
 
-            if GlassyStreamEndpoint.directCandidate(for: machine) != nil {
+            if !reachabilityAddresses(for: machine).isEmpty {
                 return machineReachabilityStatuses[machine.id] ?? .checking
             }
 
@@ -1432,13 +1389,11 @@ struct ContentView<Session: RemoteSessionControlling,
                     continue
                 }
 
-                let endpoint = reachabilityEndpoint(for: machine)
-                let host = endpoint.host
-                let port = endpoint.port
+                let addresses = reachabilityAddresses(for: machine)
                 let probeTimeout: Duration = machine.connectionMode == .glassyStream
                     ? .seconds(5)
                     : .seconds(2)
-                let endpointKey = reachabilityEndpointKey(host: host, port: port)
+                let endpointKey = reachabilityEndpointKey(for: machine)
 
                 AppLog.reachability.debug("Queueing saved machine reachability probe; generation=\(generation, privacy: .public) id=\(id.uuidString, privacy: .public) name=\(machine.displayName, privacy: .public) endpoint=\(endpointKey, privacy: .public)")
                 group.addTask {
@@ -1446,8 +1401,7 @@ struct ContentView<Session: RemoteSessionControlling,
                         AppLog.reachability.debug("Launching saved machine reachability probe; generation=\(generation, privacy: .public) id=\(id.uuidString, privacy: .public) endpoint=\(endpointKey, privacy: .public)")
                     }
                     let status = await MachineReachabilityProber.status(
-                        host: host,
-                        port: port,
+                        addresses: addresses,
                         timeout: probeTimeout
                     )
                     return (id, endpointKey, status)
@@ -1555,24 +1509,22 @@ struct ContentView<Session: RemoteSessionControlling,
     }
 
     private func reachabilityEndpointKey(for machine: SavedMachine) -> String {
-        let endpoint = reachabilityEndpoint(for: machine)
-        return reachabilityEndpointKey(host: endpoint.host, port: endpoint.port)
+        reachabilityAddresses(for: machine).map(\.displayValue).joined(separator: "|")
     }
 
-    private func reachabilityEndpoint(for machine: SavedMachine) -> (host: String, port: UInt16) {
-        if machine.connectionMode == .glassyStream,
-           let directAddress = GlassyStreamEndpoint.directCandidate(for: machine)?.directAddress {
-            return (directAddress.host, directAddress.port)
+    private func reachabilityAddresses(for machine: SavedMachine) -> [GlassyStreamDirectAddress] {
+        if machine.connectionMode == .glassyStream {
+            let candidates = GlassyStreamEndpoint.candidates(for: machine, discoveredHosts: [])
+            var seen = Set<GlassyStreamDirectAddress>()
+            return Array(candidates.flatMap(\.allDirectAddresses).filter {
+                seen.insert($0).inserted
+            }.prefix(8))
         }
 
-        return (
-            machine.host.trimmingCharacters(in: .whitespacesAndNewlines),
-            machine.port
-        )
-    }
-
-    private func reachabilityEndpointKey(host: String, port: UInt16) -> String {
-        "\(host.trimmingCharacters(in: .whitespacesAndNewlines)):\(port)"
+        return [GlassyStreamDirectAddress(
+            host: machine.host.trimmingCharacters(in: .whitespacesAndNewlines),
+            port: machine.port
+        )]
     }
 }
 

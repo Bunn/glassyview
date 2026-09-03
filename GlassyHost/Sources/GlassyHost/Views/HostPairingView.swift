@@ -57,7 +57,7 @@ struct HostPairingView: View {
                         manualCodeContent
                     }
 
-                    Label("Keep both devices on the same Wi-Fi network.", systemImage: "wifi")
+                    Label("Connect both devices to the same Wi-Fi or VPN.", systemImage: "network")
                         .font(.caption).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
@@ -92,7 +92,7 @@ struct HostPairingView: View {
                     .accessibilityLabel("Pairing QR code for \(HostIdentity.name)")
                     .privacySensitive()
             } else if payload == nil {
-                ContentUnavailableView("Use a pairing code", systemImage: "qrcode", description: Text("A local network address isn’t available yet. You can still pair by entering the code."))
+                ContentUnavailableView("Use a pairing code", systemImage: "qrcode", description: Text("A network address isn’t available yet. Connect this Mac to Wi-Fi or your VPN, then try again."))
                     .frame(height: 268)
             } else {
                 VStack(spacing: 12) {
@@ -153,9 +153,15 @@ struct HostPairingView: View {
 
     private var payload: String? {
         guard controller.allowsConnections,
-              let host = HostIdentity.address,
+              let host = controller.pairingAddresses.first,
+              let hostIdentifier = controller.pairingHostIdentifier,
               let port = controller.serverPort,
               let expiration = controller.pairingCodeExpiresAt else { return nil }
-        return HostPairingInvite(host: host, port: port, name: HostIdentity.name, code: controller.pairingCode, expiresAt: expiration).urlString
+        return HostPairingInvite(
+            host: host, port: port, name: HostIdentity.name,
+            code: controller.pairingCode, expiresAt: expiration,
+            hostIdentifier: hostIdentifier,
+            alternateHosts: Array(controller.pairingAddresses.dropFirst())
+        ).urlString
     }
 }

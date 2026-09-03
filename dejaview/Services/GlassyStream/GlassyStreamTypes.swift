@@ -28,6 +28,21 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
     let resumedSession: Bool
     let supportsStreamQuality: Bool
     let supportsCursorPositionUpdates: Bool
+    /// The selected route becomes trusted only after encrypted authentication.
+    let connectedAddress: GlassyStreamDirectAddress?
+
+    init(hostIdentifier: Data, hostName: String, maximumMediaPayloadLength: Int,
+         resumedSession: Bool, supportsStreamQuality: Bool,
+         supportsCursorPositionUpdates: Bool,
+         connectedAddress: GlassyStreamDirectAddress? = nil) {
+        self.hostIdentifier = hostIdentifier
+        self.hostName = hostName
+        self.maximumMediaPayloadLength = maximumMediaPayloadLength
+        self.resumedSession = resumedSession
+        self.supportsStreamQuality = supportsStreamQuality
+        self.supportsCursorPositionUpdates = supportsCursorPositionUpdates
+        self.connectedAddress = connectedAddress
+    }
 }
 
 enum GlassyStreamEvent: Equatable, Sendable {
@@ -58,6 +73,7 @@ struct GlassyStreamConnectionConfiguration: @unchecked Sendable {
     let desiredQuality: RemoteSessionQuality
     let clientName: String
     let authenticationTimeout: TimeInterval
+    let fallbackEndpoints: [NWEndpoint]
 
     init(endpoint: NWEndpoint,
          savedMachineID: UUID,
@@ -65,7 +81,8 @@ struct GlassyStreamConnectionConfiguration: @unchecked Sendable {
          expectedHostIdentifier: Data? = nil,
          desiredQuality: RemoteSessionQuality = .best,
          clientName: String = ProcessInfo.processInfo.hostName,
-         authenticationTimeout: TimeInterval = 10) {
+         authenticationTimeout: TimeInterval = 10,
+         fallbackEndpoints: [NWEndpoint] = []) {
         self.endpoint = endpoint
         self.savedMachineID = savedMachineID
         self.bootstrapCredential = bootstrapCredential
@@ -73,6 +90,7 @@ struct GlassyStreamConnectionConfiguration: @unchecked Sendable {
         self.desiredQuality = desiredQuality
         self.clientName = clientName
         self.authenticationTimeout = authenticationTimeout
+        self.fallbackEndpoints = fallbackEndpoints
     }
 
     func withoutBootstrapCredential() -> Self {
@@ -83,7 +101,8 @@ struct GlassyStreamConnectionConfiguration: @unchecked Sendable {
             expectedHostIdentifier: expectedHostIdentifier,
             desiredQuality: desiredQuality,
             clientName: clientName,
-            authenticationTimeout: authenticationTimeout
+            authenticationTimeout: authenticationTimeout,
+            fallbackEndpoints: fallbackEndpoints
         )
     }
 }

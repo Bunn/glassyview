@@ -22,6 +22,8 @@ final class HostController {
     private(set) var pairingCode = "Starting…"
     private(set) var pairingCodeRemainingSeconds = 0
     private(set) var pairingCodeExpiresAt: Date?
+    private(set) var pairingAddresses: [String] = []
+    private(set) var pairingHostIdentifier: Data?
     private(set) var pairedDevices: [HostPairedDevice] = []
     private(set) var allowsConnections = true
     private(set) var isUpdatingConnectionAccess = false
@@ -48,6 +50,9 @@ final class HostController {
     private let hostServer = HostServer()
     private let loginItemService = LoginItemService()
     private let remoteInputService = RemoteInputService()
+
+    @ObservationIgnored
+    private let pairingAddressService = HostPairingAddressService()
 
     @ObservationIgnored
     private lazy var captureService = ScreenCaptureService { [weak self] event in
@@ -217,6 +222,12 @@ final class HostController {
     func prepare() async {
         guard !isPrepared else { return }
         isPrepared = true
+        pairingAddressService.start { [weak self] addresses in
+            Task { @MainActor [weak self] in
+                guard let self, pairingAddresses != addresses else { return }
+                pairingAddresses = addresses
+            }
+        }
         runState = .starting
         refreshAuthorizationStatuses()
         refreshLoginItemStatus()
@@ -234,6 +245,7 @@ final class HostController {
             }.value
             let identifier = HostServer.makeHostIdentifier(from: pairingSecret.keyData)
             hostIdentifier = identifier
+            pairingHostIdentifier = identifier
 
             startServer(
                 pairingSecret: pairingSecret,
@@ -713,6 +725,7 @@ final class HostController {
                 try secretStore.replace()
             }.value
             hostIdentifier = HostServer.makeHostIdentifier(from: secret.keyData)
+            pairingHostIdentifier = hostIdentifier
             hostServer.replacePairingSecretAndRestart(secret.keyData)
             refreshPairingCode()
             let effects = streamingDemand.authenticatedClientCountChanged(to: 0)

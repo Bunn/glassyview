@@ -11,6 +11,9 @@ final class SavedMachineRecord {
     var connectionModeRawValue: String = RemoteConnectionMode.default.rawValue
     var glassyHostIdentifier: String?
     var glassyHostName: String?
+    /// Optional additive storage lets older SwiftData/CloudKit records migrate
+    /// without a required value or a transformable collection migration.
+    var glassyHostAddressesData: Data?
     var macAddress: String?
     @Attribute(.allowsCloudEncryption) var password: String?
     var createdAt: Date = Date.now
@@ -27,6 +30,7 @@ final class SavedMachineRecord {
          connectionModeRawValue: String = RemoteConnectionMode.default.rawValue,
          glassyHostIdentifier: String? = nil,
          glassyHostName: String? = nil,
+         glassyHostAddressesData: Data? = nil,
          macAddress: String? = nil,
          password: String? = nil,
          createdAt: Date = .now,
@@ -42,6 +46,7 @@ final class SavedMachineRecord {
         self.connectionModeRawValue = connectionModeRawValue
         self.glassyHostIdentifier = glassyHostIdentifier
         self.glassyHostName = glassyHostName
+        self.glassyHostAddressesData = glassyHostAddressesData
         self.macAddress = macAddress
         self.password = password
         self.createdAt = createdAt
@@ -60,6 +65,7 @@ final class SavedMachineRecord {
                   connectionModeRawValue: machine.connectionMode.rawValue,
                   glassyHostIdentifier: machine.glassyHostIdentifier,
                   glassyHostName: machine.glassyHostName,
+                  glassyHostAddressesData: Self.encodeAddresses(machine.glassyHostAddresses),
                   macAddress: machine.macAddress,
                   password: password,
                   lastConnectedAt: machine.lastConnectedAt,
@@ -75,6 +81,9 @@ final class SavedMachineRecord {
                      connectionMode: RemoteConnectionMode(rawValue: connectionModeRawValue) ?? .default,
                      glassyHostIdentifier: glassyHostIdentifier,
                      glassyHostName: glassyHostName,
+                     glassyHostAddresses: glassyHostAddressesData.flatMap {
+                         try? JSONDecoder().decode([String].self, from: $0)
+                     } ?? [],
                      macAddress: macAddress,
                      lastConnectedAt: lastConnectedAt)
     }
@@ -87,6 +96,7 @@ final class SavedMachineRecord {
         connectionModeRawValue = machine.connectionMode.rawValue
         glassyHostIdentifier = machine.glassyHostIdentifier
         glassyHostName = machine.glassyHostName
+        glassyHostAddressesData = Self.encodeAddresses(machine.glassyHostAddresses)
         macAddress = machine.macAddress
         lastConnectedAt = machine.lastConnectedAt ?? lastConnectedAt
         updatedAt = .now
@@ -94,5 +104,10 @@ final class SavedMachineRecord {
         if let sortOrder {
             self.sortOrder = sortOrder
         }
+    }
+
+    private static func encodeAddresses(_ addresses: [String]) -> Data? {
+        guard !addresses.isEmpty else { return nil }
+        return try? JSONEncoder().encode(Array(addresses.prefix(8)))
     }
 }

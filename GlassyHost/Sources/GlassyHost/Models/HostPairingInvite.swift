@@ -1,5 +1,4 @@
 import Foundation
-import Network
 import SystemConfiguration
 
 /// A short-lived pairing invitation understood by the GlassyDesk client.
@@ -10,11 +9,30 @@ struct HostPairingInvite: Equatable, Sendable {
     let name: String
     let code: String
     let expiresAt: Date
+    let hostIdentifier: Data
+    let alternateHosts: [String]
+
+    init(host: String, port: UInt16, name: String, code: String, expiresAt: Date,
+         hostIdentifier: Data, alternateHosts: [String] = []) {
+        self.host = host
+        self.port = port
+        self.name = name
+        self.code = code
+        self.expiresAt = expiresAt
+        self.hostIdentifier = hostIdentifier
+        self.alternateHosts = alternateHosts
+    }
 
     /// Versioned URL understood by the client's in-app pairing scanner.
     /// Invalid fields fail closed instead of producing a partially usable invite.
     var urlString: String? {
-        guard Self.isValidHost(host), port > 0,
+        let hosts = [host] + alternateHosts
+        let normalizedHosts = hosts.compactMap(HostPairingHostAddress.normalized)
+        guard hosts.count <= HostPairingAddressPolicy.maximumAddresses,
+              normalizedHosts.count == hosts.count,
+              Set(normalizedHosts).count == hosts.count,
+              hostIdentifier.count == HostProtocol.identifierLength,
+              port > 0,
               !name.isEmpty,
               name == name.trimmingCharacters(in: .whitespacesAndNewlines),
               name.utf8.count <= 255,
@@ -37,37 +55,27 @@ struct HostPairingInvite: Equatable, Sendable {
         components.scheme = "glassydesk"
         components.host = "pair"
         components.queryItems = [
-            URLQueryItem(name: "v", value: "1"),
-            URLQueryItem(name: "host", value: host),
+            URLQueryItem(name: "v", value: "2"),
+            URLQueryItem(name: "host", value: normalizedHosts[0]),
             URLQueryItem(name: "port", value: String(port)),
             URLQueryItem(name: "name", value: name),
             URLQueryItem(name: "code", value: code),
-            URLQueryItem(name: "expires", value: String(Int64(expiration)))
-        ]
-        return components.url?.absoluteString
+            URLQueryItem(name: "expires", value: String(Int64(expiration))),
+            URLQueryItem(name: "id", value: hostIdentifier.base64EncodedString())
+        ] + normalizedHosts.dropFirst().map { URLQueryItem(name: "alt", value: $0) }
+        // Preserve standard base64 even if a QR handoff passes through a
+        // query decoder that treats an unescaped plus as a form-style space.
+        components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        guard let url = components.url?.absoluteString, url.utf8.count <= 2_048 else { return nil }
+        return url
     }
 
-    /// macOS's Bonjour hostname is resolvable from another device on the LAN.
-    /// A display name, localhost, or an arbitrary interface address is not a substitute.
+    /// Bonjour is a useful LAN fallback. Invitations also carry active numeric
+    /// addresses because another network may not resolve this local DNS name.
     static func localHostAddress() -> String? {
         guard let localName = SCDynamicStoreCopyLocalHostName(nil) as String?,
               !localName.isEmpty else { return nil }
         let address = localName + ".local"
-        return isValidHost(address) ? address : nil
-    }
-
-    private static func isValidHost(_ host: String) -> Bool {
-        if IPv4Address(host) != nil || IPv6Address(host) != nil { return true }
-        guard !host.isEmpty, host.utf8.count <= 253 else { return false }
-        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
-        let lettersAndDigits = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        return labels.allSatisfy { label in
-            guard let first = label.first, let last = label.last,
-                  label.utf8.count <= 63,
-                  lettersAndDigits.contains(first), lettersAndDigits.contains(last) else {
-                return false
-            }
-            return label.allSatisfy { lettersAndDigits.contains($0) || $0 == "-" }
-        }
+        return HostPairingHostAddress.normalized(address)
     }
 }

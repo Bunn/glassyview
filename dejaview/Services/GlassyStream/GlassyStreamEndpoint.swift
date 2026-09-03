@@ -74,12 +74,70 @@ struct GlassyStreamEndpointCandidate: Identifiable, @unchecked Sendable {
     let source: GlassyStreamEndpointSource
     let endpoint: NWEndpoint
     let directAddress: GlassyStreamDirectAddress?
+    let expectedHostIdentifier: Data?
+    let alternateAddresses: [GlassyStreamDirectAddress]
+
+    init(id: String,
+         name: String,
+         detail: String,
+         source: GlassyStreamEndpointSource,
+         endpoint: NWEndpoint,
+         directAddress: GlassyStreamDirectAddress?,
+         expectedHostIdentifier: Data? = nil,
+         alternateAddresses: [GlassyStreamDirectAddress] = []) {
+        self.id = id
+        self.name = name
+        self.detail = detail
+        self.source = source
+        self.endpoint = endpoint
+        self.directAddress = directAddress
+        self.expectedHostIdentifier = expectedHostIdentifier
+        var identities = Set(directAddress.map { [$0.canonicalIdentity] } ?? [])
+        self.alternateAddresses = Array(alternateAddresses.filter {
+            identities.insert($0.canonicalIdentity).inserted
+        }.prefix(GlassyStreamEndpoint.maximumDirectAddressCount - 1))
+    }
+
+    var fallbackEndpoints: [NWEndpoint] { alternateAddresses.map(\.endpoint) }
+
+    var allDirectAddresses: [GlassyStreamDirectAddress] {
+        directAddress.map { [$0] + alternateAddresses } ?? alternateAddresses
+    }
+
+    /// A saved, pinned Mac can use its known Tailscale route for password
+    /// pairing even when its last successful route was on the LAN. Unpaired
+    /// manual connections retain only the route the user explicitly entered.
+    var passwordPairingCandidate: GlassyStreamEndpointCandidate? {
+        let hasPinnedIdentity = expectedHostIdentifier?.count == GlassyStreamWire.identifierLength
+        let allowedAlternates = hasPinnedIdentity ? alternateAddresses.compactMap {
+            GlassyStreamEndpoint.directAddress(from: $0.displayValue)
+        }.filter(\.isRecognizedTailscaleAddress) : []
+
+        let primary: GlassyStreamDirectAddress?
+        if case let .hostPort(host, port) = endpoint,
+           let address = GlassyStreamEndpoint.directAddress(
+               from: String(describing: host), defaultPort: port.rawValue
+           ), address.isRecognizedTailscaleAddress {
+            primary = address
+        } else {
+            primary = allowedAlternates.first
+        }
+        guard let primary else { return nil }
+
+        return GlassyStreamEndpointCandidate(
+            id: id, name: name, detail: primary.displayValue, source: .direct,
+            endpoint: primary.endpoint, directAddress: primary,
+            expectedHostIdentifier: expectedHostIdentifier,
+            alternateAddresses: allowedAlternates
+        )
+    }
 }
 
 /// Creates reliable Glassy Stream routes from persisted and discovered hosts.
 enum GlassyStreamEndpoint {
     /// Glassy Host's stable TCP listener in the dynamic/private port range.
     static let defaultPort: UInt16 = 51_515
+    static let maximumDirectAddressCount = 8
 
     private static let supportedSchemes = ["glassystream", "glassy", "tcp"]
 
@@ -180,7 +238,9 @@ enum GlassyStreamEndpoint {
             detail: address.displayValue,
             source: .direct,
             endpoint: address.endpoint,
-            directAddress: address
+            directAddress: address,
+            expectedHostIdentifier: pinnedIdentity(machine.glassyHostIdentifier),
+            alternateAddresses: savedAlternateAddresses(for: machine, excluding: address)
         )
     }
 
@@ -195,7 +255,8 @@ enum GlassyStreamEndpoint {
         discoveredHosts: [DiscoveredGlassyHost]
     ) -> [GlassyStreamEndpointCandidate] {
         let pairedHostName = machine.glassyHostName.flatMap(normalizedNonempty)
-        let isPaired = hasValidPinnedIdentity(machine.glassyHostIdentifier)
+        let expectedHostIdentifier = pinnedIdentity(machine.glassyHostIdentifier)
+        let isPaired = expectedHostIdentifier != nil
         let preferredNames = [pairedHostName, normalizedNonempty(machine.name)]
             .compactMap { $0 }
 
@@ -205,6 +266,23 @@ enum GlassyStreamEndpoint {
         if let direct = directCandidate(for: machine) {
             candidates.append(direct)
             identities.insert(endpointIdentity(direct.endpoint))
+        }
+        if isPaired {
+            let directAddresses = candidates.first?.allDirectAddresses
+                ?? savedAlternateAddresses(for: machine, excluding: nil)
+            for address in directAddresses {
+                guard identities.insert(endpointIdentity(address.endpoint)).inserted else { continue }
+                candidates.append(GlassyStreamEndpointCandidate(
+                    id: "direct:\(address.canonicalIdentity)",
+                    name: firstNonempty(machine.glassyHostName, machine.name, address.host) ?? address.host,
+                    detail: address.displayValue,
+                    source: .direct,
+                    endpoint: address.endpoint,
+                    directAddress: address,
+                    expectedHostIdentifier: expectedHostIdentifier,
+                    alternateAddresses: directAddresses
+                ))
+            }
         }
         let hasDirectCandidate = !candidates.isEmpty
 
@@ -245,7 +323,8 @@ enum GlassyStreamEndpoint {
                     detail: GlassyStreamEndpointSource.bonjour.title,
                     source: .bonjour,
                     endpoint: host.endpoint,
-                    directAddress: nil
+                    directAddress: nil,
+                    expectedHostIdentifier: expectedHostIdentifier
                 )
             )
         }
@@ -382,14 +461,30 @@ enum GlassyStreamEndpoint {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    private static func hasValidPinnedIdentity(_ encodedIdentifier: String?) -> Bool {
+    private static func pinnedIdentity(_ encodedIdentifier: String?) -> Data? {
         guard let encodedIdentifier = encodedIdentifier?.trimmingCharacters(
             in: .whitespacesAndNewlines
         ),
         let identifier = Data(base64Encoded: encodedIdentifier) else {
-            return false
+            return nil
         }
-        return identifier.count == GlassyStreamWire.identifierLength
+        return identifier.count == GlassyStreamWire.identifierLength ? identifier : nil
+    }
+
+    private static func savedAlternateAddresses(
+        for machine: SavedMachine,
+        excluding primary: GlassyStreamDirectAddress?
+    ) -> [GlassyStreamDirectAddress] {
+        // Additional routes are trusted only after the saved Mac has acquired a
+        // pinned identity. First-time manual pairing retains its explicit route.
+        guard pinnedIdentity(machine.glassyHostIdentifier) != nil else { return [] }
+        var identities = Set(primary.map { [$0.canonicalIdentity] } ?? [])
+        return machine.glassyHostAddresses.prefix(maximumDirectAddressCount).compactMap { value in
+            guard value.utf8.count <= 320,
+                  let address = directAddress(from: value),
+                  identities.insert(address.canonicalIdentity).inserted else { return nil }
+            return address
+        }
     }
 
     private static func canonicalHost(_ host: String) -> String {
@@ -401,13 +496,18 @@ enum GlassyStreamEndpoint {
     }
 }
 
-private extension GlassyStreamDirectAddress {
+extension GlassyStreamDirectAddress {
     var canonicalIdentity: String {
         var normalizedHost = host
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         while normalizedHost.hasSuffix(".") {
             normalizedHost.removeLast()
+        }
+        if let ipv6 = IPv6Address(normalizedHost) {
+            normalizedHost = ipv6.rawValue.map { String(format: "%02x", $0) }.joined()
+        } else if let ipv4 = IPv4Address(normalizedHost) {
+            normalizedHost = ipv4.rawValue.map { String($0) }.joined(separator: ".")
         }
         return "\(normalizedHost):\(port)"
     }

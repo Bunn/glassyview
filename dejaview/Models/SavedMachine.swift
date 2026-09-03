@@ -11,6 +11,7 @@ struct SavedMachine: Identifiable, Codable, Equatable {
     var connectionMode: RemoteConnectionMode
     var glassyHostIdentifier: String?
     var glassyHostName: String?
+    var glassyHostAddresses: [String]
     var macAddress: String?
     var lastConnectedAt: Date?
 
@@ -22,6 +23,7 @@ struct SavedMachine: Identifiable, Codable, Equatable {
          connectionMode: RemoteConnectionMode = .default,
          glassyHostIdentifier: String? = nil,
          glassyHostName: String? = nil,
+         glassyHostAddresses: [String] = [],
          macAddress: String? = nil,
          lastConnectedAt: Date? = nil) {
         self.id = id
@@ -32,6 +34,7 @@ struct SavedMachine: Identifiable, Codable, Equatable {
         self.connectionMode = connectionMode
         self.glassyHostIdentifier = glassyHostIdentifier
         self.glassyHostName = glassyHostName
+        self.glassyHostAddresses = Array(glassyHostAddresses.prefix(8))
         self.macAddress = macAddress
         self.lastConnectedAt = lastConnectedAt
     }
@@ -68,6 +71,7 @@ extension SavedMachine {
         case connectionMode
         case glassyHostIdentifier
         case glassyHostName
+        case glassyHostAddresses
         case macAddress
         case lastConnectedAt
     }
@@ -89,6 +93,10 @@ extension SavedMachine {
             String.self,
             forKey: .glassyHostName
         )
+        glassyHostAddresses = Array((try container.decodeIfPresent(
+            [String].self,
+            forKey: .glassyHostAddresses
+        ) ?? []).prefix(8))
         macAddress = try container.decodeIfPresent(String.self, forKey: .macAddress)
         lastConnectedAt = try container.decodeIfPresent(Date.self, forKey: .lastConnectedAt)
     }

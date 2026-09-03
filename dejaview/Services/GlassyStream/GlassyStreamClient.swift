@@ -3,7 +3,7 @@ import Foundation
 import Network
 import Security
 
-/// A single-connection Glassy Host transport.
+/// An encrypted Glassy Host transport selected from bounded concurrent routes.
 ///
 /// `connect` is callback-first so media can move directly from the Network
 /// queue to a renderer queue without MainActor work. `eventStream` is provided
@@ -27,16 +27,14 @@ final class GlassyStreamClient: @unchecked Sendable {
         case authenticated(GlassyStreamWire.SessionMaterial)
     }
 
-    /// Allows time for MagicDNS resolution and a dormant Tailscale path to
-    /// become usable before the secure-handshake clock starts.
-    private static let connectionEstablishmentTimeout: TimeInterval = 20
-
     private let queue = DispatchQueue(label: "dev.bunn.glassydesk.glassy-stream.network",
                                       qos: .userInteractive)
     private let credentialStore: any GlassyStreamResumeCredentialStoring
 
     private var generation = UUID()
     private var connection: NWConnection?
+    private var routeRace: GlassyStreamRouteRace?
+    private var selectedEndpoint: NWEndpoint?
     private var state: State = .idle
     private var configuration: GlassyStreamConnectionConfiguration?
     private var callbackQueue: DispatchQueue?
@@ -45,7 +43,6 @@ final class GlassyStreamClient: @unchecked Sendable {
     private var lastInboundSequence: UInt64 = 0
     private var nextOutboundSequence: UInt64 = 1
     private var maximumInboundPayloadLength = GlassyStreamWire.maximumHandshakePayloadLength
-    private var connectionEstablishmentTimeoutWorkItem: DispatchWorkItem?
     private var authenticationTimeoutWorkItem: DispatchWorkItem?
     private var supportsStreamQuality = false
     private var supportsCursorPositionUpdates = false
@@ -55,9 +52,9 @@ final class GlassyStreamClient: @unchecked Sendable {
     }
 
     deinit {
-        connectionEstablishmentTimeoutWorkItem?.cancel()
         authenticationTimeoutWorkItem?.cancel()
         connection?.stateUpdateHandler = nil
+        connection?.viabilityUpdateHandler = nil
         connection?.cancel()
     }
 
@@ -109,7 +106,7 @@ final class GlassyStreamClient: @unchecked Sendable {
     /// successfully; remote/network/protocol failures complete with an error.
     func disconnect() {
         queue.async { [weak self] in
-            guard let self, connection != nil else { return }
+            guard let self, callbacks != nil else { return }
             finish(.success(()), generation: generation)
         }
     }
@@ -197,7 +194,7 @@ final class GlassyStreamClient: @unchecked Sendable {
     private func start(configuration: GlassyStreamConnectionConfiguration,
                        callbackQueue: DispatchQueue,
                        callbacks: GlassyStreamClientCallbacks) {
-        guard connection == nil else {
+        guard connection == nil, routeRace == nil else {
             callbackQueue.async {
                 callbacks.onCompletion(.failure(.alreadyConnecting))
             }
@@ -266,46 +263,70 @@ final class GlassyStreamClient: @unchecked Sendable {
         maximumInboundPayloadLength = GlassyStreamWire.maximumHandshakePayloadLength
         supportsStreamQuality = false
         supportsCursorPositionUpdates = false
+        selectedEndpoint = nil
         state = .connecting
 
-        let tcpOptions = NWProtocolTCP.Options()
-        tcpOptions.noDelay = true
-        tcpOptions.enableKeepalive = true
-        tcpOptions.keepaliveIdle = 10
-        tcpOptions.keepaliveInterval = 5
-        tcpOptions.keepaliveCount = 3
-        let parameters = NWParameters(tls: nil, tcp: tcpOptions)
-        parameters.includePeerToPeer = true
-        let connection = NWConnection(to: configuration.endpoint, using: parameters)
-        self.connection = connection
-        scheduleConnectionEstablishmentTimeout(
-            after: Self.connectionEstablishmentTimeout,
-            generation: activeGeneration
-        )
+        let usesPassword: Bool
+        if case .password? = configuration.bootstrapCredential { usesPassword = true }
+        else { usesPassword = false }
+        let endpoints = ([configuration.endpoint] + configuration.fallbackEndpoints).filter {
+            !usesPassword || GlassyStreamEndpoint.isRecognizedTailscaleEndpoint($0)
+        }
+        let race = GlassyStreamRouteRace(
+            endpoints: endpoints,
+            expectedHostIdentifier: configuration.expectedHostIdentifier,
+            requiresVPNInterface: usesPassword,
+            queue: queue
+        ) { [weak self] result in
+            guard let self, activeGeneration == generation, self.callbacks != nil,
+                  case .connecting = state else {
+                if case let .success(selection) = result { selection.transport.cancel() }
+                return
+            }
+            switch result {
+            case let .failure(error):
+                finish(.failure(error), generation: activeGeneration)
+            case let .success(selection):
+                guard let selectedConnection = selection.transport.networkConnection else {
+                    selection.transport.cancel()
+                    finish(.failure(.connectionClosed), generation: activeGeneration)
+                    return
+                }
+                routeRace = nil
+                connection = selectedConnection
+                selectedEndpoint = selection.transport.endpoint
+                installConnectionStateHandler(selectedConnection, generation: activeGeneration)
+                state = .awaitingServerHello
+                scheduleAuthenticationTimeout(after: authenticationTimeout, generation: activeGeneration)
+                receiveBuffer = selection.prefetchedData
+                do {
+                    // Only the selected route enters this method, so the
+                    // bootstrap proof is produced and sent at most once.
+                    try processReceiveBuffer(generation: activeGeneration)
+                    receiveNext(generation: activeGeneration)
+                } catch {
+                    finish(.failure(clientError(error)), generation: activeGeneration)
+                }
+            }
+        }
+        routeRace = race
+        AppLog.session.info("Selecting a reachable Glassy Host route")
+        race.start()
+    }
+
+    private func installConnectionStateHandler(_ connection: NWConnection, generation activeGeneration: UUID) {
+        connection.viabilityUpdateHandler = { [weak self, weak connection] viable in
+            guard let self, let connection, !viable,
+                  activeGeneration == generation, connection === self.connection,
+                  case .authenticated = state else { return }
+            finish(.failure(.connectionFailed("The connection route is no longer available.")),
+                   generation: activeGeneration)
+        }
         connection.stateUpdateHandler = { [weak self, weak connection] networkState in
             guard let self, let connection,
                   activeGeneration == generation,
                   connection === self.connection else { return }
             switch networkState {
-            case .ready:
-                guard case .connecting = state else { return }
-                if let bootstrapCredential = self.configuration?.bootstrapCredential,
-                   case .password = bootstrapCredential,
-                   connection.currentPath?.usesInterfaceType(.other) != true {
-                    finish(
-                        .failure(.pairingPasswordRequiresTailscale),
-                        generation: activeGeneration
-                    )
-                    return
-                }
-                cancelConnectionEstablishmentTimeout()
-                state = .awaitingServerHello
-                scheduleAuthenticationTimeout(
-                    after: authenticationTimeout,
-                    generation: activeGeneration
-                )
-                AppLog.session.info("Glassy Stream TCP connection ready")
-                receiveNext(generation: activeGeneration)
             case let .failed(error):
                 finish(.failure(.connectionFailed(error.localizedDescription)),
                        generation: activeGeneration)
@@ -326,8 +347,6 @@ final class GlassyStreamClient: @unchecked Sendable {
                 break
             }
         }
-        AppLog.session.info("Connecting to discovered Glassy Host endpoint")
-        connection.start(queue: queue)
     }
 
     private func receiveNext(generation activeGeneration: UUID) {
@@ -458,8 +477,8 @@ final class GlassyStreamClient: @unchecked Sendable {
                 method = .pairingCode
             case .password(let suppliedPassword):
                 guard GlassyStreamEndpoint.isRecognizedTailscaleEndpoint(
-                    configuration.endpoint
-                ) else {
+                    selectedEndpoint ?? configuration.endpoint
+                ), connection?.currentPath?.usesInterfaceType(.other) == true else {
                     throw GlassyStreamClientError.pairingPasswordRequiresTailscale
                 }
                 guard capabilities.contains(.pairingPassword) else {
@@ -616,7 +635,8 @@ final class GlassyStreamClient: @unchecked Sendable {
                 maximumMediaPayloadLength: maximumInboundPayloadLength,
                 resumedSession: pending.resumedSession,
                 supportsStreamQuality: pending.supportsStreamQuality,
-                supportsCursorPositionUpdates: pending.supportsCursorPositionUpdates
+                supportsCursorPositionUpdates: pending.supportsCursorPositionUpdates,
+                connectedAddress: connectedAddress
             )
         ))
         AppLog.session.info("Authenticated encrypted Glassy Stream session")
@@ -759,14 +779,28 @@ final class GlassyStreamClient: @unchecked Sendable {
         }
     }
 
+    private var connectedAddress: GlassyStreamDirectAddress? {
+        let endpoint = selectedEndpoint ?? connection?.currentPath?.remoteEndpoint
+        if case let .hostPort(host, port) = endpoint {
+            return GlassyStreamDirectAddress(host: String(describing: host), port: port.rawValue)
+        }
+        if case let .hostPort(host, port) = connection?.currentPath?.remoteEndpoint {
+            return GlassyStreamDirectAddress(host: String(describing: host), port: port.rawValue)
+        }
+        return nil
+    }
+
     private func finish(_ result: Result<Void, GlassyStreamClientError>,
                         generation activeGeneration: UUID) {
-        guard activeGeneration == generation, let connection else { return }
-        cancelConnectionEstablishmentTimeout()
+        guard activeGeneration == generation, callbacks != nil else { return }
         cancelAuthenticationTimeout()
-        connection.stateUpdateHandler = nil
-        connection.cancel()
+        routeRace?.cancel()
+        routeRace = nil
+        connection?.stateUpdateHandler = nil
+        connection?.viabilityUpdateHandler = nil
+        connection?.cancel()
         self.connection = nil
+        selectedEndpoint = nil
         state = .idle
         supportsStreamQuality = false
         supportsCursorPositionUpdates = false
@@ -800,32 +834,6 @@ final class GlassyStreamClient: @unchecked Sendable {
         }
         authenticationTimeoutWorkItem = workItem
         queue.asyncAfter(deadline: .now() + timeout, execute: workItem)
-    }
-
-    private func scheduleConnectionEstablishmentTimeout(
-        after timeout: TimeInterval,
-        generation activeGeneration: UUID
-    ) {
-        cancelConnectionEstablishmentTimeout()
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self,
-                  activeGeneration == generation,
-                  connection != nil,
-                  case .connecting = state else {
-                return
-            }
-            finish(
-                .failure(.connectionFailed("The connection attempt timed out.")),
-                generation: activeGeneration
-            )
-        }
-        connectionEstablishmentTimeoutWorkItem = workItem
-        queue.asyncAfter(deadline: .now() + timeout, execute: workItem)
-    }
-
-    private func cancelConnectionEstablishmentTimeout() {
-        connectionEstablishmentTimeoutWorkItem?.cancel()
-        connectionEstablishmentTimeoutWorkItem = nil
     }
 
     private func cancelAuthenticationTimeout() {

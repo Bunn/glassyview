@@ -202,7 +202,7 @@ struct EditMachineView<Store: MachineStoring>: View {
                     Text("Machine")
                 } footer: {
                     if connectionMode == .glassyStream {
-                        Text("For remote access, use the Mac's Tailscale MagicDNS name or 100.x address. Connect both devices to the same tailnet; no public port forwarding is needed.")
+                        Text("Scan the Mac’s QR code to save its network addresses automatically. You can also enter a LAN, Tailscale, or WireGuard address here.")
                     } else {
                         Text("Enter the Mac's host name or IP address and its Screen Sharing port.")
                     }
@@ -362,6 +362,9 @@ struct EditMachineView<Store: MachineStoring>: View {
         prepared.connectionMode = connectionMode
         prepared.glassyHostIdentifier = glassyHostIdentifier
         prepared.glassyHostName = glassyHostName
+        if glassyHostIdentifier != machine.glassyHostIdentifier {
+            prepared.glassyHostAddresses = []
+        }
 
         if connectionMode == .glassyStream,
            let directAddress = GlassyStreamEndpoint.directAddress(

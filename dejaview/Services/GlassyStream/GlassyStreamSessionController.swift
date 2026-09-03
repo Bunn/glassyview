@@ -140,7 +140,8 @@ final class GlassyStreamSessionController {
         savedMachineID: UUID,
         bootstrapCredential: GlassyStreamBootstrapCredential?,
         expectedHostIdentifier: Data? = nil,
-        desiredQuality: RemoteSessionQuality = .best
+        desiredQuality: RemoteSessionQuality = .best,
+        fallbackEndpoints: [NWEndpoint] = []
     ) async throws -> GlassyStreamAuthentication {
         disconnectCurrentSession(clearError: true)
 
@@ -158,7 +159,8 @@ final class GlassyStreamSessionController {
             savedMachineID: savedMachineID,
             bootstrapCredential: bootstrapCredential,
             expectedHostIdentifier: expectedHostIdentifier,
-            desiredQuality: desiredQuality
+            desiredQuality: desiredQuality,
+            fallbackEndpoints: fallbackEndpoints
         )
 
         return try await withTaskCancellationHandler {

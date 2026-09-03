@@ -23,6 +23,14 @@ enum HostPairingQRCode {
                 size: NSSize(width: displaySize, height: displaySize)
             )
         }
+        // Multiple IPv6/VPN endpoints produce a denser symbol. A completely
+        // undecorated QR at medium correction leaves larger modules at the
+        // same display size. Keep it only when Vision verifies the exact URL.
+        if let compactMatrix = makeMatrix(for: payload, correctionLevel: "M"),
+           let rendered = render(compactMatrix, style: .standard),
+           canDecode(rendered, as: payload) {
+            return NSImage(cgImage: rendered, size: NSSize(width: displaySize, height: displaySize))
+        }
         return nil
     }
 
@@ -53,11 +61,11 @@ enum HostPairingQRCode {
         }
     }
 
-    private static func makeMatrix(for payload: String) -> Matrix? {
+    private static func makeMatrix(for payload: String, correctionLevel: String = "H") -> Matrix? {
         guard !payload.isEmpty, payload.utf8.count <= 2_048 else { return nil }
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(payload.utf8)
-        filter.correctionLevel = "H"
+        filter.correctionLevel = correctionLevel
         guard let output = filter.outputImage else { return nil }
         let side = Int(output.extent.width)
         guard side > 0, side == Int(output.extent.height) else { return nil }
