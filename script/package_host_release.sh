@@ -63,12 +63,6 @@ if [[ -z "$REQUESTED_IDENTITY" ]]; then
   usage >&2
   exit 2
 fi
-PROVISIONING_PROFILE="${GLASSY_HOST_PROVISIONING_PROFILE:-}"
-if [[ -z "$PROVISIONING_PROFILE" || ! -f "$PROVISIONING_PROFILE" || -L "$PROVISIONING_PROFILE" ]]; then
-  printf 'GLASSY_HOST_PROVISIONING_PROFILE must name the CloudKit-enabled Developer ID provisioning profile.\n' >&2
-  exit 2
-fi
-PROVISIONING_PROFILE="$(cd "$(dirname "$PROVISIONING_PROFILE")" && pwd)/$(basename "$PROVISIONING_PROFILE")"
 if [[ -n "$OUTPUT_MANIFEST" ]]; then
   MANIFEST_PARENT="$(dirname "$OUTPUT_MANIFEST")"
   if [[ ! -d "$MANIFEST_PARENT" || -e "$OUTPUT_MANIFEST" || -L "$OUTPUT_MANIFEST" || "$OUTPUT_MANIFEST" == */ ]]; then
@@ -80,54 +74,12 @@ fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PACKAGE_DIR="$ROOT_DIR/GlassyHost"
-RELEASE_CONFIG="$ROOT_DIR/script/host-release.json"
 APP_NAME="GlassyHost"
 DISPLAY_NAME="Glassy Host"
 BUNDLE_ID="dev.bunn.glassydesk.host"
-CLOUDKIT_CONTAINER="iCloud.dev.bunn.dejaview"
 INFO_PLIST="$PACKAGE_DIR/Support/Info.plist"
 ENTITLEMENTS="$PACKAGE_DIR/Support/GlassyHost.entitlements"
 ICON="$PACKAGE_DIR/Resources/GlassyHostAppIcon.icns"
-
-plist_array_contains() {
-  local plist="$1"
-  local key="$2"
-  local expected="$3"
-  local count
-  local index
-  local value
-  if ! count="$(/usr/bin/plutil -extract "$key" raw -expect array -o - "$plist" 2>/dev/null)" \
-      || [[ ! "$count" =~ ^[0-9]+$ ]]; then
-    return 1
-  fi
-  for ((index = 0; index < count; index++)); do
-    value="$(/usr/bin/plutil -extract "$key.$index" raw -expect string -o - "$plist")"
-    if [[ "$value" == "$expected" ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
-plist_prefix_array_contains() {
-  local plist="$1"
-  local key="$2"
-  local expected="$3"
-  local count
-  local index
-  local value
-  if ! count="$(/usr/bin/plutil -extract "$key" raw -expect array -o - "$plist" 2>/dev/null)" \
-      || [[ ! "$count" =~ ^[0-9]+$ ]]; then
-    return 1
-  fi
-  for ((index = 0; index < count; index++)); do
-    value="$(/usr/bin/plutil -extract "$key.$index" raw -expect string -o - "$plist")"
-    if [[ "${value%.}" == "$expected" ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
 
 # Resolve only an exact, usable Developer ID Application identity. Never fall
 # back to development or ad-hoc signing, and sign by hash to avoid ambiguity.
@@ -164,18 +116,13 @@ if [[ "$IDENTITY_COUNT" -ne 1 ]]; then
   exit 1
 fi
 
-for required_file in "$INFO_PLIST" "$ENTITLEMENTS" "$ICON" "$PACKAGE_DIR/Package.resolved" "$RELEASE_CONFIG"; do
+for required_file in "$INFO_PLIST" "$ENTITLEMENTS" "$ICON" "$PACKAGE_DIR/Package.resolved"; do
   if [[ ! -f "$required_file" ]]; then
     printf 'Required release input is missing: %s\n' "$required_file" >&2
     exit 1
   fi
 done
 /usr/bin/plutil -lint "$INFO_PLIST" "$ENTITLEMENTS"
-EXPECTED_TEAM_IDENTIFIER="$(/usr/bin/plutil -extract team_id raw -expect string -o - "$RELEASE_CONFIG")"
-if [[ ! "$EXPECTED_TEAM_IDENTIFIER" =~ ^[A-Z0-9]{10}$ ]]; then
-  printf 'The release configuration has no valid Apple Developer team identifier.\n' >&2
-  exit 1
-fi
 if [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST")" != "$BUNDLE_ID" ]]; then
   printf 'The app bundle identifier does not match the release configuration.\n' >&2
   exit 1
@@ -223,7 +170,6 @@ cp "$BUILD_DIR/$APP_NAME" "$APP_BINARY"
 cp "$INFO_PLIST" "$APP_CONTENTS/Info.plist"
 cp "$ICON" "$APP_CONTENTS/Resources/GlassyHostAppIcon.icns"
 cp "$SPARKLE_ARTIFACT/LICENSE" "$APP_CONTENTS/Resources/Sparkle-LICENSE.txt"
-cp "$PROVISIONING_PROFILE" "$APP_CONTENTS/embedded.provisionprofile"
 # Preserve the framework's version symlinks and helper executable permissions.
 /usr/bin/ditto "$BUILD_DIR/Sparkle.framework" "$SPARKLE_FRAMEWORK"
 chmod +x "$APP_BINARY"
@@ -238,77 +184,6 @@ if ! /usr/libexec/PlistBuddy -c 'Print :DTPlatformName' "$APP_CONTENTS/Info.plis
 fi
 /usr/bin/plutil -replace DTPlatformName -string macosx "$APP_CONTENTS/Info.plist"
 /usr/bin/plutil -lint "$APP_CONTENTS/Info.plist"
-
-# A Developer ID app needs an embedded distribution provisioning profile for
-# CloudKit. Validate its identity and private-container grants before sealing it
-# into the app, so a release cannot silently ship with enrollment disabled.
-PROFILE_INFO="$RELEASE_DIR/embedded-profile.plist"
-if ! /usr/bin/security cms -D -i "$PROVISIONING_PROFILE" -o "$PROFILE_INFO"; then
-  printf 'The CloudKit provisioning profile could not be decoded.\n' >&2
-  exit 1
-fi
-if ! PROFILE_APP_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.application-identifier' "$PROFILE_INFO" 2>/dev/null)"; then
-  PROFILE_APP_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$PROFILE_INFO")"
-fi
-if PROFILE_LEGACY_APP_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$PROFILE_INFO" 2>/dev/null)" \
-    && [[ "$PROFILE_LEGACY_APP_IDENTIFIER" != "$PROFILE_APP_IDENTIFIER" ]]; then
-  printf 'The provisioning profile contains conflicting Mac and legacy App IDs.\n' >&2
-  exit 1
-fi
-PROFILE_TEAM_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.team-identifier' "$PROFILE_INFO")"
-PROFILE_ENVIRONMENT="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.icloud-container-environment' "$PROFILE_INFO")"
-PROFILE_PROVISIONS_ALL_DEVICES="$(/usr/bin/plutil -extract ProvisionsAllDevices raw -expect bool -o - "$PROFILE_INFO" 2>/dev/null || true)"
-PROFILE_CERTIFICATE_COUNT="$(/usr/bin/plutil -extract DeveloperCertificates raw -expect array -o - "$PROFILE_INFO" 2>/dev/null || true)"
-PROFILE_EXPIRATION="$(/usr/bin/plutil -extract ExpirationDate raw -expect date -o - "$PROFILE_INFO" 2>/dev/null || true)"
-PROFILE_EXPIRATION_EPOCH="$(/bin/date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$PROFILE_EXPIRATION" '+%s' 2>/dev/null || true)"
-case "$PROFILE_APP_IDENTIFIER" in
-  *."$BUNDLE_ID")
-    PROFILE_APP_IDENTIFIER_PREFIX="${PROFILE_APP_IDENTIFIER%.$BUNDLE_ID}"
-    ;;
-  *)
-    PROFILE_APP_IDENTIFIER_PREFIX=""
-    ;;
-esac
-PROFILE_PREFIX_MATCH=false
-if plist_prefix_array_contains "$PROFILE_INFO" ApplicationIdentifierPrefix "$PROFILE_APP_IDENTIFIER_PREFIX"; then
-  PROFILE_PREFIX_MATCH=true
-fi
-PROFILE_TEAM_MATCH=false
-if plist_array_contains "$PROFILE_INFO" TeamIdentifier "$EXPECTED_TEAM_IDENTIFIER"; then
-  PROFILE_TEAM_MATCH=true
-fi
-PROFILE_CONTAINER_MATCH=false
-if plist_array_contains "$PROFILE_INFO" \
-    'Entitlements.com\.apple\.developer\.icloud-container-identifiers' "$CLOUDKIT_CONTAINER"; then
-  PROFILE_CONTAINER_MATCH=true
-fi
-PROFILE_SERVICE_MATCH=false
-if plist_array_contains "$PROFILE_INFO" \
-    'Entitlements.com\.apple\.developer\.icloud-services' CloudKit; then
-  PROFILE_SERVICE_MATCH=true
-fi
-if [[ -z "$PROFILE_APP_IDENTIFIER_PREFIX" \
-      || "$PROFILE_TEAM_IDENTIFIER" != "$EXPECTED_TEAM_IDENTIFIER" \
-      || "$PROFILE_PROVISIONS_ALL_DEVICES" != "true" \
-      || ! "$PROFILE_CERTIFICATE_COUNT" =~ ^[1-9][0-9]*$ \
-      || ! "$PROFILE_EXPIRATION_EPOCH" =~ ^[0-9]+$ \
-      || "$PROFILE_EXPIRATION_EPOCH" -le "$(/bin/date -u '+%s')" \
-      || "$PROFILE_PREFIX_MATCH" != true \
-      || "$PROFILE_TEAM_MATCH" != true \
-      || "$PROFILE_ENVIRONMENT" != "Production" \
-      || "$PROFILE_CONTAINER_MATCH" != true \
-      || "$PROFILE_SERVICE_MATCH" != true ]]; then
-  printf 'The provisioning profile must be a matching Developer ID profile that grants this host Production CloudKit access.\n' >&2
-  exit 1
-fi
-
-# codesign does not merge restricted entitlements from an embedded profile.
-# Add the profile-authorized identity values to the narrow release allowlist.
-EFFECTIVE_ENTITLEMENTS="$RELEASE_DIR/GlassyHost-effective.entitlements"
-cp "$ENTITLEMENTS" "$EFFECTIVE_ENTITLEMENTS"
-/usr/libexec/PlistBuddy -c "Add :com.apple.application-identifier string $PROFILE_APP_IDENTIFIER" "$EFFECTIVE_ENTITLEMENTS"
-/usr/libexec/PlistBuddy -c "Add :com.apple.developer.team-identifier string $PROFILE_TEAM_IDENTIFIER" "$EFFECTIVE_ENTITLEMENTS"
-/usr/bin/plutil -lint "$EFFECTIVE_ENTITLEMENTS"
 
 # Seal nested Sparkle code inside-out using this app's Developer ID identity.
 # Keep the helpers' existing entitlements; the host uses only its normal
@@ -334,7 +209,7 @@ done
   --identifier "$BUNDLE_ID" \
   --options runtime \
   --timestamp \
-  --entitlements "$EFFECTIVE_ENTITLEMENTS" \
+  --entitlements "$ENTITLEMENTS" \
   "$APP_BUNDLE"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 /usr/bin/xcrun lipo "$APP_BINARY" -verify_arch arm64 x86_64
@@ -353,56 +228,6 @@ if [[ ! "$TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
   printf 'The signed app does not have a valid Developer ID team identifier.\n' >&2
   exit 1
 fi
-if [[ "$TEAM_ID" != "$EXPECTED_TEAM_IDENTIFIER" || "$TEAM_ID" != "$PROFILE_TEAM_IDENTIFIER" ]]; then
-  printf 'The Developer ID identity and CloudKit provisioning profile belong to different teams.\n' >&2
-  exit 1
-fi
-
-SIGNED_ENTITLEMENTS="$RELEASE_DIR/GlassyHost-signed.entitlements"
-if ! /usr/bin/codesign --display --entitlements - --xml "$APP_BUNDLE" > "$SIGNED_ENTITLEMENTS"; then
-  printf 'The signed app entitlements could not be read.\n' >&2
-  exit 1
-fi
-SIGNED_APP_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.application-identifier' "$SIGNED_ENTITLEMENTS")"
-SIGNED_TEAM_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.developer.team-identifier' "$SIGNED_ENTITLEMENTS")"
-SIGNED_ENVIRONMENT="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.developer.icloud-container-environment' "$SIGNED_ENTITLEMENTS")"
-SIGNED_CONTAINER_MATCH=false
-if plist_array_contains "$SIGNED_ENTITLEMENTS" \
-    'com\.apple\.developer\.icloud-container-identifiers' "$CLOUDKIT_CONTAINER"; then
-  SIGNED_CONTAINER_MATCH=true
-fi
-SIGNED_SERVICE_MATCH=false
-if plist_array_contains "$SIGNED_ENTITLEMENTS" \
-    'com\.apple\.developer\.icloud-services' CloudKit; then
-  SIGNED_SERVICE_MATCH=true
-fi
-if [[ "$SIGNED_APP_IDENTIFIER" != "$PROFILE_APP_IDENTIFIER" \
-      || "$SIGNED_TEAM_IDENTIFIER" != "$EXPECTED_TEAM_IDENTIFIER" \
-      || "$SIGNED_ENVIRONMENT" != "$PROFILE_ENVIRONMENT" \
-      || "$SIGNED_CONTAINER_MATCH" != true \
-      || "$SIGNED_SERVICE_MATCH" != true ]]; then
-  printf 'The signed app does not claim the Production CloudKit entitlements authorized by its profile.\n' >&2
-  exit 1
-fi
-
-SIGNER_CERTIFICATE_PREFIX="$RELEASE_DIR/signer-certificate"
-/usr/bin/codesign --display --extract-certificates "$SIGNER_CERTIFICATE_PREFIX" "$APP_BUNDLE"
-SIGNER_CERTIFICATE="${SIGNER_CERTIFICATE_PREFIX}0"
-PROFILE_CERTIFICATE="$RELEASE_DIR/profile-certificate.der"
-CERTIFICATE_MATCH=false
-for ((certificate_index = 0; certificate_index < PROFILE_CERTIFICATE_COUNT; certificate_index++)); do
-  /usr/bin/plutil -extract "DeveloperCertificates.$certificate_index" raw -expect data -o - "$PROFILE_INFO" \
-    | /usr/bin/base64 -D > "$PROFILE_CERTIFICATE"
-  if /usr/bin/cmp -s "$SIGNER_CERTIFICATE" "$PROFILE_CERTIFICATE"; then
-    CERTIFICATE_MATCH=true
-    break
-  fi
-done
-if [[ "$CERTIFICATE_MATCH" != true ]]; then
-  printf 'The signing certificate is not authorized by the CloudKit provisioning profile.\n' >&2
-  exit 1
-fi
-rm -f "$PROFILE_INFO" "$PROFILE_CERTIFICATE" "$SIGNER_CERTIFICATE_PREFIX"{0,1,2,3,4}
 
 # Standard archive metadata lets Xcode Organizer use the signed-in developer
 # account for distribution. It is only an archive, not proof of notarization.

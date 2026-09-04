@@ -255,37 +255,6 @@ class SigningImportTests(MockedNativeCase):
         self.factory.assert_not_called()
 
 
-class CloudKitProfileMaterializationTests(ContextTestCase):
-    def setUp(self):
-        super().setUp()
-        self.directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        self.directory.chmod(0o700)
-        self.store = self.enterContext(patch.object(credentials, "CredentialStore")).return_value
-
-    def test_saved_profile_is_decoded_to_a_new_private_file(self):
-        profile = b"\x00synthetic CloudKit profile\xff"
-        self.store.get.return_value = base64.b64encode(profile).decode()
-        destination = self.directory / "GlassyHost.provisionprofile"
-
-        self.assertTrue(credentials.materialize_cloudkit_profile(destination))
-        self.assertEqual(destination.read_bytes(), profile)
-        self.assertEqual(destination.stat().st_mode & 0o777, 0o600)
-        self.store.get.assert_called_once_with("cloudkit-profile")
-        with self.assertRaises(credentials.CredentialError):
-            credentials.materialize_cloudkit_profile(destination)
-
-    def test_missing_profile_leaves_no_file_and_unsafe_directory_is_rejected(self):
-        destination = self.directory / "missing.provisionprofile"
-        self.store.get.return_value = None
-        self.assertFalse(credentials.materialize_cloudkit_profile(destination))
-        self.assertFalse(destination.exists())
-
-        unsafe = self.directory / "unsafe"
-        unsafe.mkdir(mode=0o755)
-        with self.assertRaisesRegex(credentials.CredentialError, "mode 700"):
-            credentials.materialize_cloudkit_profile(unsafe / "profile")
-
-
 class CLIImportTests(ContextTestCase):
     def setUp(self):
         super().setUp()
@@ -315,19 +284,6 @@ class CLIImportTests(ContextTestCase):
         self.assertNotIn("synthetic-file-secret", stdout + stderr)
         self.assertIn("Stored notary-key", stdout)
 
-    def test_cloudkit_management_token_can_be_saved_without_printing_it(self):
-        token = b"synthetic-cloudkit-management-secret"
-        status, stdout, stderr = self.run_cli([
-            "import", "--name", "cloudkit-management-token", "--file",
-            str(self.private_file(token)),
-        ])
-        self.assertEqual(status, 0)
-        self.store.set.assert_called_once_with(
-            "cloudkit-management-token", token.decode()
-        )
-        self.assertNotIn(token.decode(), stdout + stderr)
-        self.assertIn("Stored cloudkit-management-token", stdout)
-
     def test_binary_p12_file_is_encoded_and_base64_stdin_is_normalized(self):
         data = b"\x00synthetic\xffPKCS12\x80"
         value = base64.b64encode(data).decode()
@@ -337,16 +293,6 @@ class CLIImportTests(ContextTestCase):
         result = self.run_cli(["import", "--name", "codesign-p12", "--file", "-"], (value[:4] + "\n" + value[4:] + "\n").encode())
         self.assertEqual(result[0], 0)
         self.store.set.assert_called_with("codesign-p12", value)
-
-    def test_binary_cloudkit_profile_file_is_encoded(self):
-        data = b"\x00synthetic-cloudkit-profile\xff"
-        value = base64.b64encode(data).decode()
-        result = self.run_cli([
-            "import", "--name", "cloudkit-profile", "--file",
-            str(self.private_file(data)),
-        ])
-        self.assertEqual(result[0], 0)
-        self.store.set.assert_called_once_with("cloudkit-profile", value)
 
     def test_stdin_preserves_password_whitespace_and_accepts_empty_password(self):
         result = self.run_cli(["import", "--name", "codesign-password", "--file", "-"], b"  synthetic password \n")

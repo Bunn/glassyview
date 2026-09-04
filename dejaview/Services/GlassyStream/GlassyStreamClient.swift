@@ -19,22 +19,10 @@ final class GlassyStreamClient: @unchecked Sendable {
         let supportsCursorPositionUpdates: Bool
     }
 
-    private struct PendingCloudEnrollment: Sendable {
-        let serverHello: GlassyStreamWire.ServerHello
-        let capabilities: GlassyStreamWire.Capabilities
-        let clientIdentifier: Data
-    }
-
-    private enum CloudEnrollmentOutcome: Sendable {
-        case grant(Data)
-        case unavailable(String?)
-    }
-
     private enum State: Sendable {
         case idle
         case connecting
         case awaitingServerHello
-        case awaitingCloudEnrollment(PendingCloudEnrollment)
         case awaitingAuthentication(PendingAuthentication)
         case authenticated(GlassyStreamWire.SessionMaterial)
     }
@@ -42,8 +30,6 @@ final class GlassyStreamClient: @unchecked Sendable {
     private let queue = DispatchQueue(label: "dev.bunn.glassydesk.glassy-stream.network",
                                       qos: .userInteractive)
     private let credentialStore: any GlassyStreamResumeCredentialStoring
-    private let deviceIdentityStore: any GlassyStreamDeviceIdentityStoring
-    private let cloudEnrollmentProvider: any GlassyStreamCloudEnrollmentGrantProviding
 
     private var generation = UUID()
     private var connection: NWConnection?
@@ -60,25 +46,12 @@ final class GlassyStreamClient: @unchecked Sendable {
     private var authenticationTimeoutWorkItem: DispatchWorkItem?
     private var supportsStreamQuality = false
     private var supportsCursorPositionUpdates = false
-    private var preparedClientIdentifier: Data?
-    private var prefetchedEnrollmentGrant: Data?
-    private var isCloudEnrollmentPending = false
-    private var cloudEnrollmentTask: Task<Void, Never>?
-    private var cloudEnrollmentTimeoutWorkItem: DispatchWorkItem?
 
-    init(
-        credentialStore: any GlassyStreamResumeCredentialStoring = GlassyStreamKeychainCredentialStore(),
-        deviceIdentityStore: any GlassyStreamDeviceIdentityStoring = GlassyStreamKeychainDeviceIdentityStore(),
-        cloudEnrollmentProvider: any GlassyStreamCloudEnrollmentGrantProviding = GlassyStreamCloudEnrollmentService()
-    ) {
+    init(credentialStore: any GlassyStreamResumeCredentialStoring = GlassyStreamKeychainCredentialStore()) {
         self.credentialStore = credentialStore
-        self.deviceIdentityStore = deviceIdentityStore
-        self.cloudEnrollmentProvider = cloudEnrollmentProvider
     }
 
     deinit {
-        cloudEnrollmentTask?.cancel()
-        cloudEnrollmentTimeoutWorkItem?.cancel()
         authenticationTimeoutWorkItem?.cancel()
         connection?.stateUpdateHandler = nil
         connection?.viabilityUpdateHandler = nil
@@ -221,7 +194,7 @@ final class GlassyStreamClient: @unchecked Sendable {
     private func start(configuration: GlassyStreamConnectionConfiguration,
                        callbackQueue: DispatchQueue,
                        callbacks: GlassyStreamClientCallbacks) {
-        guard connection == nil, routeRace == nil, self.callbacks == nil else {
+        guard connection == nil, routeRace == nil else {
             callbackQueue.async {
                 callbacks.onCompletion(.failure(.alreadyConnecting))
             }
@@ -295,16 +268,8 @@ final class GlassyStreamClient: @unchecked Sendable {
         maximumInboundPayloadLength = GlassyStreamWire.maximumHandshakePayloadLength
         supportsStreamQuality = false
         supportsCursorPositionUpdates = false
-        preparedClientIdentifier = nil
-        prefetchedEnrollmentGrant = nil
-        isCloudEnrollmentPending = false
         selectedEndpoint = nil
         state = .connecting
-
-        prepareCloudEnrollmentIfNeeded(
-            configuration: configuration,
-            generation: activeGeneration
-        )
 
         let usesPassword: Bool
         if case .password? = configuration.bootstrapCredential { usesPassword = true }
@@ -352,132 +317,6 @@ final class GlassyStreamClient: @unchecked Sendable {
         routeRace = race
         AppLog.session.info("Selecting a reachable Glassy Host route")
         race.start()
-    }
-
-    private func prepareCloudEnrollmentIfNeeded(
-        configuration: GlassyStreamConnectionConfiguration,
-        generation activeGeneration: UUID
-    ) {
-        guard configuration.bootstrapCredential == nil,
-              let hostIdentifier = configuration.expectedHostIdentifier else {
-            return
-        }
-
-        do {
-            if try credentialStore.credential(
-                savedMachineID: configuration.savedMachineID,
-                hostIdentifier: hostIdentifier
-            ) != nil {
-                return
-            }
-
-            let identity = try deviceIdentityStore.identity(
-                hostIdentifier: hostIdentifier
-            )
-            preparedClientIdentifier = try identity.clientIdentifier
-            isCloudEnrollmentPending = true
-            let provider = cloudEnrollmentProvider
-            let deviceName = configuration.clientName
-            let cloudTimeout = min(8, configuration.authenticationTimeout * 0.8)
-            let timeoutWorkItem = DispatchWorkItem { [weak self] in
-                guard let self,
-                      activeGeneration == generation,
-                      callbacks != nil,
-                      isCloudEnrollmentPending else {
-                    return
-                }
-                cloudEnrollmentTask?.cancel()
-                cloudEnrollmentFinished(
-                    .unavailable("iCloud enrollment timed out."),
-                    generation: activeGeneration
-                )
-            }
-            cloudEnrollmentTimeoutWorkItem = timeoutWorkItem
-            queue.asyncAfter(deadline: .now() + cloudTimeout, execute: timeoutWorkItem)
-            cloudEnrollmentTask = Task { [weak self] in
-                let outcome: CloudEnrollmentOutcome
-                do {
-                    if let grant = try await provider.requestGrant(
-                        hostIdentifier: hostIdentifier,
-                        identity: identity,
-                        deviceName: deviceName
-                    ), grant.count == GlassyStreamWire.enrollmentGrantLength {
-                        outcome = .grant(grant)
-                    } else {
-                        outcome = .unavailable(nil)
-                    }
-                } catch is CancellationError {
-                    return
-                } catch {
-                    outcome = .unavailable(error.localizedDescription)
-                }
-                guard !Task.isCancelled else { return }
-                self?.queue.async { [weak self] in
-                    self?.cloudEnrollmentFinished(
-                        outcome,
-                        generation: activeGeneration
-                    )
-                }
-            }
-        } catch {
-            // The normal connection path will surface a Keychain error or ask
-            // for the pairing code. Cloud enrollment is only an automatic aid.
-            AppLog.storage.error(
-                "Could not prepare iCloud enrollment: \(error.localizedDescription, privacy: .public)"
-            )
-        }
-    }
-
-    private func cloudEnrollmentFinished(
-        _ outcome: CloudEnrollmentOutcome,
-        generation activeGeneration: UUID
-    ) {
-        guard activeGeneration == generation,
-              callbacks != nil,
-              isCloudEnrollmentPending else { return }
-        cloudEnrollmentTimeoutWorkItem?.cancel()
-        cloudEnrollmentTimeoutWorkItem = nil
-        cloudEnrollmentTask = nil
-        isCloudEnrollmentPending = false
-
-        let grant: Data?
-        switch outcome {
-        case let .grant(value):
-            grant = value
-            prefetchedEnrollmentGrant = value
-            AppLog.session.info("Received a device-bound Glassy Host enrollment grant from iCloud")
-        case let .unavailable(message):
-            grant = nil
-            if let message {
-                AppLog.storage.notice(
-                    "Automatic iCloud enrollment is unavailable: \(message, privacy: .public)"
-                )
-            }
-        }
-
-        guard case let .awaitingCloudEnrollment(pending) = state else { return }
-        guard let grant else {
-            finish(
-                .failure(.pairingCodeRequired(hostName: pending.serverHello.serverName)),
-                generation: activeGeneration
-            )
-            return
-        }
-
-        prefetchedEnrollmentGrant = nil
-        do {
-            try beginAuthentication(
-                serverHello: pending.serverHello,
-                capabilities: pending.capabilities,
-                clientIdentifier: pending.clientIdentifier,
-                credential: grant,
-                method: .enrollmentGrantV1,
-                resumedSession: false,
-                generation: activeGeneration
-            )
-        } catch {
-            finish(.failure(clientError(error)), generation: activeGeneration)
-        }
     }
 
     private func installConnectionStateHandler(_ connection: NWConnection, generation activeGeneration: UUID) {
@@ -577,10 +416,6 @@ final class GlassyStreamClient: @unchecked Sendable {
                 throw GlassyStreamClientError.protocolViolation("message arrived before TCP connection was ready")
             case .awaitingServerHello:
                 try handleServerHello(frame, generation: activeGeneration)
-            case .awaitingCloudEnrollment:
-                throw GlassyStreamClientError.protocolViolation(
-                    "message arrived before iCloud enrollment completed"
-                )
             case let .awaitingAuthentication(pending):
                 try handleAuthenticationAccepted(frame, pending: pending)
             case let .authenticated(material):
@@ -630,17 +465,14 @@ final class GlassyStreamClient: @unchecked Sendable {
         let clientIdentifier: Data
         if let storedCredential {
             clientIdentifier = storedCredential.clientIdentifier
-        } else if let preparedClientIdentifier {
-            clientIdentifier = preparedClientIdentifier
         } else {
-            clientIdentifier = try deviceIdentityStore.identity(
-                hostIdentifier: serverHello.hostIdentifier
-            ).clientIdentifier
+            clientIdentifier = try secureRandomData(count: GlassyStreamWire.identifierLength)
         }
 
+        var credential: Data
+        let method: GlassyStreamWire.AuthenticationMethod
+        let resumedSession: Bool
         if let bootstrapCredential = configuration.bootstrapCredential {
-            let credential: Data
-            let method: GlassyStreamWire.AuthenticationMethod
             switch bootstrapCredential {
             case .oneTimeCode(let suppliedCode):
                 guard let code = GlassyStreamWire.normalizedPairingCode(suppliedCode) else {
@@ -663,65 +495,14 @@ final class GlassyStreamClient: @unchecked Sendable {
                 )
                 method = .pairingPasswordV1
             }
-            try beginAuthentication(
-                serverHello: serverHello,
-                capabilities: capabilities,
-                clientIdentifier: clientIdentifier,
-                credential: credential,
-                method: method,
-                resumedSession: false,
-                generation: activeGeneration
-            )
+            resumedSession = false
         } else if let storedCredential {
-            cancelCloudEnrollment()
-            try beginAuthentication(
-                serverHello: serverHello,
-                capabilities: capabilities,
-                clientIdentifier: clientIdentifier,
-                credential: storedCredential.resumeSecret,
-                method: .resumeSecret,
-                resumedSession: true,
-                generation: activeGeneration
-            )
-        } else if capabilities.contains(.cloudEnrollment),
-                  let enrollmentGrant = prefetchedEnrollmentGrant {
-            prefetchedEnrollmentGrant = nil
-            try beginAuthentication(
-                serverHello: serverHello,
-                capabilities: capabilities,
-                clientIdentifier: clientIdentifier,
-                credential: enrollmentGrant,
-                method: .enrollmentGrantV1,
-                resumedSession: false,
-                generation: activeGeneration
-            )
-        } else if capabilities.contains(.cloudEnrollment), isCloudEnrollmentPending {
-            state = .awaitingCloudEnrollment(
-                PendingCloudEnrollment(
-                    serverHello: serverHello,
-                    capabilities: capabilities,
-                    clientIdentifier: clientIdentifier
-                )
-            )
+            credential = storedCredential.resumeSecret
+            method = .resumeSecret
+            resumedSession = true
         } else {
-            cancelCloudEnrollment()
             throw GlassyStreamClientError.pairingCodeRequired(hostName: serverHello.serverName)
         }
-    }
-
-    private func beginAuthentication(
-        serverHello: GlassyStreamWire.ServerHello,
-        capabilities: GlassyStreamWire.Capabilities,
-        clientIdentifier: Data,
-        credential suppliedCredential: Data,
-        method: GlassyStreamWire.AuthenticationMethod,
-        resumedSession: Bool,
-        generation activeGeneration: UUID
-    ) throws {
-        guard let configuration else {
-            throw GlassyStreamClientError.cancelled
-        }
-        var credential = suppliedCredential
         defer {
             credential.resetBytes(in: credential.startIndex..<credential.endIndex)
         }
@@ -791,19 +572,6 @@ final class GlassyStreamClient: @unchecked Sendable {
                           generation: activeGeneration)
     }
 
-    private func cancelCloudEnrollment() {
-        cloudEnrollmentTask?.cancel()
-        cloudEnrollmentTask = nil
-        cloudEnrollmentTimeoutWorkItem?.cancel()
-        cloudEnrollmentTimeoutWorkItem = nil
-        isCloudEnrollmentPending = false
-        preparedClientIdentifier = nil
-        if var grant = prefetchedEnrollmentGrant {
-            grant.resetBytes(in: grant.startIndex..<grant.endIndex)
-        }
-        prefetchedEnrollmentGrant = nil
-    }
-
     private func handleAuthenticationAccepted(
         _ frame: GlassyStreamWire.Frame,
         pending: PendingAuthentication
@@ -841,6 +609,7 @@ final class GlassyStreamClient: @unchecked Sendable {
             // will simply require the displayed code again.
             AppLog.storage.error("Could not persist Glassy Stream resume credential: \(error.localizedDescription, privacy: .public)")
         }
+
         maximumInboundPayloadLength = Int(accepted.maximumMediaPayloadLength)
         cancelAuthenticationTimeout()
         state = .authenticated(pending.material)
@@ -1036,7 +805,6 @@ final class GlassyStreamClient: @unchecked Sendable {
         connection?.viabilityUpdateHandler = nil
         connection?.cancel()
         self.connection = nil
-        cancelCloudEnrollment()
         selectedEndpoint = nil
         state = .idle
         supportsStreamQuality = false

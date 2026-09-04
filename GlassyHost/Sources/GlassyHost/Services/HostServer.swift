@@ -24,7 +24,6 @@ final class HostServer: @unchecked Sendable {
     typealias StreamQualityHandler = @Sendable (HostProtocol.StreamQuality) -> Void
     typealias AuthenticatedClientReplacementHandler = @Sendable () -> Void
     typealias PairedDevicesHandler = @Sendable ([HostPairedDevice]) -> Void
-    typealias CloudEnrollmentPollHandler = @Sendable () -> Void
 
     struct PairingCode: Equatable, Sendable {
         let value: String
@@ -37,17 +36,9 @@ final class HostServer: @unchecked Sendable {
 
     init(serviceName: String = Host.current().localizedName ?? "Glassy Host",
          port: UInt16 = HostProtocol.defaultPort,
-         deviceAccessStore: HostDeviceAccessStore = HostDeviceAccessStore(),
-         enrollmentGrantStore: HostEnrollmentGrantStore = HostEnrollmentGrantStore(),
-         cloudEnrollmentEnabled: Bool = false) {
+         deviceAccessStore: HostDeviceAccessStore = HostDeviceAccessStore()) {
         self.deviceAccessStore = deviceAccessStore
-        core = Core(
-            serviceName: serviceName,
-            port: port,
-            deviceAccessStore: deviceAccessStore,
-            enrollmentGrantStore: enrollmentGrantStore,
-            cloudEnrollmentEnabled: cloudEnrollmentEnabled
-        )
+        core = Core(serviceName: serviceName, port: port, deviceAccessStore: deviceAccessStore)
     }
 
     deinit {
@@ -99,13 +90,6 @@ final class HostServer: @unchecked Sendable {
 
     func setPairedDevicesHandler(_ handler: PairedDevicesHandler?) {
         core.setPairedDevicesHandler(handler)
-    }
-
-    /// Requests a bounded CloudKit refresh when a device reaches the listener.
-    /// The enrollment service coalesces and rate-limits these unauthenticated
-    /// hints before doing network work.
-    func setCloudEnrollmentPollHandler(_ handler: CloudEnrollmentPollHandler?) {
-        core.setCloudEnrollmentPollHandler(handler)
     }
 
     /// Rotates the root credential, invalidating all resume secrets, and starts
@@ -288,8 +272,6 @@ private extension HostServer {
         private let serviceName: String
         private let listenerPort: UInt16
         private let deviceAccessStore: HostDeviceAccessStore
-        private let enrollmentGrantStore: HostEnrollmentGrantStore
-        private let cloudEnrollmentEnabled: Bool
 
         private var listener: NWListener?
         private var listenerRetryWorkItem: DispatchWorkItem?
@@ -318,18 +300,11 @@ private extension HostServer {
         private var clientCountHandler: ClientCountHandler = { _ in }
         private var statusHandler: StatusHandler = { _ in }
         private var pairedDevicesHandler: PairedDevicesHandler = { _ in }
-        private var cloudEnrollmentPollHandler: CloudEnrollmentPollHandler = {}
 
-        init(serviceName: String,
-             port: UInt16,
-             deviceAccessStore: HostDeviceAccessStore,
-             enrollmentGrantStore: HostEnrollmentGrantStore,
-             cloudEnrollmentEnabled: Bool) {
+        init(serviceName: String, port: UInt16, deviceAccessStore: HostDeviceAccessStore) {
             self.serviceName = serviceName
             listenerPort = port
             self.deviceAccessStore = deviceAccessStore
-            self.enrollmentGrantStore = enrollmentGrantStore
-            self.cloudEnrollmentEnabled = cloudEnrollmentEnabled
         }
 
         func start(pairingSecret: Data,
@@ -367,12 +342,6 @@ private extension HostServer {
             }
         }
 
-        func setCloudEnrollmentPollHandler(_ handler: CloudEnrollmentPollHandler?) {
-            queue.async { [weak self] in
-                self?.cloudEnrollmentPollHandler = handler ?? {}
-            }
-        }
-
         func setAllowsConnections(_ allowsConnections: Bool) async throws {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
                 queue.async { [self] in
@@ -397,7 +366,6 @@ private extension HostServer {
                 queue.async { [self] in
                     do {
                         try deviceAccessStore.revoke(identifier: id)
-                        enrollmentGrantStore.remove(clientIdentifier: id)
                         let matchingClients = clients.values.filter { $0.clientIdentifier == id }
                         if !matchingClients.isEmpty {
                             authenticatedClientReplacementHandler?()
@@ -479,7 +447,6 @@ private extension HostServer {
                     // credential even if cleaning up display metadata fails.
                     Self.logger.error("Could not clear the saved device list after credential rotation")
                 }
-                enrollmentGrantStore.removeAll()
                 startLocked(
                     pairingSecret: pairingSecret,
                     pairingPasswordCredential: nil
@@ -916,25 +883,18 @@ private extension HostServer {
             guard case .connecting = client.authorizationState else { return }
 
             do {
-                if cloudEnrollmentEnabled {
-                    cloudEnrollmentPollHandler()
-                }
                 let privateKey = Curve25519.KeyAgreement.PrivateKey()
                 let serverNonce = try secureRandomData(count: HostProtocol.nonceLength)
                 let window = HostProtocol.pairingWindow(at: Date())
-                var capabilities = HostProtocol.advertisedCapabilities(
-                    pairingPasswordEnabled: pairingPasswordCredential != nil
-                )
-                if !cloudEnrollmentEnabled {
-                    capabilities.remove(.cloudEnrollment)
-                }
                 let hello = HostProtocol.ServerHello(
                     hostIdentifier: hostIdentifier,
                     serverNonce: serverNonce,
                     serverPublicKey: privateKey.publicKey.rawRepresentation,
                     pairingWindow: window,
                     pairingCodeLifetimeSeconds: UInt16(HostProtocol.pairingCodeLifetime),
-                    capabilities: capabilities.rawValue,
+                    capabilities: HostProtocol.advertisedCapabilities(
+                        pairingPasswordEnabled: pairingPasswordCredential != nil
+                    ).rawValue,
                     serverName: serviceName
                 )
                 client.authorizationState = .awaitingProof(
@@ -1083,13 +1043,6 @@ private extension HostServer {
                         throw HostProtocol.ProtocolError.invalidAuthentication
                     }
                     credential = pairingPasswordCredential
-                case .enrollmentGrantV1:
-                    guard hello.pairingWindow == context.hello.pairingWindow else {
-                        throw HostProtocol.ProtocolError.invalidAuthentication
-                    }
-                    credential = try enrollmentGrantStore.credential(
-                        clientIdentifier: hello.clientIdentifier
-                    )
                 case .resumeSecret:
                     credential = try deviceAccessStore.resumeSecret(
                         rootSecret: rootSecret,
@@ -1117,24 +1070,11 @@ private extension HostServer {
                 throw error
             }
 
-            if hello.authenticationMethod == .enrollmentGrantV1 {
-                guard enrollmentGrantStore.consume(
-                    clientIdentifier: hello.clientIdentifier,
-                    credential: authentication.credential
-                ) else {
-                    throw HostProtocol.ProtocolError.invalidAuthentication
-                }
-                try deviceAccessStore.recordCloudEnrollmentAuthentication(
-                    identifier: hello.clientIdentifier,
-                    name: hello.clientName
-                )
-            } else {
-                try deviceAccessStore.recordAuthentication(
-                    identifier: hello.clientIdentifier,
-                    name: hello.clientName,
-                    isBootstrapPairing: isBootstrapPairing
-                )
-            }
+            try deviceAccessStore.recordAuthentication(
+                identifier: hello.clientIdentifier,
+                name: hello.clientName,
+                isBootstrapPairing: isBootstrapPairing
+            )
             let resumeSecret = try deviceAccessStore.resumeSecret(
                 rootSecret: rootSecret,
                 identifier: hello.clientIdentifier

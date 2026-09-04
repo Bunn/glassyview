@@ -11,10 +11,7 @@ struct GlassyStreamRouteLoopbackTests {
         let host = try LoopbackPairingHost(hostID: hostID, behavior: "valid")
         defer { host.stop() }
         let endpoint = try await host.start()
-        let client = GlassyStreamClient(
-            credentialStore: RouteTestCredentialStore(),
-            cloudEnrollmentProvider: GlassyStreamNoCloudEnrollmentGrantProvider()
-        )
+        let client = GlassyStreamClient(credentialStore: RouteTestCredentialStore())
         defer { client.disconnect() }
         let machineID = UUID()
 
@@ -49,44 +46,6 @@ struct GlassyStreamRouteLoopbackTests {
         #expect(host.proofCount == 1)
     }
 
-    @Test
-    func syncedMachineUsesDeviceBoundCloudEnrollmentGrant() async throws {
-        let hostID = Data(repeating: 0x44, count: GlassyStreamWire.identifierLength)
-        let grant = Data(repeating: 0x75, count: GlassyStreamWire.enrollmentGrantLength)
-        let identity = GlassyStreamDeviceIdentity(
-            privateKey: Curve25519.KeyAgreement.PrivateKey().rawRepresentation
-        )
-        let host = try LoopbackPairingHost(
-            hostID: hostID,
-            behavior: "valid",
-            enrollmentGrant: grant
-        )
-        defer { host.stop() }
-        let endpoint = try await host.start()
-        let enrollmentProvider = RouteTestCloudEnrollmentProvider(grant: grant)
-        let client = GlassyStreamClient(
-            credentialStore: RouteTestCredentialStore(),
-            deviceIdentityStore: RouteTestIdentityStore(identity: identity),
-            cloudEnrollmentProvider: enrollmentProvider
-        )
-        defer { client.disconnect() }
-
-        let authentication = try await authenticate(
-            client,
-            configuration: GlassyStreamConnectionConfiguration(
-                endpoint: endpoint,
-                savedMachineID: UUID(),
-                expectedHostIdentifier: hostID
-            )
-        )
-
-        #expect(authentication.hostIdentifier == hostID)
-        #expect(!authentication.resumedSession)
-        #expect(host.proofCount == 1)
-        #expect(host.clientIdentifiers == [try identity.clientIdentifier])
-        #expect(await enrollmentProvider.requestCount == 1)
-    }
-
     /// Exercises the real NWConnection handoff and encrypted handshake: the
     /// same rotating code must produce just one ClientHello, on the winner.
     @Test(arguments: ["silent", "wrong-host", "late-hello"])
@@ -100,10 +59,7 @@ struct GlassyStreamRouteLoopbackTests {
         defer { primary.stop(); fallback.stop() }
         let primaryEndpoint = try await primary.start()
         let fallbackEndpoint = try await fallback.start()
-        let client = GlassyStreamClient(
-            credentialStore: RouteTestCredentialStore(),
-            cloudEnrollmentProvider: GlassyStreamNoCloudEnrollmentGrantProvider()
-        )
+        let client = GlassyStreamClient(credentialStore: RouteTestCredentialStore())
         defer { client.disconnect() }
 
         let authentication = try await authenticate(
@@ -163,35 +119,6 @@ private struct RouteTestCredentialStore: GlassyStreamResumeCredentialStoring {
     func removeCredential(savedMachineID: UUID, hostIdentifier: Data) throws {}
 }
 
-private struct RouteTestIdentityStore: GlassyStreamDeviceIdentityStoring {
-    let identity: GlassyStreamDeviceIdentity
-
-    func identity(hostIdentifier: Data) throws -> GlassyStreamDeviceIdentity {
-        identity
-    }
-}
-
-private actor RouteTestCloudEnrollmentProvider: GlassyStreamCloudEnrollmentGrantProviding {
-    let grant: Data
-    private(set) var requestCount = 0
-
-    init(grant: Data) {
-        self.grant = grant
-    }
-
-    func requestGrant(
-        hostIdentifier: Data,
-        identity: GlassyStreamDeviceIdentity,
-        deviceName: String
-    ) async throws -> Data? {
-        requestCount += 1
-        // Ensure ServerHello can win the route race before CloudKit finishes,
-        // exercising the client's suspended-handshake state.
-        try await Task.sleep(for: .milliseconds(100))
-        return grant
-    }
-}
-
 private final class RouteTestResult<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Value, Error>?
@@ -215,19 +142,15 @@ private final class LoopbackPairingHost: @unchecked Sendable {
     private let privateKey = Curve25519.KeyAgreement.PrivateKey()
     private let hostID: Data
     private let behavior: String
-    private let enrollmentGrant: Data?
     private var connections: [NWConnection] = []
     private var buffers: [ObjectIdentifier: Data] = [:]
     private var receivedProofs = 0
-    private var receivedClientIdentifiers: [Data] = []
 
     var proofCount: Int { queue.sync { receivedProofs } }
-    var clientIdentifiers: [Data] { queue.sync { receivedClientIdentifiers } }
 
-    init(hostID: Data, behavior: String, enrollmentGrant: Data? = nil) throws {
+    init(hostID: Data, behavior: String) throws {
         self.hostID = hostID
         self.behavior = behavior
-        self.enrollmentGrant = enrollmentGrant
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
         listener = try NWListener(using: parameters)
@@ -270,12 +193,9 @@ private final class LoopbackPairingHost: @unchecked Sendable {
     }
 
     private var hello: GlassyStreamWire.ServerHello {
-        let capabilities = GlassyStreamWire.Capabilities(rawValue: 7)
-            .union(enrollmentGrant == nil ? [] : .cloudEnrollment)
-        return .init(hostIdentifier: hostID, serverNonce: Data(repeating: 0x31, count: 32),
-                     serverPublicKey: privateKey.publicKey.rawRepresentation, pairingWindow: 1,
-                     pairingCodeLifetimeSeconds: 60, capabilities: capabilities.rawValue,
-                     serverName: "Fixture Mac")
+        .init(hostIdentifier: hostID, serverNonce: Data(repeating: 0x31, count: 32),
+              serverPublicKey: privateKey.publicKey.rawRepresentation, pairingWindow: 1,
+              pairingCodeLifetimeSeconds: 60, capabilities: 7, serverName: "Fixture Mac")
     }
 
     private func accept(_ connection: NWConnection) {
@@ -341,9 +261,8 @@ private final class LoopbackPairingHost: @unchecked Sendable {
         let nameLength = try reader.integer(2)
         let name = String(decoding: try reader.read(Int(nameLength)), as: UTF8.self)
         let proof = try reader.read(32)
-        guard let method = GlassyStreamWire.AuthenticationMethod(rawValue: methodByte) else {
-            throw GlassyStreamClientError.invalidPairingCode
-        }
+        guard let method = GlassyStreamWire.AuthenticationMethod(rawValue: methodByte),
+              method == .pairingCode else { throw GlassyStreamClientError.invalidPairingCode }
         let clientHello = GlassyStreamWire.ClientHello(
             clientIdentifier: clientID, clientNonce: nonce, clientPublicKey: publicKey,
             authenticationMethod: method, pairingWindow: window, clientName: name, proof: proof
@@ -352,19 +271,7 @@ private final class LoopbackPairingHost: @unchecked Sendable {
             with: Curve25519.KeyAgreement.PublicKey(rawRepresentation: publicKey)
         )
         let transcript = try GlassyStreamWire.authenticationTranscript(serverHello: hello, clientHello: clientHello)
-        let credential: Data
-        switch method {
-        case .pairingCode:
-            credential = Data("ABCDEFGH2345".utf8)
-        case .enrollmentGrantV1:
-            guard let enrollmentGrant else {
-                throw GlassyStreamClientError.authenticationRejected("Unexpected enrollment grant")
-            }
-            credential = enrollmentGrant
-        default:
-            throw GlassyStreamClientError.authenticationRejected("Unexpected authentication method")
-        }
-        receivedClientIdentifiers.append(clientID)
+        let credential = Data("ABCDEFGH2345".utf8)
         let key = GlassyStreamWire.authenticationKey(sharedSecret: shared, credential: credential, transcript: transcript)
         guard proof == GlassyStreamWire.authenticationProof(authenticationKey: key, transcript: transcript) else {
             throw GlassyStreamClientError.authenticationRejected("Invalid synthetic proof")

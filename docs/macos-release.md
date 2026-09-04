@@ -31,8 +31,6 @@ Local runs accept secret environment variables or credentials saved in the macOS
 | Apple notarization private key, PEM text | `NOTARY_PRIVATE_KEY` | `notary-key` |
 | Developer ID certificate and private key, base64 PKCS#12 | `CODESIGN_P12_BASE64` | `codesign-p12` |
 | PKCS#12 password; an empty password is allowed | `CODESIGN_P12_PASSWORD` | `codesign-password` |
-| CloudKit-enabled Developer ID provisioning profile, base64 | `CLOUDKIT_PROVISIONING_PROFILE_BASE64` | `cloudkit-profile` |
-| CloudKit schema verification management token | `CLOUDKIT_MANAGEMENT_TOKEN` | `cloudkit-management-token` |
 
 Use a fine-grained GitHub PAT or GitHub App token with **Contents: write** on `Bunn/GlassyDesk-Host`. The source repository's default Actions token cannot publish to another repository. See [GitHub release permissions](https://docs.github.com/en/rest/releases/releases) and [Actions token scope](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token).
 
@@ -56,7 +54,6 @@ The importer stores generic-password items under service `dev.bunn.glassydesk.re
 ./script/release_host.sh credentials import --name github-token
 ./script/release_host.sh credentials import --name cloudflare-token
 ./script/release_host.sh credentials import --name codesign-password
-./script/release_host.sh credentials import --name cloudkit-management-token
 ```
 
 For a private file, use `--file`. Files must be owned by the current user, with permissions `600` or `400`. Keep these files outside the repository. A binary `.p12` is automatically converted to base64 by the importer:
@@ -64,10 +61,9 @@ For a private file, use `--file`. Files must be owned by the current user, with 
 ```sh
 ./script/release_host.sh credentials import --name notary-key --file /private/path/AuthKey.p8
 ./script/release_host.sh credentials import --name codesign-p12 --file /private/path/DeveloperID.p12
-./script/release_host.sh credentials import --name cloudkit-profile --file /private/path/GlassyHost.provisionprofile
 ```
 
-`--file -` reads from standard input, for example when piping directly from a secret manager. For `codesign-p12` and `cloudkit-profile`, stdin and hidden terminal entry require base64 text; `--file PATH` accepts the binary file. Do not put secret values in command arguments or shell history. Re-importing a name updates its saved value. There is no credential-export command.
+`--file -` reads from standard input, for example when piping directly from a secret manager. For `codesign-p12`, stdin and hidden terminal entry require base64 text; only `--file PATH` accepts the binary file. Do not put secret values in command arguments or shell history. Re-importing a name updates its saved value. There is no credential-export command.
 
 Use the same trusted Python executable for setup and releases, and unlock the user Keychain before running. Keychain access disables authentication UI; inaccessible items fail with an actionable error. The store trusts the Python executable used during setup, so other scripts running through that executable share its access. Environment credentials are an alternative when local Keychain access is unavailable.
 
@@ -92,29 +88,6 @@ The final ZIP must stay byte-for-byte identical after its Sparkle signature is g
 Local releases may use an installed **Developer ID Application** identity. Select an exact certificate SHA-1 or full identity name with `--identity`, or set `GLASSY_HOST_CODESIGN_IDENTITY`. A development or ad-hoc identity cannot produce this release.
 
 For unattended signing, export the Developer ID Application certificate **with its private key** as a password-protected `.p12`. Import it and its password with the local credential commands, or supply `CODESIGN_P12_BASE64` and `CODESIGN_P12_PASSWORD` in the environment. CI requires the PKCS#12 secret, even if a runner has an existing signing identity.
-
-Private iCloud enrollment also requires a Developer ID provisioning profile for `dev.bunn.glassydesk.host` with Production CloudKit access to `iCloud.dev.bunn.dejaview`. Download it from the Apple Developer portal and import it as `cloudkit-profile`, or provide its base64 data through `CLOUDKIT_PROVISIONING_PROFILE_BASE64`. The release script validates and embeds the profile before signing, verifies that the selected Developer ID certificate belongs to the profile, and checks the restricted entitlements in the finished signature.
-
-Create a CloudKit management token in CloudKit Console and save it once as `cloudkit-management-token`, or provide it to CI as `CLOUDKIT_MANAGEMENT_TOKEN`. The script passes the token to `cktool` only through its environment; it never puts it in command arguments, logs, or release state. Every release performs a read-only export of the Production schema and refuses to compile or publish unless `GlassyHostEnrollmentRequestV1` contains these fields:
-
-```text
-version INT64
-hostIdentifier BYTES
-clientIdentifier BYTES
-deviceName STRING
-clientPublicKey BYTES
-requestNonce BYTES
-requestedAt TIMESTAMP
-requestExpiresAt TIMESTAMP
-fulfilledNonce BYTES
-hostEphemeralPublicKey BYTES
-sealedGrant ENCRYPTED BYTES
-grantExpiresAt TIMESTAMP
-```
-
-Deploy this record type and its fields from the CloudKit development environment to production before publishing the first compatible host and iOS builds. The release script verifies the result but never mutates a CloudKit schema. Each Apple Account's `GlassyEnrollmentV1` zone is created automatically by the apps.
-
-`script/build_and_run.sh` also reuses the saved `cloudkit-profile` without printing or exporting its value. When that saved profile is for Production, the script selects an installed Developer ID Application identity for team `B2RUA6XMHC`. This is the local build mode that can exchange enrollment requests with TestFlight, because TestFlight uses the Production CloudKit environment. An explicitly supplied Mac development profile uses Development CloudKit instead, and a build without a profile leaves private iCloud enrollment disabled while retaining QR code and password pairing.
 
 The script imports the PKCS#12 through the native Security framework into a temporary keychain. Its password is never passed as a process argument. Only the temporary keychain's random, short-lived password is used in keychain-management command arguments. The script does not change the default keychain or its search list, and removes the temporary signing keychain when the run ends.
 
@@ -194,14 +167,12 @@ jobs:
           NOTARY_ISSUER_ID: ${{ vars.NOTARY_ISSUER_ID }}
           CODESIGN_P12_BASE64: ${{ secrets.CODESIGN_P12_BASE64 }}
           CODESIGN_P12_PASSWORD: ${{ secrets.CODESIGN_P12_PASSWORD }}
-          CLOUDKIT_PROVISIONING_PROFILE_BASE64: ${{ secrets.CLOUDKIT_PROVISIONING_PROFILE_BASE64 }}
-          CLOUDKIT_MANAGEMENT_TOKEN: ${{ secrets.CLOUDKIT_MANAGEMENT_TOKEN }}
           GLASSY_HOST_CODESIGN_IDENTITY: ${{ vars.GLASSY_HOST_CODESIGN_IDENTITY }}
         run: >-
           ./script/release_host.sh --notes "$NOTES_FILE"
           --work-dir "$RUNNER_TEMP/glassy-host-release"
 ```
 
-`HOST_RELEASE_GITHUB_TOKEN` is the separate distribution-repository token, not the workflow's default `GITHUB_TOKEN`. Store the notarization `.p8` as multiline PEM text, the existing Sparkle export as base64 text, the `.p12` as base64 text, the CloudKit provisioning profile as base64, and the CloudKit management token as a secret. Set `NOTARY_ISSUER_ID` only for a team API key. The signing identity and API key IDs can be repository variables; the private keys, tokens, profiles, and PKCS#12 password must be secrets.
+`HOST_RELEASE_GITHUB_TOKEN` is the separate distribution-repository token, not the workflow's default `GITHUB_TOKEN`. Store the notarization `.p8` as multiline PEM text, the existing Sparkle export as base64 text, and the `.p12` as base64 text. Set `NOTARY_ISSUER_ID` only for a team API key. The signing identity and API key IDs can be repository variables; the private keys, tokens, and PKCS#12 password must be secrets.
 
 A hosted runner is disposable. `--resume` needs its existing workspace and artifact, so a later job cannot resume an earlier job after those files have been discarded. Do not upload private key exports or credential files as workflow artifacts.

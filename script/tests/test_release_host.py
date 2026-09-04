@@ -4,7 +4,6 @@ import argparse
 import base64
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 import copy
-import datetime as dt
 import hashlib
 import io
 import json
@@ -26,28 +25,6 @@ import release_host as release
 PAYLOAD = b"synthetic-stapled-zip-contents"
 PRIVATE_KEY = base64.b64encode(bytes(range(32))).decode()
 SIGNATURE = base64.b64encode(b"s" * 64).decode()
-PRODUCTION_CLOUDKIT_SCHEMA = b'''DEFINE SCHEMA
-/* Other application records must not satisfy the enrollment check. */
-RECORD TYPE OtherRecord (
-    version STRING,
-    sealedGrant BYTES
-);
-RECORD TYPE GlassyHostEnrollmentRequestV1 (
-    version INT64,
-    hostIdentifier BYTES,
-    clientIdentifier BYTES,
-    deviceName STRING,
-    clientPublicKey BYTES,
-    requestNonce BYTES,
-    requestedAt TIMESTAMP,
-    requestExpiresAt TIMESTAMP,
-    fulfilledNonce BYTES,
-    hostEphemeralPublicKey BYTES,
-    sealedGrant ENCRYPTED BYTES,
-    grantExpiresAt TIMESTAMP,
-    GRANT READ, CREATE, WRITE TO "_icloud"
-);
-'''
 CONFIG = {
     "repository": "Synthetic/Distribution", "branch": "main",
     "feed_path": "glassy-host/appcast.xml", "pages_project": "synthetic-host",
@@ -585,8 +562,6 @@ class AssetPublicationTests(SyntheticCase):
             stack.enter_context(patch.object(release, "GitHub", return_value=github))
             stack.enter_context(patch.object(release, "notary_auth", auth))
             stack.enter_context(patch.object(release, "Runner", return_value=self.runner))
-            stack.enter_context(patch.object(release, "verify_production_cloudkit_schema"))
-            stack.enter_context(patch.object(release, "validate_app"))
             stack.enter_context(patch.object(release, "verify_public_download", side_effect=release.ReleaseError("Synthetic public digest mismatch")))
             publish_feed = stack.enter_context(patch.object(release, "publish_feed"))
             stack.enter_context(redirect_stdout(io.StringIO()))
@@ -657,9 +632,7 @@ class EnvironmentAndDryRunTests(SyntheticCase):
     def test_unrelated_children_receive_no_release_credentials(self):
         secret_names = ("GH_TOKEN", "GITHUB_TOKEN", "CLOUDFLARE_API_TOKEN", "SPARKLE_PRIVATE_KEY",
                         "NOTARY_PRIVATE_KEY", "NOTARY_KEY_PATH", "CODESIGN_P12_BASE64",
-                        "CODESIGN_P12_PASSWORD", "CLOUDKIT_PROVISIONING_PROFILE_BASE64",
-                        "CLOUDKIT_MANAGEMENT_TOKEN",
-                        "APPLE_PASSWORD", "APPLE_APP_SPECIFIC_PASSWORD", "ASC_PRIVATE_KEY")
+                        "CODESIGN_P12_PASSWORD", "APPLE_PASSWORD", "APPLE_APP_SPECIFIC_PASSWORD", "ASC_PRIVATE_KEY")
         env = {key: f"synthetic-secret-{key}" for key in secret_names}
         env.update(PATH="/synthetic/bin", LANG="en_US.UTF-8", CI="false", GH_PROMPT_DISABLED="0")
         with patch.dict(os.environ, env):
@@ -709,201 +682,6 @@ class EnvironmentAndDryRunTests(SyntheticCase):
         self.keychain.assert_not_called()
         secrets_factory.assert_not_called()
         github_factory.assert_not_called()
-
-
-class CloudKitProvisioningTests(unittest.TestCase):
-    def profile(self, **overrides):
-        entitlements = {
-            "com.apple.application-identifier": "OLDPREFIX1.test.synthetic.host",
-            "com.apple.developer.team-identifier": "SYNTHETIC1",
-            "com.apple.developer.icloud-container-environment": "Production",
-            "com.apple.developer.icloud-container-identifiers": ["iCloud.dev.bunn.dejaview"],
-            "com.apple.developer.icloud-services": ["CloudKit"],
-        }
-        entitlements.update(overrides.pop("entitlements", {}))
-        value = {
-            "Entitlements": entitlements,
-            "ExpirationDate": dt.datetime(2030, 1, 1),
-            "ApplicationIdentifierPrefix": ["OLDPREFIX1"],
-            "TeamIdentifier": ["SYNTHETIC1"],
-            "ProvisionsAllDevices": True,
-            "DeveloperCertificates": [b"synthetic developer id certificate"],
-        }
-        value.update(overrides)
-        return plistlib.dumps(value)
-
-    def test_profile_requires_exact_production_cloudkit_grants(self):
-        details = release.validate_cloudkit_profile(
-            self.profile(), CONFIG,
-            now=dt.datetime(2029, 1, 1, tzinfo=dt.timezone.utc),
-        )
-        self.assertEqual(details["app_identifier"], "OLDPREFIX1.test.synthetic.host")
-        self.assertEqual(details["application_identifier_prefix"], "OLDPREFIX1")
-        self.assertEqual(details["team_identifier"], "SYNTHETIC1")
-        invalid = (
-            {"com.apple.application-identifier": "OLDPREFIX1.test.synthetic.other"},
-            {"com.apple.developer.team-identifier": "OTHERTEAM1"},
-            {"com.apple.developer.icloud-container-environment": "Development"},
-            {"com.apple.developer.icloud-container-identifiers": ["iCloud.example.other"]},
-            {"com.apple.developer.icloud-services": []},
-        )
-        for entitlements in invalid:
-            with self.subTest(entitlements=entitlements):
-                with self.assertRaises(release.ReleaseError):
-                    release.validate_cloudkit_profile(
-                        self.profile(entitlements=entitlements), CONFIG,
-                        now=dt.datetime(2029, 1, 1, tzinfo=dt.timezone.utc),
-                    )
-
-        invalid_profiles = (
-            {"ApplicationIdentifierPrefix": ["SYNTHETIC1"]},
-            {"TeamIdentifier": ["OTHERTEAM1"]},
-            {"ProvisionsAllDevices": False},
-            {"DeveloperCertificates": []},
-        )
-        for profile_fields in invalid_profiles:
-            with self.subTest(profile_fields=profile_fields):
-                with self.assertRaises(release.ReleaseError):
-                    release.validate_cloudkit_profile(
-                        self.profile(**profile_fields), CONFIG,
-                        now=dt.datetime(2029, 1, 1, tzinfo=dt.timezone.utc),
-                    )
-
-    def test_profile_tolerates_a_matching_legacy_app_id(self):
-        release.validate_cloudkit_profile(
-            self.profile(entitlements={
-                "application-identifier": "OLDPREFIX1.test.synthetic.host",
-            }),
-            CONFIG,
-            now=dt.datetime(2029, 1, 1, tzinfo=dt.timezone.utc),
-        )
-        with self.assertRaisesRegex(release.ReleaseError, "malformed"):
-            release.validate_cloudkit_profile(
-                self.profile(entitlements={
-                    "application-identifier": "SYNTHETIC1.test.synthetic.host",
-                }),
-                CONFIG,
-                now=dt.datetime(2029, 1, 1, tzinfo=dt.timezone.utc),
-            )
-
-    def test_signed_entitlements_must_match_profile_allowlist(self):
-        details = release.validate_cloudkit_profile(
-            self.profile(), CONFIG,
-            now=dt.datetime(2029, 1, 1, tzinfo=dt.timezone.utc),
-        )
-        signed = {
-            "com.apple.application-identifier": "OLDPREFIX1.test.synthetic.host",
-            "com.apple.developer.team-identifier": "SYNTHETIC1",
-            "com.apple.developer.icloud-container-environment": "Production",
-            "com.apple.developer.icloud-container-identifiers": ["iCloud.dev.bunn.dejaview"],
-            "com.apple.developer.icloud-services": ["CloudKit"],
-        }
-        release.validate_signed_entitlements(plistlib.dumps(signed), details, CONFIG)
-        for key, value in (
-            ("com.apple.application-identifier", "SYNTHETIC1.test.synthetic.host"),
-            ("com.apple.developer.team-identifier", "OTHERTEAM1"),
-            ("com.apple.developer.icloud-container-environment", "Development"),
-            ("com.apple.developer.icloud-container-identifiers", ["iCloud.example.other"]),
-            ("com.apple.developer.icloud-services", []),
-        ):
-            with self.subTest(key=key):
-                invalid = dict(signed, **{key: value})
-                with self.assertRaises(release.ReleaseError):
-                    release.validate_signed_entitlements(
-                        plistlib.dumps(invalid), details, CONFIG
-                    )
-
-    def test_expired_or_malformed_profile_is_rejected(self):
-        with self.assertRaisesRegex(release.ReleaseError, "expired"):
-            release.validate_cloudkit_profile(
-                self.profile(), CONFIG,
-                now=dt.datetime(2031, 1, 1, tzinfo=dt.timezone.utc),
-            )
-        for data in (b"not a plist", plistlib.dumps({})):
-            with self.assertRaisesRegex(release.ReleaseError, "malformed"):
-                release.validate_cloudkit_profile(data, CONFIG)
-
-    def test_signing_environment_materializes_profile_without_leaking_it(self):
-        profile = b"synthetic binary profile"
-
-        class Credentials:
-            ci = False
-
-            def get(self, account, variables, **kwargs):
-                if account == "cloudkit-profile":
-                    return base64.b64encode(profile).decode()
-                if account == "codesign-p12":
-                    return None
-                raise AssertionError(account)
-
-        with release.signing_environment(Credentials(), Mock(), CONFIG["identity"]) as environment:
-            path = Path(environment["GLASSY_HOST_PROVISIONING_PROFILE"])
-            self.assertEqual(path.read_bytes(), profile)
-            self.assertNotIn("CLOUDKIT_PROVISIONING_PROFILE_BASE64", environment)
-        self.assertFalse(path.exists())
-
-
-class CloudKitProductionSchemaTests(unittest.TestCase):
-    def test_exact_enrollment_schema_and_encrypted_grant_are_required(self):
-        release.validate_cloudkit_enrollment_schema(PRODUCTION_CLOUDKIT_SCHEMA)
-        quoted = PRODUCTION_CLOUDKIT_SCHEMA.replace(
-            b"GlassyHostEnrollmentRequestV1", b'"GlassyHostEnrollmentRequestV1"'
-        ).replace(b"deviceName STRING", b'"deviceName" STRING')
-        release.validate_cloudkit_enrollment_schema(b"\xef\xbb\xbf" + quoted)
-
-        invalid = (
-            PRODUCTION_CLOUDKIT_SCHEMA.replace(b"    deviceName STRING,\n", b""),
-            PRODUCTION_CLOUDKIT_SCHEMA.replace(b"requestNonce BYTES", b"requestNonce STRING"),
-            PRODUCTION_CLOUDKIT_SCHEMA.replace(
-                b"sealedGrant ENCRYPTED BYTES", b"sealedGrant BYTES"
-            ),
-            PRODUCTION_CLOUDKIT_SCHEMA.replace(
-                b"GlassyHostEnrollmentRequestV1", b"GlassyHostEnrollmentRequestV2"
-            ),
-        )
-        for schema in invalid:
-            with self.subTest(schema=schema):
-                with self.assertRaisesRegex(release.ReleaseError, "Deploy the development schema"):
-                    release.validate_cloudkit_enrollment_schema(schema)
-
-    def test_export_uses_production_and_keeps_management_token_out_of_argv(self):
-        calls = []
-
-        class Credentials:
-            def get(self, account, variables):
-                calls.append(("credential", account, variables))
-                return "synthetic-management-secret"
-
-        class Runner:
-            def run(self, args, label, **options):
-                calls.append(("command", list(args), label, options))
-                Path(args[args.index("--output-file") + 1]).write_bytes(
-                    PRODUCTION_CLOUDKIT_SCHEMA
-                )
-                return b"", b""
-
-        with patch.dict(os.environ, {
-            "CLOUDKIT_MANAGEMENT_TOKEN": "ambient-secret-must-be-replaced",
-            "GH_TOKEN": "unrelated-secret",
-            "PATH": "/synthetic/bin",
-        }, clear=True):
-            release.verify_production_cloudkit_schema(CONFIG, Credentials(), Runner())
-
-        self.assertEqual(calls[0], (
-            "credential", "cloudkit-management-token", ["CLOUDKIT_MANAGEMENT_TOKEN"]
-        ))
-        _, args, label, options = calls[1]
-        self.assertEqual(args[:3], ["xcrun", "cktool", "export-schema"])
-        self.assertEqual(args[args.index("--team-id") + 1], CONFIG["team_id"])
-        self.assertEqual(args[args.index("--container-id") + 1], release.CLOUDKIT_CONTAINER)
-        self.assertEqual(args[args.index("--environment") + 1], "production")
-        self.assertNotIn("--token", args)
-        self.assertNotIn("synthetic-management-secret", args)
-        self.assertEqual(options["env"]["CLOUDKIT_MANAGEMENT_TOKEN"],
-                         "synthetic-management-secret")
-        self.assertNotIn("GH_TOKEN", options["env"])
-        self.assertTrue(options["sensitive"])
-        self.assertIn("Production CloudKit", label)
 
 
 if __name__ == "__main__":
