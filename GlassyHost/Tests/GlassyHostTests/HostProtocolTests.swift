@@ -136,27 +136,101 @@ func pairingCodeRotation() {
     )
 }
 
-@Test("Protocol v1 reserves input, recovery, quality, and cursor values")
+@Test("An enrollment proof cannot be replayed under another client identity")
+func enrollmentGrantProofBindsClientIdentifier() throws {
+    let serverKey = Curve25519.KeyAgreement.PrivateKey()
+    let clientKey = Curve25519.KeyAgreement.PrivateKey()
+    let sharedSecret = try serverKey.sharedSecretFromKeyAgreement(with: clientKey.publicKey)
+    let serverHello = HostProtocol.ServerHello(
+        hostIdentifier: Data(repeating: 0x11, count: HostProtocol.identifierLength),
+        serverNonce: Data(repeating: 0x22, count: HostProtocol.nonceLength),
+        serverPublicKey: serverKey.publicKey.rawRepresentation,
+        pairingWindow: 1_234,
+        pairingCodeLifetimeSeconds: 60,
+        capabilities: HostProtocol.Capabilities.cloudEnrollment.rawValue,
+        serverName: "Fixture Mac"
+    )
+    let grant = Data(repeating: 0xA7, count: HostProtocol.enrollmentGrantLength)
+    let first = HostProtocol.ClientHello(
+        clientIdentifier: Data(repeating: 0x31, count: HostProtocol.identifierLength),
+        clientNonce: Data(repeating: 0x44, count: HostProtocol.nonceLength),
+        clientPublicKey: clientKey.publicKey.rawRepresentation,
+        authenticationMethod: .enrollmentGrantV1,
+        pairingWindow: 0,
+        clientName: "Fixture iPhone",
+        proof: Data(repeating: 0, count: HostProtocol.proofLength)
+    )
+    let firstTranscript = try HostProtocol.authenticationTranscript(
+        serverHello: serverHello,
+        clientHello: first
+    )
+    let firstKey = HostProtocol.authenticationKey(
+        sharedSecret: sharedSecret,
+        credential: grant,
+        transcript: firstTranscript
+    )
+    let proof = Data(HMAC<SHA256>.authenticationCode(for: firstTranscript, using: firstKey))
+    #expect(HostProtocol.isValidProof(
+        proof,
+        authenticationKey: firstKey,
+        transcript: firstTranscript
+    ))
+
+    let second = HostProtocol.ClientHello(
+        clientIdentifier: Data(repeating: 0x32, count: HostProtocol.identifierLength),
+        clientNonce: first.clientNonce,
+        clientPublicKey: first.clientPublicKey,
+        authenticationMethod: .enrollmentGrantV1,
+        pairingWindow: 0,
+        clientName: first.clientName,
+        proof: proof
+    )
+    let secondTranscript = try HostProtocol.authenticationTranscript(
+        serverHello: serverHello,
+        clientHello: second
+    )
+    let secondKey = HostProtocol.authenticationKey(
+        sharedSecret: sharedSecret,
+        credential: grant,
+        transcript: secondTranscript
+    )
+    #expect(!HostProtocol.isValidProof(
+        proof,
+        authenticationKey: secondKey,
+        transcript: secondTranscript
+    ))
+
+    let decoded = try HostProtocol.decodeClientHello(HostProtocol.encodeClientHello(second))
+    #expect(decoded.authenticationMethod == .enrollmentGrantV1)
+    #expect(decoded.clientIdentifier == second.clientIdentifier)
+    #expect(decoded.proof == proof)
+}
+
+@Test("Protocol v1 reserves authentication, capability, input, quality, and cursor values")
 func protocolWireValues() throws {
     #expect(HostProtocol.Capabilities.directInput.rawValue == 0x0000_0004)
     #expect(HostProtocol.Capabilities.streamQualityControl.rawValue == 0x0000_0008)
     #expect(HostProtocol.Capabilities.cursorPositionTelemetry.rawValue == 0x0000_0010)
     #expect(HostProtocol.Capabilities.pairingPassword.rawValue == 0x0000_0020)
-    #expect(HostProtocol.advertisedCapabilities.rawValue == 0x0000_001F)
+    #expect(HostProtocol.Capabilities.cloudEnrollment.rawValue == 0x0000_0040)
+    #expect(HostProtocol.advertisedCapabilities.rawValue == 0x0000_005F)
     #expect(
         HostProtocol.advertisedCapabilities(pairingPasswordEnabled: true).rawValue
-            == 0x0000_003F
+            == 0x0000_007F
     )
     #expect(
         HostProtocol.advertisedCapabilities(pairingPasswordEnabled: false).rawValue
-            == 0x0000_001F
+            == 0x0000_005F
     )
     #expect(HostProtocol.AuthenticationMethod.pairingCode.rawValue == 1)
     #expect(HostProtocol.AuthenticationMethod.resumeSecret.rawValue == 2)
     #expect(HostProtocol.AuthenticationMethod.pairingPasswordV1.rawValue == 3)
+    #expect(HostProtocol.AuthenticationMethod.enrollmentGrantV1.rawValue == 4)
     #expect(HostProtocol.AuthenticationMethod.pairingCode.isBootstrapPairing)
     #expect(HostProtocol.AuthenticationMethod.pairingPasswordV1.isBootstrapPairing)
+    #expect(HostProtocol.AuthenticationMethod.enrollmentGrantV1.isBootstrapPairing)
     #expect(!HostProtocol.AuthenticationMethod.resumeSecret.isBootstrapPairing)
+    #expect(HostProtocol.enrollmentGrantLength == 32)
     #expect(HostProtocol.MessageKind.keyFrameRequest.rawValue == 0x12)
     #expect(HostProtocol.MessageKind.streamQualityRequest.rawValue == 0x13)
     #expect(HostProtocol.MessageKind.cursorPositionSubscriptionRequest.rawValue == 0x14)

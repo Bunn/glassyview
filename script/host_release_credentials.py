@@ -39,6 +39,8 @@ ACCOUNTS = (
     "notary-key",
     "codesign-p12",
     "codesign-password",
+    "cloudkit-profile",
+    "cloudkit-management-token",
 )
 MAX_SECRET_BYTES = 1024 * 1024
 _SUCCESS = 0
@@ -428,6 +430,56 @@ class CredentialStore:
             _check_status(status, "store the release credential")
 
 
+def materialize_cloudkit_profile(path: Path) -> bool:
+    """Write the saved binary profile into a caller-owned private directory.
+
+    The profile is never returned through stdout or argv. ``False`` means the
+    user has not imported one; malformed data and unsafe destinations fail.
+    """
+    destination = Path(path)
+    if not destination.is_absolute() or destination.exists() or destination.is_symlink():
+        raise CredentialError("The CloudKit profile destination must be a new absolute path.")
+    try:
+        parent = destination.parent.stat()
+    except OSError:
+        raise CredentialError("The CloudKit profile destination directory is unavailable.") from None
+    if (not stat.S_ISDIR(parent.st_mode) or parent.st_uid != os.getuid()
+            or stat.S_IMODE(parent.st_mode) & 0o077):
+        raise CredentialError(
+            "The CloudKit profile destination directory must be owned by the current user with mode 700."
+        )
+    value = CredentialStore().get("cloudkit-profile")
+    if value is None:
+        return False
+    try:
+        data = base64.b64decode("".join(value.split()), validate=True)
+    except (ValueError, binascii.Error):
+        raise CredentialError("The saved CloudKit provisioning profile is malformed. Import it again.") from None
+    if not data:
+        raise CredentialError("The saved CloudKit provisioning profile is empty. Import it again.")
+    descriptor = None
+    try:
+        descriptor = os.open(
+            destination,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+            0o600,
+        )
+        with os.fdopen(descriptor, "wb") as output:
+            descriptor = None
+            output.write(data)
+            output.flush()
+            os.fsync(output.fileno())
+    except OSError:
+        if descriptor is not None:
+            os.close(descriptor)
+        try:
+            destination.unlink()
+        except OSError:
+            pass
+        raise CredentialError("Unable to materialize the saved CloudKit provisioning profile.") from None
+    return True
+
+
 def import_signing_identity(p12: bytes, password: str, keychain_path: Path) -> None:
     """Import into an existing isolated Keychain; no secret ever enters argv.
 
@@ -502,12 +554,12 @@ def _read_import(name: str, file: str | None) -> str:
             raise CredentialError("The credential source exceeds the 1 MiB size limit.")
     else:
         data = _read_private_file(file)
-        if name == "codesign-p12":
+        if name in ("codesign-p12", "cloudkit-profile"):
             return base64.b64encode(data).decode("ascii")
     try:
         return data.decode("utf-8")
     except UnicodeError:
-        raise CredentialError("The credential source must be UTF-8 text; codesign-p12 stdin must be base64 text.") from None
+        raise CredentialError("The credential source must be UTF-8 text; binary credentials from stdin must be base64 text.") from None
 
 
 class _SafeArgumentParser(argparse.ArgumentParser):
@@ -524,20 +576,20 @@ def main(argv: list[str] | None = None) -> int:
     setup.add_argument("--name", choices=ACCOUNTS, required=True)
     setup.add_argument(
         "--file", metavar="PATH|-",
-        help="Read a current-user-only (600) file, or stdin with '-'. For codesign-p12, PATH is binary P12; stdin is base64 text. Without --file, use hidden entry (base64 for codesign-p12).",
+        help="Read a current-user-only (600) file, or stdin with '-'. Binary codesign-p12 and cloudkit-profile files are converted to base64; stdin/hidden entry must already be base64.",
     )
     args = parser.parse_args(argv)
     try:
         if _is_ci():
             raise CredentialError("CI must use secret environment variables; local Keychain setup is disabled.")
         secret = _read_import(args.name, args.file)
-        if args.name == "codesign-p12":
+        if args.name in ("codesign-p12", "cloudkit-profile"):
             try:
                 decoded = base64.b64decode("".join(secret.split()), validate=True)
             except (ValueError, binascii.Error):
-                raise CredentialError("The signing P12 must be a binary file or valid base64 text on stdin.") from None
+                raise CredentialError("The binary credential must be a file or valid base64 text on stdin.") from None
             if not decoded:
-                raise CredentialError("The signing P12 is empty.")
+                raise CredentialError("The binary credential is empty.")
             secret = base64.b64encode(decoded).decode("ascii")
         CredentialStore().set(args.name, secret)
     except CredentialError as error:

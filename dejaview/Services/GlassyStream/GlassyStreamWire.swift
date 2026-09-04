@@ -14,6 +14,7 @@ enum GlassyStreamWire {
     static let publicKeyLength = 32
     static let proofLength = 32
     static let resumeSecretLength = 32
+    static let enrollmentGrantLength = 32
     static let authenticationTagLength = 16
     static let pairingCodeSymbolCount = 12
 
@@ -26,6 +27,7 @@ enum GlassyStreamWire {
         static let streamQualityControl = Capabilities(rawValue: 1 << 3)
         static let cursorPositionUpdates = Capabilities(rawValue: 1 << 4)
         static let pairingPassword = Capabilities(rawValue: 1 << 5)
+        static let cloudEnrollment = Capabilities(rawValue: 1 << 6)
     }
 
     enum MessageKind: UInt8, Sendable {
@@ -58,6 +60,7 @@ enum GlassyStreamWire {
         case pairingCode = 1
         case resumeSecret = 2
         case pairingPasswordV1 = 3
+        case enrollmentGrantV1 = 4
     }
 
     struct Frame: Sendable {

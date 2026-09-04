@@ -37,6 +37,7 @@ enum HostProtocol {
     static let publicKeyLength = 32
     static let proofLength = 32
     static let resumeSecretLength = 32
+    static let enrollmentGrantLength = 32
     static let authenticationTagLength = 16
     static let pairingCodeSymbolCount = 12
 
@@ -49,6 +50,9 @@ enum HostProtocol {
         static let streamQualityControl = Capabilities(rawValue: 1 << 3)
         static let cursorPositionTelemetry = Capabilities(rawValue: 1 << 4)
         static let pairingPassword = Capabilities(rawValue: 1 << 5)
+        /// The host can approve a device-specific, one-time enrollment grant
+        /// through the user's private iCloud database.
+        static let cloudEnrollment = Capabilities(rawValue: 1 << 6)
     }
 
     static let advertisedCapabilities: Capabilities = [
@@ -56,7 +60,8 @@ enum HostProtocol {
         .encryptedMedia,
         .directInput,
         .streamQualityControl,
-        .cursorPositionTelemetry
+        .cursorPositionTelemetry,
+        .cloudEnrollment
     ]
 
     static func advertisedCapabilities(pairingPasswordEnabled: Bool) -> Capabilities {
@@ -107,9 +112,14 @@ enum HostProtocol {
         /// participates in the proof and is never transmitted.
         case pairingPasswordV1 = 3
 
+        /// First-use pairing approved through the user's private iCloud
+        /// database. The grant is a one-time 256-bit credential bound to the
+        /// client's independently generated identifier.
+        case enrollmentGrantV1 = 4
+
         var isBootstrapPairing: Bool {
             switch self {
-            case .pairingCode, .pairingPasswordV1:
+            case .pairingCode, .pairingPasswordV1, .enrollmentGrantV1:
                 true
             case .resumeSecret:
                 false

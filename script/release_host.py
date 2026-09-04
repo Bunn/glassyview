@@ -37,10 +37,29 @@ ET.register_namespace("sparkle", SPARKLE)
 SECRET_ENV = {
     "GH_TOKEN", "GITHUB_TOKEN", "CLOUDFLARE_API_TOKEN", "SPARKLE_PRIVATE_KEY",
     "NOTARY_PRIVATE_KEY", "NOTARY_KEY_PATH", "CODESIGN_P12_BASE64", "CODESIGN_P12_PASSWORD",
+    "CLOUDKIT_PROVISIONING_PROFILE_BASE64", "CLOUDKIT_MANAGEMENT_TOKEN",
     "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_PASSWORD", "ASC_PRIVATE_KEY",
 }
 XCODE_NOTARY_POLL_ATTEMPTS = 41
 XCODE_NOTARY_POLL_INTERVAL = 30
+CLOUDKIT_CONTAINER = "iCloud.dev.bunn.dejaview"
+MAC_APP_IDENTIFIER_ENTITLEMENT = "com.apple.application-identifier"
+CLOUDKIT_ENROLLMENT_RECORD = "GlassyHostEnrollmentRequestV1"
+CLOUDKIT_ENROLLMENT_FIELDS = {
+    "version": (False, "INT64"),
+    "hostIdentifier": (False, "BYTES"),
+    "clientIdentifier": (False, "BYTES"),
+    "deviceName": (False, "STRING"),
+    "clientPublicKey": (False, "BYTES"),
+    "requestNonce": (False, "BYTES"),
+    "requestedAt": (False, "TIMESTAMP"),
+    "requestExpiresAt": (False, "TIMESTAMP"),
+    "fulfilledNonce": (False, "BYTES"),
+    "hostEphemeralPublicKey": (False, "BYTES"),
+    "sealedGrant": (True, "BYTES"),
+    "grantExpiresAt": (False, "TIMESTAMP"),
+}
+MAX_CLOUDKIT_SCHEMA_BYTES = 32 * 1024 * 1024
 
 
 class ReleaseError(Exception):
@@ -81,6 +100,138 @@ def clean_environment() -> dict[str, str]:
     environment.update(CI="true", GH_PROMPT_DISABLED="1", GIT_TERMINAL_PROMPT="0",
                        WRANGLER_SEND_METRICS="false")
     return environment
+
+
+def _cloudkit_schema_tokens(data: bytes) -> list[str]:
+    if len(data) > MAX_CLOUDKIT_SCHEMA_BYTES:
+        raise ReleaseError("The exported Production CloudKit schema is unexpectedly large.")
+    try:
+        schema_text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise ReleaseError("The exported Production CloudKit schema is not UTF-8.") from None
+    tokens = []
+    index = 0
+    while index < len(schema_text):
+        match = re.match(r"\s+|/\*.*?\*/|//[^\r\n]*", schema_text[index:], re.DOTALL)
+        if match:
+            index += match.end()
+            continue
+        if schema_text[index] == '"':
+            match = re.match(r'"(?:\\.|[^"\\])*"', schema_text[index:])
+            if not match:
+                raise ReleaseError("The exported Production CloudKit schema is malformed.")
+            token = match.group(0)
+            try:
+                tokens.append(json.loads(token))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                raise ReleaseError("The exported Production CloudKit schema is malformed.") from None
+            index += match.end()
+            continue
+        match = re.match(r"[A-Za-z_$][A-Za-z0-9_$.-]*|[(),;<>]", schema_text[index:])
+        if not match:
+            raise ReleaseError("The exported Production CloudKit schema is malformed.")
+        tokens.append(match.group(0))
+        index += match.end()
+    return tokens
+
+
+def _cloudkit_record_fields(
+    tokens: list[str], record_name: str
+) -> dict[str, tuple[bool, str]] | None:
+    index = 0
+    while index + 3 < len(tokens):
+        if (tokens[index].upper(), tokens[index + 1].upper()) != ("RECORD", "TYPE"):
+            index += 1
+            continue
+        name = tokens[index + 2]
+        if tokens[index + 3] != "(":
+            raise ReleaseError("The exported Production CloudKit schema is malformed.")
+        body_start = index + 4
+        cursor = body_start
+        depth = 1
+        while cursor < len(tokens) and depth:
+            depth += (tokens[cursor] == "(") - (tokens[cursor] == ")")
+            cursor += 1
+        if depth:
+            raise ReleaseError("The exported Production CloudKit schema is malformed.")
+        if name == record_name:
+            fields = {}
+            body = tokens[body_start:cursor - 1]
+            field_index = 0
+            while field_index < len(body):
+                if body[field_index] == ",":
+                    field_index += 1
+                    continue
+                if body[field_index].upper() == "GRANT":
+                    while field_index < len(body) and body[field_index].upper() != "TO":
+                        field_index += 1
+                    if field_index + 1 >= len(body):
+                        raise ReleaseError("The exported Production CloudKit schema is malformed.")
+                    field_index += 2
+                    continue
+                field_name = body[field_index]
+                field_index += 1
+                encrypted = field_index < len(body) and body[field_index].upper() == "ENCRYPTED"
+                if encrypted:
+                    field_index += 1
+                if field_index >= len(body) or field_name in fields:
+                    raise ReleaseError("The exported Production CloudKit schema is malformed.")
+                fields[field_name] = (encrypted, body[field_index].upper())
+                field_index += 1
+                while field_index < len(body) and body[field_index] != ",":
+                    field_index += 1
+            return fields
+        index = cursor
+    return None
+
+
+def validate_cloudkit_enrollment_schema(data: bytes) -> None:
+    fields = _cloudkit_record_fields(
+        _cloudkit_schema_tokens(data), CLOUDKIT_ENROLLMENT_RECORD
+    )
+    if fields is None:
+        raise ReleaseError(
+            f"Production CloudKit is missing record type {CLOUDKIT_ENROLLMENT_RECORD}. "
+            "Deploy the development schema before publishing."
+        )
+    mismatches = [
+        f"{name} ({'ENCRYPTED ' if encrypted else ''}{field_type})"
+        for name, (encrypted, field_type) in CLOUDKIT_ENROLLMENT_FIELDS.items()
+        if fields.get(name) != (encrypted, field_type)
+    ]
+    if mismatches:
+        raise ReleaseError(
+            f"Production CloudKit record {CLOUDKIT_ENROLLMENT_RECORD} is missing or has the wrong type for: "
+            + ", ".join(mismatches)
+            + ". Deploy the development schema before publishing."
+        )
+
+
+def verify_production_cloudkit_schema(config: dict, credentials, run) -> None:
+    token = credentials.get(
+        "cloudkit-management-token", ["CLOUDKIT_MANAGEMENT_TOKEN"]
+    )
+    environment = clean_environment()
+    environment["CLOUDKIT_MANAGEMENT_TOKEN"] = token
+    with tempfile.TemporaryDirectory(prefix="glassy-cloudkit-schema-") as temporary:
+        schema = Path(temporary) / "production.ckdb"
+        run.run(
+            [
+                "xcrun", "cktool", "export-schema",
+                "--team-id", config["team_id"],
+                "--container-id", CLOUDKIT_CONTAINER,
+                "--environment", "production",
+                "--output-file", schema,
+            ],
+            "Verify Production CloudKit enrollment schema",
+            env=environment,
+            sensitive=True,
+        )
+        try:
+            data = schema.read_bytes()
+        except OSError:
+            raise ReleaseError("cktool did not export the Production CloudKit schema.") from None
+        validate_cloudkit_enrollment_schema(data)
 
 
 def is_ci_environment() -> bool:
@@ -278,6 +429,14 @@ def validate_app(app, config, state, run):
         key: state[key] for key in ("version", "build", "minimum_system")
     }:
         raise ReleaseError("The built app version differs from this release's recorded version.")
+    profile = app / "Contents/embedded.provisionprofile"
+    if not profile.is_file() or profile.is_symlink():
+        raise ReleaseError("The built app is missing its CloudKit Developer ID provisioning profile.")
+    profile_data, _ = run.run(
+        ["/usr/bin/security", "cms", "-D", "-i", profile],
+        "Inspect embedded CloudKit provisioning profile",
+    )
+    profile_details = validate_cloudkit_profile(profile_data, config)
     run.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", app], "Verify app signature")
     _, details = run.run(["/usr/bin/codesign", "-d", "--verbose=4", app], "Inspect Developer ID signature")
     text = details.decode(errors="replace")
@@ -286,27 +445,177 @@ def validate_app(app, config, state, run):
             not re.search(r"flags=0x[0-9a-f]+\([^)]*runtime", text) or
             not re.search(r"^Timestamp=(?!none\s*$).+", text, re.MULTILINE)):
         raise ReleaseError("The app needs this team's Developer ID signature, hardened runtime, and timestamp.")
+    signed_entitlements, entitlement_diagnostics = run.run(
+        ["/usr/bin/codesign", "-d", "--entitlements", "-", "--xml", app],
+        "Inspect signed app entitlements",
+    )
+    validate_signed_entitlements(
+        plist_from_tool_output(signed_entitlements, entitlement_diagnostics),
+        profile_details,
+        config,
+    )
+    with tempfile.TemporaryDirectory(prefix="glassy-signer-certificate-") as temporary:
+        certificate_prefix = Path(temporary) / "certificate"
+        run.run(
+            ["/usr/bin/codesign", "-d", "--extract-certificates", certificate_prefix, app],
+            "Inspect app signing certificate",
+        )
+        leaf_certificate = certificate_prefix.with_name(certificate_prefix.name + "0")
+        if (not leaf_certificate.is_file()
+                or hashlib.sha256(leaf_certificate.read_bytes()).digest()
+                not in profile_details["developer_certificate_hashes"]):
+            raise ReleaseError(
+                "The app's Developer ID signing certificate is not authorized by its provisioning profile."
+            )
     for binary in (app / "Contents/MacOS/GlassyHost", app / "Contents/Frameworks/Sparkle.framework/Sparkle"):
         run.run(["xcrun", "lipo", binary, "-verify_arch", "arm64", "x86_64"], "Verify universal architectures")
+
+
+def plist_from_tool_output(*chunks: bytes) -> bytes:
+    for chunk in chunks:
+        if chunk.startswith(b"bplist00"):
+            try:
+                plistlib.loads(chunk)
+            except plistlib.InvalidFileException:
+                continue
+            return chunk
+        start = chunk.find(b"<?xml")
+        end = chunk.rfind(b"</plist>")
+        if start >= 0 and end >= start:
+            candidate = chunk[start:end + len(b"</plist>")]
+            try:
+                plistlib.loads(candidate)
+            except plistlib.InvalidFileException:
+                continue
+            return candidate
+    raise ReleaseError("The signed app entitlements could not be decoded.")
+
+
+def validate_signed_entitlements(data: bytes, profile: dict, config: dict) -> None:
+    try:
+        entitlements = plistlib.loads(data)
+    except (TypeError, ValueError, plistlib.InvalidFileException):
+        raise ReleaseError("The signed app entitlements are malformed.") from None
+    if not isinstance(entitlements, dict):
+        raise ReleaseError("The signed app entitlements are malformed.")
+
+    containers = entitlements.get("com.apple.developer.icloud-container-identifiers")
+    services = entitlements.get("com.apple.developer.icloud-services")
+    if (entitlements.get(MAC_APP_IDENTIFIER_ENTITLEMENT) != profile["app_identifier"]
+            or entitlements.get("com.apple.developer.team-identifier") != config["team_id"]
+            or entitlements.get("com.apple.developer.icloud-container-environment")
+                != profile["environment"]
+            or not isinstance(containers, list)
+            or not containers
+            or not set(containers).issubset(profile["containers"])
+            or CLOUDKIT_CONTAINER not in containers
+            or not isinstance(services, list)
+            or not services
+            or not set(services).issubset(profile["services"])
+            or "CloudKit" not in services):
+        raise ReleaseError(
+            "The signed app does not claim the CloudKit entitlements authorized by its profile."
+        )
+
+
+def validate_cloudkit_profile(data: bytes, config: dict, *,
+                              now: dt.datetime | None = None) -> dict:
+    try:
+        profile = plistlib.loads(data)
+        entitlements = profile["Entitlements"]
+        expiration = profile["ExpirationDate"]
+    except (KeyError, TypeError, ValueError, plistlib.InvalidFileException):
+        raise ReleaseError("The embedded CloudKit provisioning profile is malformed.") from None
+    if not isinstance(entitlements, dict) or not isinstance(expiration, dt.datetime):
+        raise ReleaseError("The embedded CloudKit provisioning profile is malformed.")
+    current = now or dt.datetime.now(dt.timezone.utc)
+    if expiration.tzinfo is None:
+        expiration = expiration.replace(tzinfo=dt.timezone.utc)
+    if expiration <= current:
+        raise ReleaseError("The embedded CloudKit provisioning profile has expired.")
+
+    app_identifier = entitlements.get(MAC_APP_IDENTIFIER_ENTITLEMENT)
+    legacy_app_identifier = entitlements.get("application-identifier")
+    if app_identifier is None:
+        app_identifier = legacy_app_identifier
+    elif legacy_app_identifier is not None and legacy_app_identifier != app_identifier:
+        raise ReleaseError("The embedded CloudKit provisioning profile is malformed.")
+    suffix = "." + config["bundle_id"]
+    identifier_prefix = (app_identifier[:-len(suffix)]
+                         if isinstance(app_identifier, str) and app_identifier.endswith(suffix)
+                         else None)
+    application_identifier_prefixes = profile.get("ApplicationIdentifierPrefix")
+    team_identifiers = profile.get("TeamIdentifier")
+    developer_certificates = profile.get("DeveloperCertificates")
+    containers = entitlements.get("com.apple.developer.icloud-container-identifiers")
+    services = entitlements.get("com.apple.developer.icloud-services")
+    normalized_prefixes = ({value.rstrip(".") for value in application_identifier_prefixes}
+                           if isinstance(application_identifier_prefixes, list)
+                           and all(isinstance(value, str) for value in application_identifier_prefixes)
+                           else set())
+    certificate_hashes = ({hashlib.sha256(value).digest() for value in developer_certificates}
+                          if isinstance(developer_certificates, list)
+                          and developer_certificates
+                          and all(isinstance(value, bytes) and value for value in developer_certificates)
+                          else set())
+    if (not identifier_prefix
+            or identifier_prefix not in normalized_prefixes
+            or entitlements.get("com.apple.developer.team-identifier") != config["team_id"]
+            or team_identifiers != [config["team_id"]]
+            or profile.get("ProvisionsAllDevices") is not True
+            or not certificate_hashes
+            or entitlements.get("com.apple.developer.icloud-container-environment") != "Production"
+            or not isinstance(containers, list)
+            or CLOUDKIT_CONTAINER not in containers
+            or not isinstance(services, list)
+            or "CloudKit" not in services):
+        raise ReleaseError(
+            "The embedded provisioning profile does not grant this host Production CloudKit access."
+        )
+    return {
+        "app_identifier": app_identifier,
+        "application_identifier_prefix": identifier_prefix,
+        "team_identifier": config["team_id"],
+        "environment": "Production",
+        "containers": frozenset(containers),
+        "services": frozenset(services),
+        "developer_certificate_hashes": frozenset(certificate_hashes),
+    }
 
 
 @contextlib.contextmanager
 def signing_environment(credentials, run, identity):
     p12 = credentials.get("codesign-p12", ["CODESIGN_P12_BASE64"], required=False)
+    profile_text = credentials.get(
+        "cloudkit-profile", ["CLOUDKIT_PROVISIONING_PROFILE_BASE64"]
+    )
+    try:
+        profile_data = base64.b64decode("".join(profile_text.split()), validate=True)
+    except (ValueError, binascii.Error):
+        raise ReleaseError("CLOUDKIT_PROVISIONING_PROFILE_BASE64 is not valid base64.") from None
+    if not profile_data:
+        raise ReleaseError("The CloudKit Developer ID provisioning profile is empty.")
     env = clean_environment()
     env["GLASSY_HOST_CODESIGN_IDENTITY"] = identity
-    if not p12:
-        if credentials.ci:
-            raise ReleaseError("CI builds require CODESIGN_P12_BASE64 and CODESIGN_P12_PASSWORD for unattended signing.")
-        yield env
-        return
-    password = credentials.get("codesign-password", ["CODESIGN_P12_PASSWORD"], strip=False)
-    try:
-        certificate = base64.b64decode(p12, validate=True)
-    except (ValueError, binascii.Error):
-        raise ReleaseError("CODESIGN_P12_BASE64 is not valid base64.") from None
     with tempfile.TemporaryDirectory(prefix="glassy-signing-") as temporary:
-        keychain = Path(temporary) / "signing.keychain-db"
+        temporary_path = Path(temporary)
+        profile = temporary_path / "GlassyHost.provisionprofile"
+        profile.write_bytes(profile_data)
+        profile.chmod(0o600)
+        env["GLASSY_HOST_PROVISIONING_PROFILE"] = str(profile)
+
+        if not p12:
+            if credentials.ci:
+                raise ReleaseError("CI builds require CODESIGN_P12_BASE64 and CODESIGN_P12_PASSWORD for unattended signing.")
+            yield env
+            return
+
+        password = credentials.get("codesign-password", ["CODESIGN_P12_PASSWORD"], strip=False)
+        try:
+            certificate = base64.b64decode(p12, validate=True)
+        except (ValueError, binascii.Error):
+            raise ReleaseError("CODESIGN_P12_BASE64 is not valid base64.") from None
+        keychain = temporary_path / "signing.keychain-db"
         # Only this throwaway password enters argv, never the P12 password.
         ephemeral = secrets.token_urlsafe(32)
         try:
@@ -701,6 +1010,8 @@ def execute(args):
         if not state.get("sha256"):
             sparkle_key = credentials.get("sparkle-key", ["SPARKLE_PRIVATE_KEY"])
             validate_sparkle_secret(sparkle_key)
+        run = Runner(work)
+        verify_production_cloudkit_schema(config, credentials, run)
         feed, _ = github.content(config["feed_path"])
         check_feed(feed, state, allow_existing=bool(state.get("signature")))
         existing = github.release(state["tag"])
@@ -710,7 +1021,6 @@ def execute(args):
             ref = github.request("GET", f"git/ref/heads/{config['branch']}")
             state["distribution_base"] = ref["object"]["sha"]
             save()
-        run = Runner(work)
         uses_xcode_notary = state["notarization_mode"] == "xcode"
         auth_context = (notary_auth(credentials)
                         if not uses_xcode_notary and state.get("notary_status") != "Accepted"
@@ -746,6 +1056,10 @@ def execute(args):
                     if digest(work / "submission.zip") != state["submission_sha256"]:
                         raise ReleaseError("The notarization submission ZIP changed since packaging.")
                     notarize(state, work, run, auth, save)
+        # Revalidate resumed and already-finalized workspaces too. Receipts from
+        # releases created before CloudKit support must never bypass the new
+        # embedded-profile requirement on their way to publication.
+        validate_app(work / "Glassy Host.app", config, state, run)
         archive = finalize(state, work, config, run, sparkle_key, save)
         # Recheck immediately before publication in case another release advanced the feed.
         feed, _ = github.content(config["feed_path"])

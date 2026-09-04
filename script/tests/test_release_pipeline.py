@@ -1,6 +1,7 @@
 """Offline end-to-end release orchestration: real receipts, fake external services."""
 import base64
 import contextlib
+import datetime as dt
 import io
 import json
 import os
@@ -21,9 +22,28 @@ xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel>
 <title>Glassy Host</title><item><title>Old release</title><sparkle:version>3</sparkle:version>
 <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString></item></channel></rss>'''
 SIGNATURE = base64.b64encode(bytes(64)).decode()
+PRODUCTION_CLOUDKIT_SCHEMA = b'''DEFINE SCHEMA
+RECORD TYPE GlassyHostEnrollmentRequestV1 (
+    version INT64,
+    hostIdentifier BYTES,
+    clientIdentifier BYTES,
+    deviceName STRING,
+    clientPublicKey BYTES,
+    requestNonce BYTES,
+    requestedAt TIMESTAMP,
+    requestExpiresAt TIMESTAMP,
+    fulfilledNonce BYTES,
+    hostEphemeralPublicKey BYTES,
+    sealedGrant ENCRYPTED BYTES,
+    grantExpiresAt TIMESTAMP
+);
+'''
 
 
 class ServiceFixture:
+    app_identifier_prefix = "MIGRATED1"
+    signing_certificate = b"synthetic developer id leaf certificate"
+
     def __init__(self, work):
         self.work = work
         self.feed = OLD_FEED
@@ -35,6 +55,8 @@ class ServiceFixture:
         self.events = []
         self.apple_status = "Accepted"
         self.interrupt_wait = False
+        self.profile_certificates = [self.signing_certificate]
+        self.cloudkit_schema = PRODUCTION_CLOUDKIT_SCHEMA
         self.version = plistlib.loads((release.ROOT / "GlassyHost/Support/Info.plist").read_bytes())["CFBundleShortVersionString"]
 
     def content(self, path):
@@ -73,17 +95,43 @@ class ServiceFixture:
     def run(self, args, label, **options):
         args = [str(arg) for arg in args]
         self.commands.append(args)
-        if args[0] == "bash":
+        if args[:3] == ["xcrun", "cktool", "export-schema"]:
+            self.events.append("schema")
+            assert "--token" not in args
+            assert options["env"]["CLOUDKIT_MANAGEMENT_TOKEN"] == "fake-cloudkit-management"
+            assert options["sensitive"] is True
+            Path(args[args.index("--output-file") + 1]).write_bytes(
+                self.cloudkit_schema
+            )
+        elif args[0] == "bash":
             self.events.append("compile")
             package_dir = self.work / "compiled"
             app = package_dir / "Glassy Host.app"
             (app / "Contents").mkdir(parents=True)
             shutil.copyfile(release.ROOT / "GlassyHost/Support/Info.plist", app / "Contents/Info.plist")
+            (app / "Contents/embedded.provisionprofile").write_bytes(b"synthetic profile")
             submission = package_dir / "submission.zip"
             submission.write_bytes(b"submission-before-stapling")
             (self.work / "package.json").write_text(json.dumps({
                 "app": str(app), "submission_zip": str(submission), "sparkle_tools": str(package_dir),
             }))
+        elif args[:4] == ["/usr/bin/security", "cms", "-D", "-i"]:
+            config = json.loads((release.ROOT / "script/host-release.json").read_text())
+            return plistlib.dumps({
+                "ExpirationDate": dt.datetime(2035, 1, 1),
+                "ApplicationIdentifierPrefix": [self.app_identifier_prefix],
+                "TeamIdentifier": [config["team_id"]],
+                "ProvisionsAllDevices": True,
+                "DeveloperCertificates": self.profile_certificates,
+                "Entitlements": {
+                    "com.apple.application-identifier":
+                        f"{self.app_identifier_prefix}.{config['bundle_id']}",
+                    "com.apple.developer.team-identifier": config["team_id"],
+                    "com.apple.developer.icloud-container-environment": "Production",
+                    "com.apple.developer.icloud-container-identifiers": ["iCloud.dev.bunn.dejaview"],
+                    "com.apple.developer.icloud-services": ["CloudKit"],
+                },
+            }), b""
         elif args[0] == "ditto" and "-c" not in args:
             shutil.copytree(args[1], args[2])
         elif args[:3] == ["xcrun", "notarytool", "submit"]:
@@ -108,6 +156,20 @@ class ServiceFixture:
             return SIGNATURE.encode(), b""
         elif args[0] == "swift":
             self.events.append("verify-signature")
+        elif args[0] == "/usr/bin/codesign" and "--entitlements" in args:
+            config = json.loads((release.ROOT / "script/host-release.json").read_text())
+            return plistlib.dumps({
+                "com.apple.application-identifier":
+                    f"{self.app_identifier_prefix}.{config['bundle_id']}",
+                "com.apple.developer.team-identifier": config["team_id"],
+                "com.apple.developer.icloud-container-environment": "Production",
+                "com.apple.developer.icloud-container-identifiers": ["iCloud.dev.bunn.dejaview"],
+                "com.apple.developer.icloud-services": ["CloudKit"],
+            }), b""
+        elif args[0] == "/usr/bin/codesign" and "--extract-certificates" in args:
+            prefix = Path(args[args.index("--extract-certificates") + 1])
+            prefix.with_name(prefix.name + "0").write_bytes(self.signing_certificate)
+            return b"", b""
         elif args[0] == "/usr/bin/codesign" and "-d" in args:
             return b"", (b"Authority=Developer ID Application: Test\nTeamIdentifier=B2RUA6XMHC\n"
                          b"Timestamp=Sep 3 2026\nCodeDirectory flags=0x10000(runtime)\n")
@@ -137,6 +199,7 @@ class ReleasePipelineTests(unittest.TestCase):
             "CI": "true", "GH_TOKEN": "fake-github", "CLOUDFLARE_API_TOKEN": "fake-cloudflare",
             "CLOUDFLARE_ACCOUNT_ID": "a" * 32,
             "SPARKLE_PRIVATE_KEY": base64.b64encode(bytes(32)).decode(),
+            "CLOUDKIT_MANAGEMENT_TOKEN": "fake-cloudkit-management",
         }
         self.patches = contextlib.ExitStack()
         self.addCleanup(self.patches.close)
@@ -162,7 +225,7 @@ class ReleasePipelineTests(unittest.TestCase):
 
     def test_full_command_compiles_notarizes_and_publishes_only_verified_download(self):
         self.assertEqual(self.start(), 0)
-        self.assertEqual(self.service.events, ["compile", "submit", "wait", "staple", "zip", "sign",
+        self.assertEqual(self.service.events, ["schema", "compile", "submit", "wait", "staple", "zip", "sign",
                                                "verify-signature", "draft", "asset", "publish", "feed", "deploy"])
         state = json.loads((self.work / "state.json").read_text())
         self.assertTrue(state["complete"])
@@ -171,13 +234,27 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertEqual(self.work.joinpath("state.json").stat().st_mode & 0o777, 0o600)
         self.assertNotIn("fake-github", json.dumps(state))
         self.assertNotIn("fake-cloudflare", json.dumps(state))
+        self.assertNotIn("fake-cloudkit-management", json.dumps(state))
+
+    def test_missing_production_cloudkit_schema_stops_before_compilation(self):
+        self.service.cloudkit_schema = b"DEFINE SCHEMA;"
+        self.assertEqual(self.start(), 1)
+        self.assertEqual(self.service.events, ["schema"])
+        self.assertIsNone(self.service.release_value)
+        self.assertEqual(self.service.feed, OLD_FEED)
 
     def test_notary_rejection_stops_before_any_publication(self):
         self.service.apple_status = "Invalid"
         self.assertEqual(self.start(), 1)
-        self.assertEqual(self.service.events, ["compile", "submit", "wait"])
+        self.assertEqual(self.service.events, ["schema", "compile", "submit", "wait"])
         self.assertIsNone(self.service.release_value)
         self.assertEqual(self.service.feed, OLD_FEED)
+
+    def test_profile_must_authorize_the_actual_signing_certificate(self):
+        self.service.profile_certificates = [b"different developer id certificate"]
+        self.assertEqual(self.start(), 1)
+        self.assertEqual(self.service.events, ["schema", "compile"])
+        self.assertIsNone(self.service.release_value)
 
     def test_wait_timeout_resumes_same_submission_without_compile_or_resubmit(self):
         self.service.interrupt_wait = True

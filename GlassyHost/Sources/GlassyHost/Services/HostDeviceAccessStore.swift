@@ -112,6 +112,45 @@ final class HostDeviceAccessStore: @unchecked Sendable {
         }
     }
 
+    /// Cloud enrollment may create a new device or refresh an active one, but
+    /// it never overrides an explicit revocation. QR/password pairing remains
+    /// available when the owner wants to restore that identity.
+    func recordCloudEnrollmentAuthentication(identifier: Data,
+                                             name: String,
+                                             at date: Date = Date()) throws {
+        guard identifier.count == HostProtocol.identifierLength else {
+            throw HostProtocol.ProtocolError.invalidAuthentication
+        }
+        try update { state in
+            guard state.allowsConnections else {
+                throw HostProtocol.ProtocolError.invalidAuthentication
+            }
+            if let index = state.devices.firstIndex(where: { $0.identifier == identifier }) {
+                guard !state.devices[index].isRevoked else {
+                    throw HostProtocol.ProtocolError.invalidAuthentication
+                }
+                state.devices[index].name = Self.displayName(name)
+                state.devices[index].lastConnectedAt = date
+            } else {
+                state.devices.append(Device(
+                    identifier: identifier,
+                    name: Self.displayName(name),
+                    lastConnectedAt: date,
+                    resumeSalt: Self.makeResumeSalt(),
+                    isRevoked: false
+                ))
+            }
+        }
+    }
+
+    func permitsCloudEnrollment(identifier: Data) -> Bool {
+        lock.withLock {
+            guard state.allowsConnections,
+                  identifier.count == HostProtocol.identifierLength else { return false }
+            return state.devices.first(where: { $0.identifier == identifier })?.isRevoked != true
+        }
+    }
+
     func revoke(identifier: Data) throws {
         try update { state in
             guard let index = state.devices.firstIndex(where: { $0.identifier == identifier }) else {

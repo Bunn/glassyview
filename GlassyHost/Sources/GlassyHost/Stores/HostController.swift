@@ -47,7 +47,9 @@ final class HostController {
 
     private let pairingSecretStore = PairingSecretStore()
     private let pairingPasswordStore = PairingPasswordStore()
-    private let hostServer = HostServer()
+    private let hostServer: HostServer
+    private let cloudEnrollmentService: HostCloudEnrollmentService?
+    private let cloudEnrollmentEnabled: Bool
     private let loginItemService = LoginItemService()
     private let remoteInputService = RemoteInputService()
 
@@ -141,6 +143,22 @@ final class HostController {
     private static let pipelineRetryStabilityInterval: Duration = .seconds(10)
 
     init() {
+        let deviceAccessStore = HostDeviceAccessStore()
+        let enrollmentGrantStore = HostEnrollmentGrantStore()
+        let cloudEnrollmentEnabled = HostCloudEnrollmentAvailability
+            .hasEmbeddedProvisioningProfile
+        self.cloudEnrollmentEnabled = cloudEnrollmentEnabled
+        hostServer = HostServer(
+            deviceAccessStore: deviceAccessStore,
+            enrollmentGrantStore: enrollmentGrantStore,
+            cloudEnrollmentEnabled: cloudEnrollmentEnabled
+        )
+        cloudEnrollmentService = cloudEnrollmentEnabled
+            ? HostCloudEnrollmentService(
+                deviceAccessStore: deviceAccessStore,
+                grantStore: enrollmentGrantStore
+            )
+            : nil
         allowsConnections = hostServer.allowsConnections
         pairedDevices = hostServer.pairedDevices
     }
@@ -238,6 +256,13 @@ final class HostController {
         hostServer.setAuthenticatedClientReplacementHandler { [remoteInputService] in
             remoteInputService.releasePressedInput()
         }
+        if cloudEnrollmentEnabled {
+            hostServer.setCloudEnrollmentPollHandler { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.cloudEnrollmentService?.requestFastPoll()
+                }
+            }
+        }
         do {
             let store = pairingSecretStore
             let pairingSecret = try await Task.detached(priority: .userInitiated) {
@@ -246,6 +271,9 @@ final class HostController {
             let identifier = HostServer.makeHostIdentifier(from: pairingSecret.keyData)
             hostIdentifier = identifier
             pairingHostIdentifier = identifier
+            if cloudEnrollmentEnabled {
+                cloudEnrollmentService?.start(hostIdentifier: identifier)
+            }
 
             startServer(
                 pairingSecret: pairingSecret,
@@ -727,6 +755,9 @@ final class HostController {
             hostIdentifier = HostServer.makeHostIdentifier(from: secret.keyData)
             pairingHostIdentifier = hostIdentifier
             hostServer.replacePairingSecretAndRestart(secret.keyData)
+            if cloudEnrollmentEnabled, let hostIdentifier {
+                cloudEnrollmentService?.start(hostIdentifier: hostIdentifier)
+            }
             refreshPairingCode()
             let effects = streamingDemand.authenticatedClientCountChanged(to: 0)
             clientCount = streamingDemand.authenticatedClientCount
