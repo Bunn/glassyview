@@ -17,6 +17,7 @@ struct ContentView<Session: RemoteSessionControlling,
     @State private var networkPathObserver = NetworkPathObserver()
     @State private var glassyHostBrowser = GlassyHostBrowser()
     private let wakeOnLANSender: any WakeOnLANSending
+    private let widgetSnapshotPublisher: any WidgetSnapshotPublishing
 
     @State private var selectedSection: ConnectSection? = .hosts
     @State private var searchText = ""
@@ -63,6 +64,7 @@ struct ContentView<Session: RemoteSessionControlling,
         _store = State(initialValue: dependencies.makeStore())
         _intentRouter = State(initialValue: dependencies.makeIntentRouter())
         wakeOnLANSender = dependencies.wakeOnLANSender
+        widgetSnapshotPublisher = dependencies.widgetSnapshotPublisher
     }
 
     var body: some View {
@@ -181,6 +183,7 @@ struct ContentView<Session: RemoteSessionControlling,
             guard let request else { return }
             handleIntentRequest(request)
         }
+        .onOpenURL(perform: handleWidgetURL)
         .onChange(of: session.status) { _, status in
             guard sessionMachine?.connectionMode == .vnc else { return }
             handleSessionStatusChanged(status)
@@ -754,6 +757,20 @@ struct ContentView<Session: RemoteSessionControlling,
         searchText = ""
         machineEditorRequest = nil
         connect(to: machine)
+    }
+
+    private func handleWidgetURL(_ url: URL) {
+        guard let deepLink = GlassyDeskWidgetDeepLink(url: url) else {
+            AppLog.ui.warning("Ignored malformed Glassy Desk widget URL")
+            return
+        }
+
+        switch deepLink {
+        case .hosts:
+            openFromIntent(destination: .hosts)
+        case .connect(let machineID):
+            connectFromIntent(machineID: machineID)
+        }
     }
 
     private func openFromIntent(destination: DejaViewDestination) {
@@ -1365,6 +1382,11 @@ struct ContentView<Session: RemoteSessionControlling,
             AppLog.reachability.info("Skipping saved machine reachability refresh because there are no saved machines")
             machineReachabilityStatuses.removeAll()
             machineReachabilityEndpoints.removeAll()
+            widgetSnapshotPublisher.publish(
+                machines: [],
+                reachabilityStatuses: [:],
+                checkedAt: .now
+            )
             return
         }
 
@@ -1432,6 +1454,13 @@ struct ContentView<Session: RemoteSessionControlling,
 
         let elapsed = String(describing: startedAt.duration(to: .now))
         AppLog.reachability.info("Finished saved machine reachability refresh; generation=\(generation, privacy: .public) elapsed=\(elapsed, privacy: .public) taskCancelled=\(Task.isCancelled, privacy: .public)")
+
+        guard reachabilityProbeGeneration == generation else { return }
+        widgetSnapshotPublisher.publish(
+            machines: machines,
+            reachabilityStatuses: machineReachabilityStatuses,
+            checkedAt: .now
+        )
     }
 
     @MainActor
@@ -1506,6 +1535,12 @@ struct ContentView<Session: RemoteSessionControlling,
         for machine in store.machines {
             machineReachabilityStatuses[machine.id] = status
         }
+
+        widgetSnapshotPublisher.publish(
+            machines: store.machines,
+            reachabilityStatuses: machineReachabilityStatuses,
+            checkedAt: .now
+        )
     }
 
     private func reachabilityEndpointKey(for machine: SavedMachine) -> String {

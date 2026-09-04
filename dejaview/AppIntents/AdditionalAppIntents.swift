@@ -100,7 +100,10 @@ struct AddSavedMachineIntent: AppIntent {
                                    port: UInt16(port),
                                    username: trimmedUsername)
 
-        MachineStore(repository: SwiftDataSavedMachineRepository.shared)
+        MachineStore(
+            repository: SwiftDataSavedMachineRepository.shared,
+            widgetSnapshotPublisher: WidgetSnapshotPublisher()
+        )
             .add(machine, password: password ?? "")
 
         AppIntentRouter.shared.requestMachinesReload()

@@ -10,10 +10,15 @@ final class MachineStore: MachineStoring {
     private(set) var recentConnections: [ConnectionHistoryEntry] = []
 
     @ObservationIgnored private let repository: SavedMachineRepository
+    @ObservationIgnored private let widgetSnapshotPublisher: any WidgetSnapshotPublishing
     @ObservationIgnored private let recentConnectionLimit = 50
 
-    init(repository: SavedMachineRepository = SwiftDataSavedMachineRepository.shared) {
+    init(
+        repository: SavedMachineRepository = SwiftDataSavedMachineRepository.shared,
+        widgetSnapshotPublisher: any WidgetSnapshotPublishing = NoopWidgetSnapshotPublisher()
+    ) {
         self.repository = repository
+        self.widgetSnapshotPublisher = widgetSnapshotPublisher
         reload()
     }
 
@@ -22,6 +27,7 @@ final class MachineStore: MachineStoring {
         let loadedRecentConnections = repository.loadRecentConnections(limit: recentConnectionLimit)
         machines = loadedMachines
         recentConnections = loadedRecentConnections
+        widgetSnapshotPublisher.publish(machines: loadedMachines)
 
         let recentIDs = loadedRecentConnections.isEmpty
             ? "none"
