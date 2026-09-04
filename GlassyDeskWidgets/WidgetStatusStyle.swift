@@ -3,13 +3,13 @@ import SwiftUI
 func statusTitle(_ status: WidgetMachineReachability) -> String {
     switch status {
     case .unknown:
-        "Status unknown"
+        String(localized: "Status unknown")
     case .checking:
-        "Checking"
+        String(localized: "Checking")
     case .reachable:
-        "Online"
+        String(localized: "Online")
     case .unreachable:
-        "Offline"
+        String(localized: "Offline")
     }
 }
 

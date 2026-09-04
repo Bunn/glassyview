@@ -89,6 +89,9 @@ struct QuickConnectWidget: Widget {
 }
 
 private struct QuickConnectWidgetView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
     let entry: QuickConnectEntry
 
     var body: some View {
@@ -105,78 +108,210 @@ private struct QuickConnectWidgetView: View {
     }
 
     private func readyView(_ machine: WidgetMachineSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center) {
-                Image(systemName: machine.connectionKind == .glassyStream
-                      ? "bolt.horizontal.circle.fill"
-                      : "display")
-                    .font(.title2)
-                    .foregroundStyle(.tint)
-                    .widgetAccentable()
-
-                Spacer(minLength: 4)
-                statusDot(machine.reachability)
+        ZStack(alignment: .topLeading) {
+            if !dynamicTypeSize.isAccessibilitySize {
+                screenDecoration
             }
 
-            Spacer(minLength: 2)
+            VStack(alignment: .leading, spacing: 0) {
+                header
 
-            Text(machine.displayName)
-                .font(.headline)
-                .lineLimit(2)
-                .privacySensitive()
+                Spacer(minLength: 8)
 
-            statusLine(for: machine)
+                Text(machine.displayName)
+                    .font(.system(.title3, design: .rounded, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 1 : 2)
+                    .minimumScaleFactor(0.85)
+                    .privacySensitive()
 
-            Label("Connect", systemImage: "arrow.right.circle.fill")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tint)
-                .widgetAccentable()
+                Spacer(minLength: 7)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(
+                        compactStatusTitle(machine.reachability),
+                        systemImage: statusSymbol(machine.reachability)
+                    )
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .foregroundStyle(statusForeground(machine.reachability))
+
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        recencyText(for: machine)
+                            .font(.system(.caption2, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityHint("Opens Glassy Desk and connects to this Mac")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .privacySensitive()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(machine.displayName)
+        .accessibilityValue("\(compactStatusTitle(machine.reachability)). \(accessibilityRecencyTitle(for: machine)).")
+        .accessibilityHint("Connects to this Mac")
     }
 
     private var emptyView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: entry.state == .unavailable
-                  ? "questionmark.circle"
-                  : "desktopcomputer")
-                .font(.title)
-                .foregroundStyle(.secondary)
+        ZStack(alignment: .topLeading) {
+            if !dynamicTypeSize.isAccessibilitySize {
+                screenDecoration
+            }
 
-            Spacer()
+            VStack(alignment: .leading, spacing: 0) {
+                header
 
-            Text(entry.state == .unavailable ? "Mac unavailable" : "No saved Macs")
-                .font(.headline)
-                .lineLimit(2)
+                Spacer(minLength: 8)
 
-            Text(entry.state == .unavailable
-                 ? "Edit the widget to choose another."
-                 : "Open Glassy Desk to add one.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-        }
-    }
+                Label(emptyStatusTitle, systemImage: emptyStatusSymbol)
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .foregroundStyle(.tint)
+                    .widgetAccentable()
 
-    private func statusLine(for machine: WidgetMachineSnapshot) -> some View {
-        HStack(spacing: 3) {
-            Text(statusTitle(machine.reachability))
-            if let checkedAt = machine.reachabilityCheckedAt {
-                Text("·")
-                Text(checkedAt, style: .relative)
+                Text(emptyTitle)
+                    .font(.system(.headline, design: .rounded, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .padding(.top, 3)
+
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Text(emptyMessage)
+                        .font(.system(.caption2, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .padding(.top, 3)
+                }
             }
         }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(emptyTitle)
+        .accessibilityValue(emptyMessage)
+        .accessibilityHint("Opens Glassy Desk")
     }
 
-    private func statusDot(_ status: WidgetMachineReachability) -> some View {
-        Circle()
-            .fill(statusColor(status))
-            .frame(width: 9, height: 9)
-            .accessibilityLabel(statusTitle(status))
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("Quick Connect")
+                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Spacer(minLength: 4)
+
+            Image(systemName: "arrow.up.right")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.tint)
+                .widgetAccentable()
+        }
+    }
+
+    private var screenDecoration: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(decorationColor.opacity(decorationOpacity * 0.72), lineWidth: 1.2)
+                .frame(width: 65, height: 48)
+                .offset(x: 11, y: -8)
+
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(decorationColor.opacity(decorationOpacity * 0.34))
+                .frame(width: 70, height: 53)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .stroke(decorationColor.opacity(decorationOpacity), lineWidth: 1.2)
+                }
+                .offset(x: -7, y: 7)
+        }
+        .rotationEffect(.degrees(-7))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+        .offset(x: 28, y: 2)
+        .widgetAccentable()
+        .accessibilityHidden(true)
+    }
+
+    private var decorationColor: Color {
+        renderingMode == .fullColor ? Color.accentColor : Color.primary
+    }
+
+    private var decorationOpacity: Double {
+        renderingMode == .fullColor ? 0.16 : 0.10
+    }
+
+    private func compactStatusTitle(_ status: WidgetMachineReachability) -> String {
+        switch status {
+        case .unknown:
+            String(localized: "Unknown")
+        case .checking:
+            String(localized: "Checking")
+        case .reachable:
+            String(localized: "Online")
+        case .unreachable:
+            String(localized: "Offline")
+        }
+    }
+
+    private func statusSymbol(_ status: WidgetMachineReachability) -> String {
+        switch status {
+        case .unknown:
+            "questionmark.circle"
+        case .checking:
+            "ellipsis.circle"
+        case .reachable:
+            "checkmark.circle.fill"
+        case .unreachable:
+            "xmark.circle.fill"
+        }
+    }
+
+    private func statusForeground(_ status: WidgetMachineReachability) -> Color {
+        renderingMode == .fullColor ? statusColor(status) : Color.primary
+    }
+
+    @ViewBuilder
+    private func recencyText(for machine: WidgetMachineSnapshot) -> some View {
+        if let checkedAt = machine.reachabilityCheckedAt {
+            Text("Checked \(checkedAt, style: .relative)")
+        } else if machine.reachability == .checking {
+            Text("Checking now")
+        } else {
+            Text("Not checked yet")
+        }
+    }
+
+    private func accessibilityRecencyTitle(for machine: WidgetMachineSnapshot) -> String {
+        guard let checkedAt = machine.reachabilityCheckedAt else {
+            return machine.reachability == .checking
+                ? String(localized: "Checking now")
+                : String(localized: "Not checked yet")
+        }
+
+        let formatter = RelativeDateTimeFormatter()
+        formatter.dateTimeStyle = .numeric
+        formatter.unitsStyle = .full
+        let relative = formatter.localizedString(for: min(checkedAt, entry.date), relativeTo: entry.date)
+        return String(localized: "Checked \(relative)")
+    }
+
+    private var emptyTitle: String {
+        entry.state == .unavailable
+            ? String(localized: "Mac unavailable")
+            : String(localized: "No saved Macs")
+    }
+
+    private var emptyMessage: String {
+        entry.state == .unavailable
+            ? String(localized: "Touch and hold to choose another Mac.")
+            : String(localized: "Open Glassy Desk to add one.")
+    }
+
+    private var emptyStatusTitle: String {
+        entry.state == .unavailable
+            ? String(localized: "Choose another")
+            : String(localized: "Setup needed")
+    }
+
+    private var emptyStatusSymbol: String {
+        entry.state == .unavailable ? "exclamationmark.circle.fill" : "plus.circle.fill"
     }
 }
 
