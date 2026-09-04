@@ -1,0 +1,111 @@
+{
+  "bandwidth_limited_2mbps": {
+    "consumer_stall_seconds": 0,
+    "errors": [],
+    "frames_delivered": 51,
+    "frames_offered": 180,
+    "frames_over_100ms_old": 51,
+    "frames_over_500ms_old": 47,
+    "host_effective_quality_events": [
+      "best"
+    ],
+    "link_bits_per_second": 2000000,
+    "maximum_callback_age_ms": 3872.814708389342,
+    "nominal_source_fps": 60,
+    "observation_duration_seconds": 6.867116916691884,
+    "offered_payload_mbps": 9.323084098753263,
+    "p95_callback_age_ms": 3765.4316663974896,
+    "payload_bytes_per_frame": 25000,
+    "pong_delay_ms": 3435.2529583266005,
+    "producer_duration_seconds": 3.861383166629821
+  },
+  "bandwidth_limited_with_lower_synthetic_source_budget": {
+    "consumer_stall_seconds": 0,
+    "errors": [],
+    "frames_delivered": 60,
+    "frames_offered": 60,
+    "frames_over_100ms_old": 0,
+    "frames_over_500ms_old": 0,
+    "host_effective_quality_events": [
+      "best"
+    ],
+    "link_bits_per_second": 2000000,
+    "maximum_callback_age_ms": 42.49262507073581,
+    "nominal_source_fps": 15,
+    "observation_duration_seconds": 7.556353083346039,
+    "offered_payload_mbps": 0.726076657644255,
+    "p95_callback_age_ms": 41.489666677080095,
+    "payload_bytes_per_frame": 6666,
+    "pong_delay_ms": 38.02570828702301,
+    "producer_duration_seconds": 4.406807416700758
+  },
+  "callback_baseline": {
+    "consumer_stall_seconds": 0,
+    "errors": [],
+    "frames_delivered": 180,
+    "frames_offered": 180,
+    "frames_over_100ms_old": 0,
+    "frames_over_500ms_old": 0,
+    "host_effective_quality_events": [
+      "best"
+    ],
+    "link_bits_per_second": null,
+    "maximum_callback_age_ms": 1.5664170496165752,
+    "nominal_source_fps": 60,
+    "observation_duration_seconds": 4.540740583324805,
+    "offered_payload_mbps": 8.919774802164948,
+    "p95_callback_age_ms": 1.2693330645561218,
+    "payload_bytes_per_frame": 25000,
+    "pong_delay_ms": 0.8207083446905017,
+    "producer_duration_seconds": 4.035976333310828
+  },
+  "callback_stalled_consumer": {
+    "consumer_stall_seconds": 1,
+    "errors": [],
+    "frames_delivered": 180,
+    "frames_offered": 180,
+    "frames_over_100ms_old": 43,
+    "frames_over_500ms_old": 24,
+    "host_effective_quality_events": [
+      "best"
+    ],
+    "link_bits_per_second": null,
+    "maximum_callback_age_ms": 1001.8239587079734,
+    "nominal_source_fps": 60,
+    "observation_duration_seconds": 4.4840929582715034,
+    "offered_payload_mbps": 9.043420097686067,
+    "p95_callback_age_ms": 826.5861663967371,
+    "payload_bytes_per_frame": 25000,
+    "pong_delay_ms": 355.7747083250433,
+    "producer_duration_seconds": 3.980794833274558
+  },
+  "idle_keyframe": {
+    "encoded_before_request": 3,
+    "encoder_errors": [],
+    "next_input_produced_keyframe": true,
+    "outputs_during_one_second_without_new_capture": 0
+  },
+  "scope": "Optimized macOS build of production host + iOS transport; synthetic media; no display decode",
+  "environment": {
+    "reviewed_commit": "08226c1",
+    "recorded_at_utc": "2026-09-04T19:33:12.730350+00:00",
+    "hardware": "Macmini9,1, 8 logical CPUs, 16 GiB RAM",
+    "macos": "26.6.2 (25G83)",
+    "xcode": "26.6 (17F113)",
+    "swift": "6.3.3, Swift 6 mode, -O",
+    "ios_tests": "iPhone 17 Pro simulator, iOS 26.5, Debug"
+  },
+  "existing_test_results": {
+    "focused_host_tests_passed": 37,
+    "selected_ios_simulator_tests_passed": 29,
+    "failed": 0
+  },
+  "limitations": [
+    "Transport diagnostics compile the production iOS client on macOS; no iPhone/iPad rendering performance is measured.",
+    "Host binding is changed only in a temporary copy to loopback without Bonjour; credentials are synthetic and temporary.",
+    "Forward proxy pacing sets a 2 Mbps ceiling; scheduling and TCP overhead reduce achieved throughput. Reverse traffic is unpaced.",
+    "Synthetic transport payloads do not measure actual encoder rate control or image quality. The low-rate comparison changes the producer manually, not through automatic app adaptation.",
+    "Frames not observed by the observation deadline may still be buffered; they are not a measured packet/frame-drop count.",
+    "The separate idle-keyframe probe uses the actual VideoToolbox encoder with a synthetic 720p pixel buffer."
+  ]
+}
