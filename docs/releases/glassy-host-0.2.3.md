@@ -1,0 +1,1 @@
+Fixes an issue where double-tapping during a Glassy Stream session was treated as separate single clicks on the Mac, preventing files and folders from opening. Double clicks now follow your Mac's double-click speed setting.
