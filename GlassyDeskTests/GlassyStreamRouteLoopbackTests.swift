@@ -5,6 +5,47 @@ import Testing
 @testable import GlassyDesk
 
 struct GlassyStreamRouteLoopbackTests {
+    @Test
+    func syncedMachineWithoutLocalCredentialRequestsPairingThenReconnects() async throws {
+        let hostID = Data(repeating: 0x42, count: 16)
+        let host = try LoopbackPairingHost(hostID: hostID, behavior: "valid")
+        defer { host.stop() }
+        let endpoint = try await host.start()
+        let client = GlassyStreamClient(credentialStore: RouteTestCredentialStore())
+        defer { client.disconnect() }
+        let machineID = UUID()
+
+        do {
+            _ = try await authenticate(
+                client,
+                configuration: GlassyStreamConnectionConfiguration(
+                    endpoint: endpoint,
+                    savedMachineID: machineID,
+                    expectedHostIdentifier: hostID
+                )
+            )
+            Issue.record("A synced machine without this device's credential should request pairing")
+        } catch let GlassyStreamClientError.pairingCodeRequired(hostName) {
+            #expect(hostName == "Fixture Mac")
+        } catch {
+            Issue.record("Expected a pairing request, received \(error)")
+        }
+
+        #expect(host.proofCount == 0)
+        let authentication = try await authenticate(
+            client,
+            configuration: GlassyStreamConnectionConfiguration(
+                endpoint: endpoint,
+                savedMachineID: machineID,
+                bootstrapCredential: .oneTimeCode("ABCDEFGH2345"),
+                expectedHostIdentifier: hostID
+            )
+        )
+        #expect(authentication.hostIdentifier == hostID)
+        #expect(!authentication.resumedSession)
+        #expect(host.proofCount == 1)
+    }
+
     /// Exercises the real NWConnection handoff and encrypted handshake: the
     /// same rotating code must produce just one ClientHello, on the winner.
     @Test(arguments: ["silent", "wrong-host", "late-hello"])

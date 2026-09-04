@@ -257,7 +257,12 @@ final class GlassyStreamClient: @unchecked Sendable {
             target: callbackQueue
         )
         self.callbacks = callbacks
-        receiveBuffer.removeAll(keepingCapacity: true)
+        // Route selection hands this client a copy-on-write Data value. If the
+        // prefetched ServerHello consumes that buffer completely while the
+        // selection still retains its copy, Foundation can trap when an empty
+        // slice is cleared while preserving capacity. Start each connection
+        // with independent empty storage instead.
+        receiveBuffer = Data()
         lastInboundSequence = 0
         nextOutboundSequence = 1
         maximumInboundPayloadLength = GlassyStreamWire.maximumHandshakePayloadLength
@@ -805,7 +810,10 @@ final class GlassyStreamClient: @unchecked Sendable {
         supportsStreamQuality = false
         supportsCursorPositionUpdates = false
         configuration = nil
-        receiveBuffer.removeAll(keepingCapacity: true)
+        // Do not preserve storage inherited from the route-race handoff. A
+        // fully consumed, shared Data slice can trap inside Foundation when
+        // removeAll(keepingCapacity: true) tries to mutate it.
+        receiveBuffer = Data()
 
         let completionQueue = callbackQueue
         let completionCallbacks = callbacks
