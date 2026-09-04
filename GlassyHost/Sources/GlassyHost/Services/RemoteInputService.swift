@@ -13,6 +13,7 @@ final class RemoteInputService: @unchecked Sendable {
     private var pressedButtons: HostProtocol.PointerButtonMask = []
     private var pressedModifierKeysyms: Set<UInt32> = []
     private var lastPointerLocation: CGPoint?
+    private var mouseEventBuilder = RemoteMouseEventBuilder()
 
     init(inputQueue: DispatchQueue = DispatchQueue(
         label: "dev.bunn.glassydesk.host.remote-input",
@@ -35,7 +36,11 @@ final class RemoteInputService: @unchecked Sendable {
 
     func setDisplayID(_ displayID: CGDirectDisplayID?) {
         queue.async { [weak self] in
-            self?.selectedDisplayID = displayID
+            guard let self else { return }
+            if selectedDisplayID != displayID {
+                mouseEventBuilder.resetClickSequence()
+            }
+            selectedDisplayID = displayID
         }
     }
 
@@ -240,6 +245,7 @@ final class RemoteInputService: @unchecked Sendable {
     }
 
     private func releasePressedInputLocked() {
+        defer { mouseEventBuilder = RemoteMouseEventBuilder() }
         guard Self.isAccessibilityGranted else {
             pressedButtons = []
             pressedModifierKeysyms.removeAll()
@@ -285,10 +291,9 @@ final class RemoteInputService: @unchecked Sendable {
     private func postMouse(type: CGEventType,
                            location: CGPoint,
                            button: CGMouseButton) {
-        guard let event = CGEvent(mouseEventSource: nil,
-                                  mouseType: type,
-                                  mouseCursorPosition: location,
-                                  mouseButton: button) else { return }
+        guard let event = mouseEventBuilder.makeEvent(type: type,
+                                                     location: location,
+                                                     button: button) else { return }
         event.post(tap: .cghidEventTap)
     }
 
