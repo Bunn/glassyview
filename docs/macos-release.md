@@ -21,6 +21,8 @@ The website uses `GlassyDesk-VERSION.dmg` for first installs. Sparkle keeps usin
 
 Public destinations and release settings live in [`script/host-release.json`](../script/host-release.json). Its optional `cloudflare_account_id`, or the `CLOUDFLARE_ACCOUNT_ID` environment variable, selects the Cloudflare account. Account IDs and signing identity names are configuration, not secrets. `--config FILE` selects another public configuration file; its bundle, feed, and Sparkle key settings must match the app.
 
+The package step also compiles the committed [Mac icon document](../GlassyHost/Resources/GlassyDeskAppIcon.md) with Xcode's `actool`, producing the modern icon catalog and legacy ICNS before signing. A replacement build computer needs the same Xcode 26+ tools; no separately exported icon files are needed.
+
 Install the pinned DMG tools once with a Python 3.10+ interpreter:
 
 ```sh

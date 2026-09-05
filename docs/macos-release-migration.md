@@ -115,6 +115,8 @@ python3 -m venv .build/dmgbuild
 
 Recreate the virtual environment on the new machine; do not copy its old interpreter paths. Use `GLASSY_DMG_PYTHON` if the DMG environment is elsewhere. Check `git diff -- GlassyHost/Package.resolved` stays empty. Clone the website repo only if also maintaining its download/setup page; it is not required for routine Sparkle feed deployment.
 
+From version 0.2.8, both local and release packaging compile the committed `.icon` source with Xcode 26+ `actool`. The [icon build notes](../GlassyHost/Resources/GlassyDeskAppIcon.md) describe the modern catalog and older macOS fallback. These resources are generated before code signing, so moving computers requires no manual icon export or separate Icon Composer GUI setup.
+
 ### 2. Restore signing and Xcode notarization
 
 Import the saved `.p12` into the new Mac's **login Keychain** through Keychain Access, entering its password locally. Verify that My Certificates shows the same Developer ID Application certificate **with its private key**, and rerun `security find-identity -v -p codesigning`. Xcode downloading certificates alone is insufficient if the private key was not restored.

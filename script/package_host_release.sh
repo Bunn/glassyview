@@ -79,7 +79,7 @@ DISPLAY_NAME="Glassy Desk"
 BUNDLE_ID="dev.bunn.glassydesk.host"
 INFO_PLIST="$PACKAGE_DIR/Support/Info.plist"
 ENTITLEMENTS="$PACKAGE_DIR/Support/GlassyHost.entitlements"
-ICON="$PACKAGE_DIR/Resources/GlassyDeskAppIcon.icns"
+ICON="$PACKAGE_DIR/Resources/GlassyDeskAppIcon.icon/icon.json"
 
 # Resolve only an exact, usable Developer ID Application identity. Never fall
 # back to development or ad-hoc signing, and sign by hash to avoid ambiguity.
@@ -168,7 +168,7 @@ printf 'Release workspace: %s\n' "$RELEASE_DIR"
 mkdir -p "$APP_CONTENTS/MacOS" "$APP_CONTENTS/Resources" "$APP_CONTENTS/Frameworks"
 cp "$BUILD_DIR/$APP_NAME" "$APP_BINARY"
 cp "$INFO_PLIST" "$APP_CONTENTS/Info.plist"
-cp "$ICON" "$APP_CONTENTS/Resources/GlassyDeskAppIcon.icns"
+"$ROOT_DIR/script/compile_host_icon.sh" "$APP_CONTENTS"
 cp "$SPARKLE_ARTIFACT/LICENSE" "$APP_CONTENTS/Resources/Sparkle-LICENSE.txt"
 /usr/bin/ditto "$BUILD_DIR/PermissionFlow_PermissionFlow.bundle" "$APP_CONTENTS/Resources/PermissionFlow_PermissionFlow.bundle"
 cp "$PACKAGE_DIR/.build/checkouts/PermissionFlow/LICENSE" "$APP_CONTENTS/Resources/PermissionFlow-LICENSE.txt"

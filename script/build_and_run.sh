@@ -39,7 +39,7 @@ rm -rf "$STAGED_APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$APP_FRAMEWORKS"
 cp "$BUILD_DIR/$APP_NAME" "$STAGED_APP_BINARY"
 cp "$PACKAGE_DIR/Support/Info.plist" "$APP_CONTENTS/Info.plist"
-cp "$PACKAGE_DIR/Resources/GlassyDeskAppIcon.icns" "$APP_RESOURCES/GlassyDeskAppIcon.icns"
+"$ROOT_DIR/script/compile_host_icon.sh" "$APP_CONTENTS"
 # SwiftPM resource bundles must travel with the installed app for localization.
 /usr/bin/ditto "$BUILD_DIR/PermissionFlow_PermissionFlow.bundle" "$APP_RESOURCES/PermissionFlow_PermissionFlow.bundle"
 cp "$PACKAGE_DIR/.build/checkouts/PermissionFlow/LICENSE" "$APP_RESOURCES/PermissionFlow-LICENSE.txt"

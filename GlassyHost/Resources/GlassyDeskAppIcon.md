@@ -1,15 +1,32 @@
 # Glassy Desk for Mac icon
 
-`GlassyDeskAppIcon.png` is the 1024 × 1024 production source, with transparency outside the blue tile. `GlassyDeskAppIcon.icns` contains the standard 16–512 point representations at 1× and 2×. Both the development and release bundles use this icon.
+The production source is [`GlassyDeskAppIcon.icon`](GlassyDeskAppIcon.icon): an Icon Composer document containing one opaque, unmasked 1024 × 1024 PNG. The centered white monitor and blue palette carry over from the previous icon. The artwork extends to every canvas edge so macOS can apply its own mask and presentation.
 
-The design uses one centered monitor silhouette, generous empty space, and a restrained blue glass finish. Wireless arcs, perspective tilt, detailed wallpaper, and bright reflections were removed to improve recognition in the Dock. The result was visually checked at 32 and 64 pixels.
+Apple's [app icon guidelines](https://developer.apple.com/design/human-interface-guidelines/app-icons) call for square, unmasked layers and an opaque background that fills the canvas. The previous pre-rounded PNG and standalone ICNS could receive an additional compatibility plate in the macOS 26 Dock, producing the white border reported in version 0.2.7.
 
-Generated with the built-in image generation tool, using the previous Mac icon as the edit target and the iOS light icon as a palette reference. Native `sips` resizing and `iconutil` packaging produced the final resources.
+## Build and compatibility
 
-Design prompt:
+Both `script/build_and_run.sh` and `script/package_host_release.sh` run [`script/compile_host_icon.sh`](../../script/compile_host_icon.sh) before signing. The helper uses the selected Xcode 26+ `actool` to compile the `.icon` document into:
 
-> Redesign the macOS app icon for Glassy Desk to be dramatically simpler and recognizable at 32 and 64 pixels. Use one bold, centered, straight-on desktop monitor: a softly frosted white/cyan screen outline and a short simple pedestal. Use a calm blue rounded-square tile, a quiet blue screen, restrained depth, and generous negative space. Remove wireless arcs, rays, lens flares, extra panels, text, badges, perspective tilt, detailed reflections, multiple borders, and neon glow. Produce one finished app icon with transparent corners.
+- `Assets.car`, containing the macOS 26 icon stack and flattened compatibility representations.
+- `GlassyDeskAppIcon.icns`, the compiler-generated fallback also used for the DMG volume icon.
 
-Final background extraction prompt:
+`CFBundleIconName` and `CFBundleIconFile` both name `GlassyDeskAppIcon`. The helper checks those values against the compiler's generated metadata and requires both compiled resources. Keep fallback generation enabled for macOS 14 and 15. The PNG, document, and build scripts are committed; compiled resources are regenerated for each bundle.
 
-> Change only the background outside the rounded blue icon tile: remove the painted gray-and-white checkerboard completely and produce an actual transparent PNG with an alpha channel. Preserve the blue square and centered white monitor, including their colors, scale, shape, and position. Keep rounded edges antialiased and corners transparent, without a checkerboard or matte.
+Apple describes the document and app-icon configuration in [Creating your app icon using Icon Composer](https://developer.apple.com/documentation/xcode/creating-your-app-icon-using-icon-composer) and [Configuring your app icon](https://developer.apple.com/documentation/xcode/configuring-your-app-icon). The document can be maintained as source and compiled from the command line; release setup does not depend on opening the Icon Composer GUI.
+
+To inspect an assembled bundle, check its icon metadata and catalog, then launch a local preview and examine the actual Dock icon:
+
+```sh
+./script/build_and_run.sh --preview
+plutil -p 'dist/Glassy Desk.app/Contents/Info.plist'
+xcrun assetutil --info 'dist/Glassy Desk.app/Contents/Resources/Assets.car'
+```
+
+## Artwork provenance
+
+Edited with the built-in image generation tool using the prior Mac PNG as the target, then resized to 1024 × 1024 with native `sips`. The master is fully opaque. The document disables extra layer glass, shadows, and specular effects to preserve the monitor artwork while the system supplies the outer shape.
+
+Edit prompt:
+
+> Edit the Glassy Desk macOS app icon source. Produce a square production app icon master. Change only the outer blue background: extend its existing calm blue gradient seamlessly to all four straight canvas edges and all four corners so the image is completely opaque and full-bleed. Remove the pre-rounded tile boundary, the outer rim/bevel/glow, the transparent padding and stray cyan alpha pixels outside the tile. Preserve the single centered white/frosted desktop monitor and pedestal, their position, scale, silhouette, screen colors, and blue palette. The whole canvas must be solid blue-gradient artwork. No border, outer drop shadow, rounded corners, transparency, white/gray matte, or checkerboard. This is an unmasked app icon input that Apple's compiler will mask. Do not redesign the monitor or add symbols, text, badges, or decorations.
