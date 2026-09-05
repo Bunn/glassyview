@@ -11,12 +11,14 @@ let package = Package(
         .executable(name: "GlassyHost", targets: ["GlassyHost"])
     ],
     dependencies: [
+        .package(url: "https://github.com/jaywcjlove/PermissionFlow", from: "2.11.2"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.6")
     ],
     targets: [
         .executableTarget(
             name: "GlassyHost",
             dependencies: [
+                .product(name: "PermissionFlow", package: "PermissionFlow"),
                 .product(name: "Sparkle", package: "Sparkle")
             ],
             path: "Sources/GlassyHost",

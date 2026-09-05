@@ -170,6 +170,8 @@ cp "$BUILD_DIR/$APP_NAME" "$APP_BINARY"
 cp "$INFO_PLIST" "$APP_CONTENTS/Info.plist"
 cp "$ICON" "$APP_CONTENTS/Resources/GlassyDeskAppIcon.icns"
 cp "$SPARKLE_ARTIFACT/LICENSE" "$APP_CONTENTS/Resources/Sparkle-LICENSE.txt"
+/usr/bin/ditto "$BUILD_DIR/PermissionFlow_PermissionFlow.bundle" "$APP_CONTENTS/Resources/PermissionFlow_PermissionFlow.bundle"
+cp "$PACKAGE_DIR/.build/checkouts/PermissionFlow/LICENSE" "$APP_CONTENTS/Resources/PermissionFlow-LICENSE.txt"
 # Preserve the framework's version symlinks and helper executable permissions.
 /usr/bin/ditto "$BUILD_DIR/Sparkle.framework" "$SPARKLE_FRAMEWORK"
 chmod +x "$APP_BINARY"

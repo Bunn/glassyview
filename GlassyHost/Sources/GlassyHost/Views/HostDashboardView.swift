@@ -91,7 +91,6 @@ struct HostDashboardView: View {
         .sheet(isPresented: $isPairingPresented) { HostPairingView(controller: controller) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             controller.refreshLoginItemStatus()
-            controller.refreshAuthorizationStatuses()
         }
     }
 }

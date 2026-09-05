@@ -40,6 +40,9 @@ mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$APP_FRAMEWORKS"
 cp "$BUILD_DIR/$APP_NAME" "$STAGED_APP_BINARY"
 cp "$PACKAGE_DIR/Support/Info.plist" "$APP_CONTENTS/Info.plist"
 cp "$PACKAGE_DIR/Resources/GlassyDeskAppIcon.icns" "$APP_RESOURCES/GlassyDeskAppIcon.icns"
+# SwiftPM resource bundles must travel with the installed app for localization.
+/usr/bin/ditto "$BUILD_DIR/PermissionFlow_PermissionFlow.bundle" "$APP_RESOURCES/PermissionFlow_PermissionFlow.bundle"
+cp "$PACKAGE_DIR/.build/checkouts/PermissionFlow/LICENSE" "$APP_RESOURCES/PermissionFlow-LICENSE.txt"
 # Preserve Sparkle's framework symlinks and helper executable permissions.
 /usr/bin/ditto "$BUILD_DIR/Sparkle.framework" "$SPARKLE_FRAMEWORK"
 chmod +x "$STAGED_APP_BINARY"

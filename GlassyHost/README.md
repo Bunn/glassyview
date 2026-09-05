@@ -16,6 +16,12 @@ The script builds and signs `dist/Glassy Desk.app`, installs a verified copy at 
 
 Grant Screen Recording and Accessibility access locally, then leave Glassy Desk for Mac running. Its lightweight `_glassydesk._tcp` listener remains available without recording the screen. Capture starts automatically after a Glassy Desk device completes the authenticated pairing or resume handshake, then stops five seconds after the final device disconnects. **Share Continuously** in Display & Control is available as an explicit always-on override.
 
+### Guided permission setup
+
+Choose **Enable…** beside Screen Recording or Accessibility in Connections or Display & Control. [PermissionFlow](https://github.com/jaywcjlove/PermissionFlow) opens the matching System Settings page with a floating Glassy Desk app card. Turn on Glassy Desk in the list, or drag the card into the list if the app is missing. Return to Glassy Desk to see the completed step; the display picker refreshes when Screen Recording becomes available. If macOS asks you to quit and reopen the app, follow that prompt to apply the change.
+
+PermissionFlow supplies the guidance; the host continues checking macOS Screen Recording and Accessibility authorization directly. Requests remain tied to local **Enable…** or **Share Continuously** actions. The guide does not request Accessibility just to track the Settings window. Both local and release app bundles include PermissionFlow’s localized resources and license.
+
 ### Pair new devices with a QR code, code, or password
 
 Choose **Add Device** in Connections. On your iPhone or iPad, choose **Add Mac → Set Up Fast Connection → Scan Mac’s Code** in Glassy Desk. Review the Mac on the device and choose **Pair & Connect**. The custom QR refreshes every minute and includes the connection address. **Pair Manually** provides a camera-free alternative. Device names, last connection times, and access controls appear in Connections; existing paired devices populate the list the next time they connect. Revoking a device invalidates its saved credential, and **Allow connections** can pause access entirely.

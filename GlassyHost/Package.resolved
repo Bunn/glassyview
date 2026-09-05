@@ -1,6 +1,15 @@
 {
-  "originHash" : "febb96b086ffd2607c63808b04e798567aadeb3a2bb4fab2ec23c80a009ee897",
+  "originHash" : "08bb6f9b9202c8503cfcf5501be8b9e66070c7aac53f9216fc829a61045b2dbb",
   "pins" : [
+    {
+      "identity" : "permissionflow",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jaywcjlove/PermissionFlow",
+      "state" : {
+        "revision" : "2f2a4b76b1eb2ff7ab815b977be8229853f10bf8",
+        "version" : "2.11.2"
+      }
+    },
     {
       "identity" : "sparkle",
       "kind" : "remoteSourceControl",

@@ -1,7 +1,9 @@
 import AppKit
+import Combine
 import CoreGraphics
 import Foundation
 import Observation
+import PermissionFlow
 
 @MainActor
 @Observable
@@ -50,6 +52,12 @@ final class HostController {
     private let hostServer = HostServer()
     private let loginItemService = LoginItemService()
     private let remoteInputService = RemoteInputService()
+
+    @ObservationIgnored
+    private var permissionFlowController: PermissionFlowController?
+
+    @ObservationIgnored
+    private var authorizationActivationObserver: AnyCancellable?
 
     @ObservationIgnored
     private let pairingAddressService = HostPairingAddressService()
@@ -143,6 +151,14 @@ final class HostController {
     init() {
         allowsConnections = hostServer.allowsConnections
         pairedDevices = hostServer.pairedDevices
+        // The menu-bar host outlives its dashboard. A Settings visit must also
+        // refresh permissions when the guide was opened without a main window.
+        authorizationActivationObserver = NotificationCenter.default
+            .publisher(for: NSApplication.didBecomeActiveNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.refreshAuthorizationStatuses()
+            }
     }
 
     var isTransitioning: Bool {
@@ -573,40 +589,54 @@ final class HostController {
     }
 
     func requestScreenRecordingPermission() {
-        let granted = CGRequestScreenCaptureAccess()
-        screenRecordingAuthorization = granted ? .granted : .denied
-        if granted {
-            Task {
-                await refreshDisplays()
-            }
-        }
+        guidePermission(.screenRecording)
     }
 
     func requestAccessibilityPermission() {
-        accessibilityAuthorization = RemoteInputService.requestAccessibilityAccess()
-            ? .granted
-            : .denied
-    }
-
-    func openScreenRecordingSettings() {
-        guard let url = URL(
-            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
-        ) else { return }
-        NSWorkspace.shared.open(url)
-    }
-
-    func openAccessibilitySettings() {
-        guard let url = URL(
-            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-        ) else { return }
-        NSWorkspace.shared.open(url)
+        guidePermission(.accessibility)
     }
 
     func refreshAuthorizationStatuses() {
+        let previouslyAllowedScreenRecording = screenRecordingAuthorization == .granted
         updateScreenRecordingAuthorization()
         accessibilityAuthorization = RemoteInputService.isAccessibilityGranted
             ? .granted
             : .denied
+
+        // Preparing the host loads displays separately. After a Settings visit,
+        // make the display picker available as soon as macOS reports access.
+        if !previouslyAllowedScreenRecording,
+           screenRecordingAuthorization == .granted,
+           isServerReady {
+            Task { await refreshDisplays() }
+        }
+
+        if let pane = permissionFlowController?.currentPane,
+           (pane == .screenRecording && screenRecordingAuthorization == .granted)
+            || (pane == .accessibility && accessibilityAuthorization == .granted) {
+            permissionFlowController?.closePanel()
+            permissionFlowController = nil
+        }
+    }
+
+    private func guidePermission(_ pane: PermissionFlowPane) {
+        refreshAuthorizationStatuses()
+        guard (pane == .screenRecording && screenRecordingAuthorization != .granted)
+            || (pane == .accessibility && accessibilityAuthorization != .granted) else { return }
+
+        // Keep one guide across dashboard windows and menu-bar actions. Do not
+        // request Accessibility just to position the Screen Recording guide.
+        if permissionFlowController == nil {
+            permissionFlowController = PermissionFlow.makeController(
+                configuration: .init(promptForAccessibilityTrust: false)
+            )
+        }
+        let pointer = NSEvent.mouseLocation
+        permissionFlowController?.authorize(
+            pane: pane,
+            suggestedAppURLs: [Bundle.main.bundleURL],
+            sourceFrameInScreen: CGRect(x: pointer.x - 16, y: pointer.y - 16, width: 32, height: 32)
+        )
     }
 
     func setStartsAtLogin(_ enabled: Bool) {
