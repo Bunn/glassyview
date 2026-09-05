@@ -19,7 +19,18 @@ SPARKLE_FRAMEWORK="$APP_FRAMEWORKS/Sparkle.framework"
 STAGED_APP_BINARY="$APP_MACOS/$APP_NAME"
 INSTALLED_APP_BINARY="$INSTALLED_APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
-pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+if [[ "$MODE" == "--preview" ]]; then
+  # Replace only an earlier preview from this checkout. The installed app may
+  # be serving a paired device and must keep its listener and identity.
+  for preview_pid in $(pgrep -x "$APP_NAME" || true); do
+    preview_command="$(ps -p "$preview_pid" -o args= 2>/dev/null || true)"
+    if [[ "$preview_command" == "$STAGED_APP_BINARY --glassy-preview" ]]; then
+      kill "$preview_pid" 2>/dev/null || true
+    fi
+  done
+else
+  pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+fi
 
 swift build --package-path "$PACKAGE_DIR" --product "$APP_NAME"
 BUILD_DIR="$(swift build --package-path "$PACKAGE_DIR" --show-bin-path)"

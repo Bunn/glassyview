@@ -36,11 +36,10 @@ struct GlassyHostApp: App {
         } label: {
             Label("Glassy Desk", systemImage: controller.menuBarSystemImage)
                 .task {
-                    // Local UI previews must not query the production feed or
-                    // show Sparkle's first-launch preference prompt.
-                    if !isLocalPreview {
-                        updater.startIfConfigured()
-                    }
+                    // A visual preview must not read pairing credentials,
+                    // serve connections, or start the production updater.
+                    guard !isLocalPreview else { return }
+                    updater.startIfConfigured()
                     // The listener lifecycle belongs to the menu-bar host, not
                     // to whether the dashboard window happens to be open.
                     await controller.prepare()
@@ -61,6 +60,7 @@ struct GlassyHostApp: App {
             HostDashboardView(controller: controller)
                 .frame(minWidth: 820, minHeight: 620)
                 .task {
+                    guard !isLocalPreview else { return }
                     await controller.prepare()
                 }
         }
