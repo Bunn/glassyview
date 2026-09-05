@@ -7,6 +7,8 @@ import Foundation
 /// ordered even when Network.framework delivers messages rapidly.
 final class RemoteInputService: @unchecked Sendable {
     private let queue: DispatchQueue
+    private let clipboardPaste: HostClipboardPasteService
+    private let accessibilityCheck: @Sendable () -> Bool
 
     private var selectedDisplayID: CGDirectDisplayID?
     private var isEnabled = false
@@ -18,8 +20,12 @@ final class RemoteInputService: @unchecked Sendable {
     init(inputQueue: DispatchQueue = DispatchQueue(
         label: "dev.bunn.glassydesk.host.remote-input",
         qos: .userInteractive
-    )) {
+    ),
+         clipboardPaste: HostClipboardPasteService = HostClipboardPasteService(),
+         accessibilityCheck: @escaping @Sendable () -> Bool = { AXIsProcessTrusted() }) {
         queue = inputQueue
+        self.clipboardPaste = clipboardPaste
+        self.accessibilityCheck = accessibilityCheck
     }
 
     static var isAccessibilityGranted: Bool {
@@ -56,7 +62,7 @@ final class RemoteInputService: @unchecked Sendable {
 
     func handle(_ event: HostProtocol.RemoteInputEvent) {
         queue.async { [weak self] in
-            guard let self, self.isEnabled, Self.isAccessibilityGranted else { return }
+            guard let self, self.isEnabled, self.accessibilityCheck() else { return }
             switch event {
             case .pointer(let input):
                 handlePointer(input)
@@ -66,6 +72,8 @@ final class RemoteInputService: @unchecked Sendable {
                 handleKey(input)
             case .text(let input):
                 handleText(input)
+            case .clipboardPaste(let text):
+                clipboardPaste.paste(text)
             }
         }
     }
@@ -246,7 +254,7 @@ final class RemoteInputService: @unchecked Sendable {
 
     private func releasePressedInputLocked() {
         defer { mouseEventBuilder = RemoteMouseEventBuilder() }
-        guard Self.isAccessibilityGranted else {
+        guard accessibilityCheck() else {
             pressedButtons = []
             pressedModifierKeysyms.removeAll()
             return

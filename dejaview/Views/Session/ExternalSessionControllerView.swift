@@ -42,7 +42,8 @@ struct ExternalSessionControllerView<Session: RemoteSessionControlling>: View {
                                         isFocused: $isKeyboardFocused,
                                         onInsertText: sendText,
                                         onDeleteBackward: deleteBackward,
-                                        onReturn: sendReturn)
+                                        onReturn: sendReturn,
+                                        onPasteText: session.supportsClipboardPaste ? session.pasteText : nil)
                 .frame(width: 1, height: 1)
                 .accessibilityHidden(true)
         }

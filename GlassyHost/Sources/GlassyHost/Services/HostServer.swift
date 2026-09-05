@@ -1174,7 +1174,7 @@ private extension HostServer {
                         for: client
                     )
                 }
-            case .pointerInput, .scrollInput, .keyInput, .textInput:
+            case .pointerInput, .scrollInput, .keyInput, .textInput, .clipboardPaste:
                 let input = try HostProtocol.decodeRemoteInput(
                     kind: frame.kind,
                     payload: plaintext

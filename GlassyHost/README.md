@@ -28,6 +28,8 @@ Changing or removing the password does not disconnect authenticated viewers and 
 
 Connected Glassy Desk devices can request Data Saver (720p/15 FPS/~2 Mbps), Balanced (1080p/30 FPS/~5 Mbps), or Best (up to 4K/60 FPS/~12 Mbps). The host accepts only these bounded presets and reconfigures capture and H.264 encoding without dropping the authenticated session. Because one encoder serves every connected device, the most bandwidth-conscious active request determines the shared stream.
 
+Connected devices can also explicitly paste copied text into the active Mac app. The host receives the text over the authenticated, encrypted session, writes it to the Mac clipboard, then posts Cmd-V using the existing Accessibility permission. Text remains on the Mac clipboard for subsequent pastes. This requires compatible builds on both devices; clipboard contents are never monitored or synchronized in the background. See [clipboard behavior and verification](../docs/md/clipboard-paste.md).
+
 ## Connect remotely with Tailscale
 
 Tailscale provides a private route to a remote Mac without exposing Glassy Desk for Mac to the public internet:

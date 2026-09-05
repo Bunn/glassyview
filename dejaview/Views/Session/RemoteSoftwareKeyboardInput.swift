@@ -8,6 +8,7 @@ struct RemoteSoftwareKeyboardInput: UIViewRepresentable {
     let onInsertText: (String) -> Void
     let onDeleteBackward: () -> Void
     let onReturn: () -> Void
+    var onPasteText: ((String) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(isFocused: $isFocused)
@@ -34,6 +35,7 @@ struct RemoteSoftwareKeyboardInput: UIViewRepresentable {
         inputView.onInsertText = onInsertText
         inputView.onDeleteBackward = onDeleteBackward
         inputView.onReturn = onReturn
+        inputView.onPasteText = onPasteText
         inputView.setFocus(isFocused, request: focusRequest)
     }
 
@@ -62,11 +64,18 @@ struct RemoteSoftwareKeyboardInput: UIViewRepresentable {
         }
     }
 
-    final class InputView: UIView, UIKeyInput {
+    final class InputView: RemoteClipboardInputView, UIKeyInput {
         var onInsertText: (String) -> Void = { _ in }
         var onDeleteBackward: () -> Void = {}
         var onReturn: () -> Void = {}
         var onFocusChange: (Bool) -> Void = { _ in }
+        var onPasteText: ((String) -> Void)?
+
+        override var acceptsRemotePaste: Bool { onPasteText != nil }
+
+        override func sendPasteText(_ text: String) {
+            onPasteText?(text)
+        }
 
         var autocapitalizationType: UITextAutocapitalizationType = .none
         var autocorrectionType: UITextAutocorrectionType = .no
@@ -153,6 +162,7 @@ struct RemoteSoftwareKeyboardInput: UIViewRepresentable {
 
         func deactivate() {
             isActive = false
+            onPasteText = nil
             latestFocusRequest = nil
             wantsFocus = false
 

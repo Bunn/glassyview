@@ -30,6 +30,7 @@ enum HostProtocol {
 
     static let maximumHandshakePayloadLength = 64 * 1024
     static let maximumPayloadLength = 16 * 1024 * 1024
+    static let maximumClipboardTextLength = 1024 * 1024
     static let pairingCodeLifetime: TimeInterval = 60
 
     static let identifierLength = 16
@@ -49,6 +50,7 @@ enum HostProtocol {
         static let streamQualityControl = Capabilities(rawValue: 1 << 3)
         static let cursorPositionTelemetry = Capabilities(rawValue: 1 << 4)
         static let pairingPassword = Capabilities(rawValue: 1 << 5)
+        static let clipboardPaste = Capabilities(rawValue: 1 << 6)
     }
 
     static let advertisedCapabilities: Capabilities = [
@@ -56,7 +58,8 @@ enum HostProtocol {
         .encryptedMedia,
         .directInput,
         .streamQualityControl,
-        .cursorPositionTelemetry
+        .cursorPositionTelemetry,
+        .clipboardPaste
     ]
 
     static func advertisedCapabilities(pairingPasswordEnabled: Bool) -> Capabilities {
@@ -84,6 +87,7 @@ enum HostProtocol {
         case scrollInput = 0x21
         case keyInput = 0x22
         case textInput = 0x23
+        case clipboardPaste = 0x24
     }
 
     struct Flags: OptionSet, Sendable {
@@ -214,6 +218,7 @@ enum HostProtocol {
         case scroll(ScrollInput)
         case key(KeyInput)
         case text(TextInput)
+        case clipboardPaste(String)
     }
 
     struct SessionMaterial: Sendable {
@@ -551,6 +556,16 @@ enum HostProtocol {
                          text: text)
     }
 
+    /// A single UTF-8 payload is both a clipboard update and a paste command.
+    /// Keeping these together prevents a key event overtaking the clipboard write.
+    static func decodeClipboardPaste(_ data: Data) throws -> String {
+        guard (1...maximumClipboardTextLength).contains(data.count),
+              let text = String(data: data, encoding: .utf8) else {
+            throw ProtocolError.malformedPayload("clipboard text must be 1...1048576 UTF-8 bytes")
+        }
+        return text
+    }
+
     static func decodeRemoteInput(kind: MessageKind, payload: Data) throws -> RemoteInputEvent {
         switch kind {
         case .pointerInput:
@@ -561,6 +576,8 @@ enum HostProtocol {
             .key(try decodeKeyInput(payload))
         case .textInput:
             .text(try decodeTextInput(payload))
+        case .clipboardPaste:
+            .clipboardPaste(try decodeClipboardPaste(payload))
         default:
             throw ProtocolError.malformedPayload("message is not a direct input event")
         }

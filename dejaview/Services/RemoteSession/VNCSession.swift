@@ -122,6 +122,8 @@ final class VNCSession: NSObject, ObservableObject, RemoteSessionControlling, @u
             isScalingEnabled: true,
             useDisplayLink: true,
             inputMode: .forwardKeyboardShortcutsEvenIfInUseLocally,
+            // RoyalVNC polls UIPasteboard when enabled, prompting on cross-app
+            // reads. Clipboard access belongs to native, user-initiated paste.
             isClipboardRedirectionEnabled: false,
             colorDepth: .depth24Bit,
             frameEncodings: .default

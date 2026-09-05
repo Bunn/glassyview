@@ -133,8 +133,15 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
     }
 
-    final class ScreenView: UIView, UIGestureRecognizerDelegate {
+    final class ScreenView: RemoteClipboardInputView, UIGestureRecognizerDelegate {
         weak var session: (any RemoteSessionInputControlling)?
+        override var acceptsRemotePaste: Bool {
+            acceptsHardwareKeyboardInput && session?.supportsClipboardPaste == true
+        }
+
+        override func sendPasteText(_ text: String) {
+            session?.pasteText(text)
+        }
         var onZoomScaleChanged: ((CGFloat) -> Void)?
 
         private var fullImageSize: CGSize = .zero
@@ -1815,6 +1822,13 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             for press in presses {
                 guard let key = press.key else {
+                    unhandledPresses.insert(press)
+                    continue
+                }
+
+                if routesThroughSystemPaste(keyCode: key.keyCode, modifiers: key.modifierFlags) {
+                    // UIKit must see the native paste gesture. Forwarding "v"
+                    // here would paste the Mac's old clipboard as well.
                     unhandledPresses.insert(press)
                     continue
                 }

@@ -5,6 +5,7 @@ import RoyalVNCKit
 protocol RemoteSessionInputControlling: AnyObject {
     var touchMode: RemoteTouchMode { get }
     var cursorLocation: CGPoint { get }
+    var supportsClipboardPaste: Bool { get }
 
     func leftButtonDown(at point: CGPoint)
     func leftButtonUp(at point: CGPoint)
@@ -21,10 +22,13 @@ protocol RemoteSessionInputControlling: AnyObject {
     func sendText(_ text: String, modifiers: [VNCKeyCode])
     func sendKey(_ keyCode: VNCKeyCode, modifiers: [VNCKeyCode])
     func sendReturn()
+    func pasteText(_ text: String)
 }
 
 protocol RemoteSessionControlling: ObservableObject, RemoteSessionInputControlling {
     var status: RemoteSessionStatus { get }
+    var clipboardPasteError: String? { get }
+    func clearClipboardPasteError()
 
     /// Current framebuffer updates. Deliberately NOT part of
     /// `objectWillChange`: frames arrive at display rate, and invalidating
@@ -60,6 +64,11 @@ protocol RemoteSessionControlling: ObservableObject, RemoteSessionInputControlli
 }
 
 extension RemoteSessionInputControlling {
+    // Standard VNC has no explicit clipboard-write API in RoyalVNC. Keep its
+    // automatic clipboard monitor disabled; only capable transports opt in.
+    var supportsClipboardPaste: Bool { false }
+    func pasteText(_ text: String) {}
+
     func moveCursor(to point: CGPoint) {
         moveCursor(to: point, dragging: false)
     }
@@ -75,4 +84,9 @@ extension RemoteSessionInputControlling {
     func sendKey(_ keyCode: VNCKeyCode) {
         sendKey(keyCode, modifiers: [])
     }
+}
+
+extension RemoteSessionControlling {
+    var clipboardPasteError: String? { nil }
+    func clearClipboardPasteError() {}
 }

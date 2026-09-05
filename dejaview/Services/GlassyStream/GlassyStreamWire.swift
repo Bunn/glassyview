@@ -9,6 +9,7 @@ enum GlassyStreamWire {
     static let headerLength = 20
     static let maximumHandshakePayloadLength = 64 * 1024
     static let maximumPayloadLength = 16 * 1024 * 1024
+    static let maximumClipboardTextLength = 1024 * 1024
     static let identifierLength = 16
     static let nonceLength = 32
     static let publicKeyLength = 32
@@ -26,6 +27,7 @@ enum GlassyStreamWire {
         static let streamQualityControl = Capabilities(rawValue: 1 << 3)
         static let cursorPositionUpdates = Capabilities(rawValue: 1 << 4)
         static let pairingPassword = Capabilities(rawValue: 1 << 5)
+        static let clipboardPaste = Capabilities(rawValue: 1 << 6)
     }
 
     enum MessageKind: UInt8, Sendable {
@@ -45,6 +47,7 @@ enum GlassyStreamWire {
         case scrollInput = 0x21
         case keyInput = 0x22
         case textInput = 0x23
+        case clipboardPaste = 0x24
     }
 
     struct Flags: OptionSet, Sendable {

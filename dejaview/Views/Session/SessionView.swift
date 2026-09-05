@@ -366,6 +366,18 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
     private var controlPill: some View {
         HStack(spacing: 2) {
+            if session.supportsClipboardPaste {
+                PasteButton(payloadType: String.self) { strings in
+                    session.pasteText(strings.joined(separator: "\n"))
+                }
+                .labelStyle(.iconOnly)
+                .buttonBorderShape(.capsule)
+                .accessibilityLabel("Paste to Mac")
+                .accessibilityHint("Pastes copied text into the active app on your Mac.")
+                .help("Paste to Mac")
+                .padding(.leading, 8)
+            }
+
             if isExternalControllerActive {
                 Button(externalKeyboardFocused ? "Hide Software Keyboard" : "Show Software Keyboard",
                        systemImage: externalKeyboardFocused ? "keyboard.chevron.compact.down" : "keyboard",
@@ -390,6 +402,14 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .liquidGlass(in: Capsule())
         .padding(.top, 20)
         .padding(.trailing, 20)
+        .alert("Couldn't Paste", isPresented: Binding(
+            get: { session.clipboardPasteError != nil },
+            set: { if !$0 { session.clearClipboardPasteError() } }
+        )) {
+            Button("OK") { session.clearClipboardPasteError() }
+        } message: {
+            Text(session.clipboardPasteError ?? "")
+        }
     }
 
     private var isConnectedFreeSession: Bool {

@@ -28,12 +28,14 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
     let resumedSession: Bool
     let supportsStreamQuality: Bool
     let supportsCursorPositionUpdates: Bool
+    let supportsClipboardPaste: Bool
     /// The selected route becomes trusted only after encrypted authentication.
     let connectedAddress: GlassyStreamDirectAddress?
 
     init(hostIdentifier: Data, hostName: String, maximumMediaPayloadLength: Int,
          resumedSession: Bool, supportsStreamQuality: Bool,
          supportsCursorPositionUpdates: Bool,
+         supportsClipboardPaste: Bool = false,
          connectedAddress: GlassyStreamDirectAddress? = nil) {
         self.hostIdentifier = hostIdentifier
         self.hostName = hostName
@@ -41,6 +43,7 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
         self.resumedSession = resumedSession
         self.supportsStreamQuality = supportsStreamQuality
         self.supportsCursorPositionUpdates = supportsCursorPositionUpdates
+        self.supportsClipboardPaste = supportsClipboardPaste
         self.connectedAddress = connectedAddress
     }
 }

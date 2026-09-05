@@ -401,6 +401,12 @@ final class GlassyStreamSessionController {
         client.sendTextInput(text, modifiers: modifiers)
     }
 
+    func pasteClipboardText(_ text: String) {
+        guard state == .connected,
+              authentication?.supportsClipboardPaste == true else { return }
+        client.pasteClipboardText(text)
+    }
+
     private func scheduleVideoReadinessTimeout(generation: UUID) {
         cancelVideoReadinessTimeout()
         guard videoReadinessTimeout.isFinite, videoReadinessTimeout > 0 else {

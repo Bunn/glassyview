@@ -5,6 +5,60 @@ import Testing
 @testable import GlassyDesk
 
 struct GlassyStreamRouteLoopbackTests {
+    @Test(arguments: [false, true])
+    func clipboardPasteRequiresNegotiatedSupport(supported: Bool) async throws {
+        let hostID = Data(repeating: 0x42, count: 16)
+        let host = try LoopbackPairingHost(hostID: hostID, behavior: "valid", supportsClipboardPaste: supported)
+        defer { host.stop() }
+        let endpoint = try await host.start()
+        let client = GlassyStreamClient(credentialStore: RouteTestCredentialStore())
+        defer { client.disconnect() }
+        client.pasteClipboardText("before authentication")
+        let authentication = try await authenticate(client, configuration: .init(
+            endpoint: endpoint, savedMachineID: UUID(),
+            bootstrapCredential: .oneTimeCode("ABCDEFGH2345"), expectedHostIdentifier: hostID
+        ))
+        #expect(authentication.supportsClipboardPaste == supported)
+        let text = "  Café 👩🏽‍💻\r\n\t" + String(repeating: "a", count: 8_192)
+        client.pasteClipboardText("")
+        client.pasteClipboardText(String(repeating: "é", count: 524_289))
+        client.pasteClipboardText(text)
+        client.sendPing()
+        try await waitForPing(host)
+        #expect(host.clipboardPayloads == (supported ? [Data(text.utf8)] : []))
+    }
+
+    @Test
+    func clipboardCapabilityDoesNotSurviveReconnectToOlderHost() async throws {
+        let hostID = Data(repeating: 0x42, count: 16)
+        let newer = try LoopbackPairingHost(hostID: hostID, behavior: "valid", supportsClipboardPaste: true)
+        let older = try LoopbackPairingHost(hostID: hostID, behavior: "valid")
+        defer { newer.stop(); older.stop() }
+        let client = GlassyStreamClient(credentialStore: RouteTestCredentialStore())
+        defer { client.disconnect() }
+        for host in [newer, older] {
+            let endpoint = try await host.start()
+            _ = try await authenticate(client, configuration: .init(
+                endpoint: endpoint, savedMachineID: UUID(),
+                bootstrapCredential: .oneTimeCode("ABCDEFGH2345"), expectedHostIdentifier: hostID
+            ))
+            client.pasteClipboardText("one paste")
+            client.sendPing()
+            try await waitForPing(host)
+            client.disconnect()
+        }
+        #expect(newer.clipboardPayloads == [Data("one paste".utf8)])
+        #expect(older.clipboardPayloads.isEmpty)
+    }
+
+    private func waitForPing(_ host: LoopbackPairingHost) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while host.pingCount == 0, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try #require(host.pingCount == 1)
+    }
+
     @Test
     func syncedMachineWithoutLocalCredentialRequestsPairingThenReconnects() async throws {
         let hostID = Data(repeating: 0x42, count: 16)
@@ -142,15 +196,22 @@ private final class LoopbackPairingHost: @unchecked Sendable {
     private let privateKey = Curve25519.KeyAgreement.PrivateKey()
     private let hostID: Data
     private let behavior: String
+    private let supportsClipboardPaste: Bool
     private var connections: [NWConnection] = []
     private var buffers: [ObjectIdentifier: Data] = [:]
     private var receivedProofs = 0
+    private var receivedClipboardPayloads: [Data] = []
+    private var receivedPings = 0
+    private var materials: [ObjectIdentifier: GlassyStreamWire.SessionMaterial] = [:]
 
     var proofCount: Int { queue.sync { receivedProofs } }
+    var clipboardPayloads: [Data] { queue.sync { receivedClipboardPayloads } }
+    var pingCount: Int { queue.sync { receivedPings } }
 
-    init(hostID: Data, behavior: String) throws {
+    init(hostID: Data, behavior: String, supportsClipboardPaste: Bool = false) throws {
         self.hostID = hostID
         self.behavior = behavior
+        self.supportsClipboardPaste = supportsClipboardPaste
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
         listener = try NWListener(using: parameters)
@@ -195,7 +256,8 @@ private final class LoopbackPairingHost: @unchecked Sendable {
     private var hello: GlassyStreamWire.ServerHello {
         .init(hostIdentifier: hostID, serverNonce: Data(repeating: 0x31, count: 32),
               serverPublicKey: privateKey.publicKey.rawRepresentation, pairingWindow: 1,
-              pairingCodeLifetimeSeconds: 60, capabilities: 7, serverName: "Fixture Mac")
+              pairingCodeLifetimeSeconds: 60, capabilities: supportsClipboardPaste ? 0x47 : 7,
+              serverName: "Fixture Mac")
     }
 
     private func accept(_ connection: NWConnection) {
@@ -242,6 +304,16 @@ private final class LoopbackPairingHost: @unchecked Sendable {
                     if frame.kind == .clientHello {
                         receivedProofs += 1
                         try authenticate(frame, connection: connection)
+                    } else if let material = materials[id] {
+                        let plaintext = try GlassyStreamWire.open(
+                            frame.payload, kind: frame.kind, flags: frame.flags,
+                            sequence: frame.sequence, material: material, serverToClient: false
+                        )
+                        if frame.kind == .clipboardPaste {
+                            receivedClipboardPayloads.append(plaintext)
+                        } else if frame.kind == .ping {
+                            receivedPings += 1
+                        }
                     }
                 }
             } catch { connection.cancel(); return }
@@ -277,6 +349,7 @@ private final class LoopbackPairingHost: @unchecked Sendable {
             throw GlassyStreamClientError.authenticationRejected("Invalid synthetic proof")
         }
         let material = GlassyStreamWire.sessionMaterial(sharedSecret: shared, credential: credential, transcript: transcript)
+        materials[ObjectIdentifier(connection)] = material
         var accepted = clientID
         accepted.append(Data(repeating: 0x61, count: 32))
         append(UInt64(1), to: &accepted)

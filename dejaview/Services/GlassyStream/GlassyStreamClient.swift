@@ -17,6 +17,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         let resumedSession: Bool
         let supportsStreamQuality: Bool
         let supportsCursorPositionUpdates: Bool
+        let supportsClipboardPaste: Bool
     }
 
     private enum State: Sendable {
@@ -46,6 +47,7 @@ final class GlassyStreamClient: @unchecked Sendable {
     private var authenticationTimeoutWorkItem: DispatchWorkItem?
     private var supportsStreamQuality = false
     private var supportsCursorPositionUpdates = false
+    private var supportsClipboardPaste = false
 
     init(credentialStore: any GlassyStreamResumeCredentialStoring = GlassyStreamKeychainCredentialStore()) {
         self.credentialStore = credentialStore
@@ -191,6 +193,12 @@ final class GlassyStreamClient: @unchecked Sendable {
         }
     }
 
+    func pasteClipboardText(_ text: String) {
+        // Validate before queuing so oversized local content cannot end the session.
+        guard (1...GlassyStreamWire.maximumClipboardTextLength).contains(text.utf8.count) else { return }
+        sendAuthenticated(kind: .clipboardPaste) { Data(text.utf8) }
+    }
+
     private func start(configuration: GlassyStreamConnectionConfiguration,
                        callbackQueue: DispatchQueue,
                        callbacks: GlassyStreamClientCallbacks) {
@@ -268,6 +276,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         maximumInboundPayloadLength = GlassyStreamWire.maximumHandshakePayloadLength
         supportsStreamQuality = false
         supportsCursorPositionUpdates = false
+        supportsClipboardPaste = false
         selectedEndpoint = nil
         state = .connecting
 
@@ -564,7 +573,8 @@ final class GlassyStreamClient: @unchecked Sendable {
                                   clientIdentifier: clientIdentifier,
                                   resumedSession: resumedSession,
                                   supportsStreamQuality: capabilities.contains(.streamQualityControl),
-                                  supportsCursorPositionUpdates: capabilities.contains(.cursorPositionUpdates))
+                                  supportsCursorPositionUpdates: capabilities.contains(.cursorPositionUpdates),
+                                  supportsClipboardPaste: capabilities.contains(.clipboardPaste))
         )
         try sendPlaintext(GlassyStreamWire.encodeClientHello(hello),
                           kind: .clientHello,
@@ -615,6 +625,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         state = .authenticated(pending.material)
         supportsStreamQuality = pending.supportsStreamQuality
         supportsCursorPositionUpdates = pending.supportsCursorPositionUpdates
+        supportsClipboardPaste = pending.supportsClipboardPaste
         if pending.supportsStreamQuality {
             try sendEncrypted(
                 GlassyStreamWire.encodeStreamQualityRequest(configuration.desiredQuality),
@@ -641,6 +652,7 @@ final class GlassyStreamClient: @unchecked Sendable {
                 resumedSession: pending.resumedSession,
                 supportsStreamQuality: pending.supportsStreamQuality,
                 supportsCursorPositionUpdates: pending.supportsCursorPositionUpdates,
+                supportsClipboardPaste: pending.supportsClipboardPaste,
                 connectedAddress: connectedAddress
             )
         ))
@@ -725,6 +737,9 @@ final class GlassyStreamClient: @unchecked Sendable {
                   connection != nil else {
                 return
             }
+            // Older hosts reject unknown message kinds. Check on the network
+            // queue against this authenticated connection, including after reconnect.
+            guard kind != .clipboardPaste || supportsClipboardPaste else { return }
 
             do {
                 try sendEncrypted(
@@ -809,6 +824,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         state = .idle
         supportsStreamQuality = false
         supportsCursorPositionUpdates = false
+        supportsClipboardPaste = false
         configuration = nil
         // Do not preserve storage inherited from the route-race handoff. A
         // fully consumed, shared Data slice can trap inside Foundation when

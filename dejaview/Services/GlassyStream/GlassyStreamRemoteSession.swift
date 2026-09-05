@@ -17,6 +17,11 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     @Published private(set) var touchMode: RemoteTouchMode = .direct
     @Published private(set) var displays: [RemoteDisplay] = []
     @Published private(set) var displaySelection: RemoteDisplaySelection = .all
+    @Published private(set) var clipboardPasteError: String?
+
+    var supportsClipboardPaste: Bool {
+        canSendInput && controller.authentication?.supportsClipboardPaste == true
+    }
 
     let controller: GlassyStreamSessionController
 
@@ -456,6 +461,20 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         transientModifiers.reversed().forEach {
             controller.sendKeyInput(keysym: keysym(for: $0), isDown: false)
         }
+    }
+
+    func pasteText(_ text: String) {
+        guard supportsClipboardPaste, !text.isEmpty else { return }
+        guard text.utf8.count <= GlassyStreamWire.maximumClipboardTextLength else {
+            clipboardPasteError = String(localized: "This text is too large to paste at once. Copy a smaller selection (up to 1 MB) and try again.")
+            return
+        }
+        clipboardPasteError = nil
+        controller.pasteClipboardText(text)
+    }
+
+    func clearClipboardPasteError() {
+        clipboardPasteError = nil
     }
 
     func sendReturn() {
