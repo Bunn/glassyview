@@ -71,16 +71,16 @@ struct EditMachineView<Store: MachineStoring>: View {
     private var glassyStreamDetectionMessage: String {
         switch connectionMode {
         case .vnc:
-            String(localized: "This Mac is advertising Glassy Stream support. Select Glassy Stream above to use it.")
+            String(localized: "Fast Connection is available on this Mac. Select it above to use it.")
         case .glassyStream:
-            String(localized: "Glassy Stream is selected for this Mac. Save or connect to continue.")
+            String(localized: "Fast Connection is selected for this Mac. Save or connect to continue.")
         }
     }
 
     private var glassyStreamDetectionHint: String {
         switch connectionMode {
         case .vnc:
-            String(localized: "Select Glassy Stream in the connection method picker to use it.")
+            String(localized: "Select Fast Connection in the connection method picker to use it.")
         case .glassyStream:
             String(localized: "Save or connect to continue.")
         }
@@ -134,13 +134,13 @@ struct EditMachineView<Store: MachineStoring>: View {
                             }
                         }
                         .pickerStyle(.segmented)
-                        .accessibilityHint("Choose standard VNC or the faster Glassy Host stream for this Mac.")
+                        .accessibilityHint("Choose Fast Connection with Glassy Desk for Mac, or Standard VNC.")
                     }
 
                     if isGlassyHostDetected {
                         VStack(alignment: .leading, spacing: 4) {
                             GlassyStreamDetectionBadge(
-                                title: "Glassy Stream detected on this Mac"
+                                title: "Fast Connection available on this Mac"
                             )
 
                             Text(glassyStreamDetectionMessage)
@@ -173,7 +173,7 @@ struct EditMachineView<Store: MachineStoring>: View {
                         .accessibilityLabel(
                             connectionMode == .vnc
                                 ? "VNC host or IP address"
-                                : "Glassy Stream host name or IP address"
+                                : "Mac host name or IP address"
                         )
                         .accessibilityIdentifier(
                             connectionMode == .vnc
@@ -182,7 +182,7 @@ struct EditMachineView<Store: MachineStoring>: View {
                         )
 
                     TextField(
-                        connectionMode == .vnc ? "Port" : "Glassy Host Port",
+                        connectionMode == .vnc ? "Port" : "Connection Port",
                         text: $portText
                     )
                         .keyboardType(.numberPad)
@@ -223,7 +223,7 @@ struct EditMachineView<Store: MachineStoring>: View {
                 if connectionMode == .glassyStream, let glassyHostIdentifier {
                     Section {
                         LabeledContent("Paired Mac") {
-                            Text(glassyHostName ?? String(localized: "Glassy Host"))
+                            Text(glassyHostName ?? String(localized: "Glassy Desk"))
                                 .foregroundStyle(.secondary)
                         }
 

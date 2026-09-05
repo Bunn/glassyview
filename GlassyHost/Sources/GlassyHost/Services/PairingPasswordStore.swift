@@ -13,7 +13,7 @@ enum PairingPasswordPolicyError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidHostIdentifier:
-            "The Glassy Host identity is invalid."
+            "The Glassy Desk identity is invalid."
         case .tooShort:
             "Use at least 15 characters."
         case .tooLong:
@@ -114,7 +114,7 @@ enum PairingPasswordStoreError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidHostIdentifier:
-            return "The Glassy Host identity is invalid."
+            return "The Glassy Desk identity is invalid."
         case .invalidCredential:
             return "The stored pairing password credential is invalid. Set the password again."
         case .keychain(let status):

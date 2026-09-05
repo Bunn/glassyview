@@ -1,6 +1,8 @@
-# Glassy Host
+# Glassy Desk for Mac
 
-Glassy Host is the macOS companion for Glassy Desk. It advertises an authenticated local service over Bonjour and can capture a selected display with ScreenCaptureKit, encode it as low-latency H.264 with VideoToolbox, and stream frames to paired clients.
+Glassy Desk for Mac is the macOS companion for Glassy Desk. It advertises an authenticated local service over Bonjour and can capture a selected display with ScreenCaptureKit, encode it as low-latency H.264 with VideoToolbox, and stream frames to paired clients.
+
+Both apps display the name **Glassy Desk**. Setup and download copy uses **Glassy Desk for Mac** to identify the desktop app; iOS calls its streaming method **Fast Connection**, alongside **Standard VNC**. The `GlassyHost` executable and package, bundle identifier, protocol identifiers, credential namespaces, and update URLs retain their existing technical names.
 
 ## Run
 
@@ -10,17 +12,17 @@ From the repository root:
 ./script/build_and_run.sh
 ```
 
-The script builds and signs `dist/Glassy Host.app`, installs a verified copy at `/Applications/Glassy Host.app`, then opens the installed app. You can also use the repository's Codex **Run** action.
+The script builds and signs `dist/Glassy Desk.app`, installs a verified copy at `/Applications/Glassy Desk.app`, then opens the installed app. You can also use the repository's Codex **Run** action.
 
-Grant Screen Recording and Accessibility access locally, then leave Glassy Host running. Its lightweight `_glassydesk._tcp` listener remains available without recording the screen. Capture starts automatically after a Glassy Desk device completes the authenticated pairing or resume handshake, then stops five seconds after the final device disconnects. **Share Continuously** in Display & Control is available as an explicit always-on override.
+Grant Screen Recording and Accessibility access locally, then leave Glassy Desk for Mac running. Its lightweight `_glassydesk._tcp` listener remains available without recording the screen. Capture starts automatically after a Glassy Desk device completes the authenticated pairing or resume handshake, then stops five seconds after the final device disconnects. **Share Continuously** in Display & Control is available as an explicit always-on override.
 
 ### Pair new devices with a QR code, code, or password
 
-Choose **Add Device** in Connections, then **Scan QR Code** in Glassy Desk on an iPhone or iPad on the same local network. Review the Mac on the device and choose **Pair & Connect**. The custom QR refreshes every minute and includes the connection address. **Enter Code** provides a camera-free alternative. Device names, last connection times, and access controls appear in Connections; existing paired devices populate the list the next time they connect. Revoking a device invalidates its saved credential, and **Allow connections** can pause access entirely.
+Choose **Add Device** in Connections. On your iPhone or iPad, choose **Add Mac → Set Up Fast Connection → Scan Mac’s Code** in Glassy Desk. Review the Mac on the device and choose **Pair & Connect**. The custom QR refreshes every minute and includes the connection address. **Pair Manually** provides a camera-free alternative. Device names, last connection times, and access controls appear in Connections; existing paired devices populate the list the next time they connect. Revoking a device invalidates its saved credential, and **Allow connections** can pause access entirely.
 
-The rotating 12-symbol code shown by Glassy Host is available whenever connections are allowed. If copying that code is inconvenient for a remote Tailscale Mac, choose **Set Password…** in Settings → Security. A new Glassy Desk device can then explicitly choose Password while using the Mac's Tailscale `100.64.0.0/10` address, Tailscale IPv6 address, or full `.ts.net` MagicDNS name. Before pairing, confirm Tailscale is connected on both devices and the selected tailnet peer is the intended Mac. Glassy Desk checks for a recognizable Tailscale address and an active VPN route, and intentionally requires the one-time code for Nearby, ordinary LAN, and other raw TCP routes. This is an operational trust requirement: the password handshake is not a PAKE, so the rotating code remains the safer choice whenever the route or peer is uncertain. Devices that are already paired continue using their device- and host-bound resume credential, so they do not need the code or password again.
+The rotating 12-symbol code shown by Glassy Desk for Mac is available whenever connections are allowed. If copying that code is inconvenient for a remote Tailscale Mac, choose **Set Password…** in Settings → Security. A new Glassy Desk device can then explicitly choose Password while using the Mac's Tailscale `100.64.0.0/10` address, Tailscale IPv6 address, or full `.ts.net` MagicDNS name. Before pairing, confirm Tailscale is connected on both devices and the selected tailnet peer is the intended Mac. Glassy Desk checks for a recognizable Tailscale address and an active VPN route, and intentionally requires the one-time code for Nearby, ordinary LAN, and other raw TCP routes. This is an operational trust requirement: the password handshake is not a PAKE, so the rotating code remains the safer choice whenever the route or peer is uncertain. Devices that are already paired continue using their device- and host-bound resume credential, so they do not need the code or password again.
 
-Pairing passwords must contain 15–128 characters. Spaces are allowed and significant; line breaks and control characters are not. Use a long, unique passphrase for a remotely reachable Mac. Glassy Host applies NFC normalization and 600,000 rounds of PBKDF2-HMAC-SHA256, then saves only the resulting 32-byte, host-bound credential in the encrypted macOS login Keychain without enabling iCloud synchronization. The plaintext password is never stored, logged, or displayed.
+Pairing passwords must contain 15–128 characters. Spaces are allowed and significant; line breaks and control characters are not. Use a long, unique passphrase for a remotely reachable Mac. Glassy Desk for Mac applies NFC normalization and 600,000 rounds of PBKDF2-HMAC-SHA256, then saves only the resulting 32-byte, host-bound credential in the encrypted macOS login Keychain without enabling iCloud synchronization. The plaintext password is never stored, logged, or displayed.
 
 Changing or removing the password does not disconnect authenticated viewers and does not unpair existing devices. Replacing the host pairing key intentionally unpairs every device and removes the password because the password credential is bound to that host identity.
 
@@ -28,17 +30,17 @@ Connected Glassy Desk devices can request Data Saver (720p/15 FPS/~2 Mbps), Bala
 
 ## Connect remotely with Tailscale
 
-Tailscale provides a private route to a remote Mac without exposing Glassy Host to the public internet:
+Tailscale provides a private route to a remote Mac without exposing Glassy Desk for Mac to the public internet:
 
 1. Install Tailscale on the Mac and iPad, sign in to the same tailnet, and confirm both devices appear online.
-2. Install and run the same current Glassy Desk/Glassy Host version on both devices. Leave Glassy Host running and grant its Screen Recording and Accessibility permissions.
+2. Install and run the current compatible Glassy Desk versions on both devices. Leave Glassy Desk for Mac running and grant its Screen Recording and Accessibility permissions.
 3. In Tailscale on the Mac, copy the Mac's MagicDNS name or `100.x.y.z` address.
-4. In Glassy Desk, edit the saved Mac, select **Glassy Stream**, enter that Tailscale name or address, and use TCP port `51515`.
-5. Connect and enter either the pairing code currently shown by Glassy Host on that remote Mac or its configured pairing password. The credential must belong to the Mac whose Tailscale address you entered.
+4. In Glassy Desk, edit the saved Mac, select **Fast Connection**, enter that Tailscale name or address, and use TCP port `51515`.
+5. Connect and enter either the pairing code currently shown by Glassy Desk for Mac on that remote Mac or its configured pairing password. The credential must belong to the Mac whose Tailscale address you entered.
 
 The nearby-host picker uses Bonjour, which normally discovers only Macs on the iPad's local network. A remote Tailscale Mac is therefore not expected to appear in that list; connect with its saved address instead. Do not configure router port forwarding or expose port `51515` publicly.
 
-If the direct connection cannot be established, verify that both devices still show as online in the same tailnet, that the tailnet's access-control policy permits the iPad to reach the Mac on TCP `51515`, and that the macOS firewall allows the current Glassy Host app. Rebuilding or replacing only one side can also produce protocol or authentication errors, so deploy compatible Glassy Desk and Glassy Host builds together.
+If the direct connection cannot be established, verify that both devices still show as online in the same tailnet, that the tailnet's access-control policy permits the iPad to reach the Mac on TCP `51515`, and that the macOS firewall allows the current Glassy Desk for Mac app. Rebuilding or replacing only one side can also produce protocol or authentication errors, so deploy compatible Glassy Desk and Glassy Desk for Mac builds together.
 
 ## Verify
 
@@ -57,7 +59,7 @@ The script embeds and signs Sparkle and its helpers with the host's signing iden
 
 ### Package a release
 
-Follow [Release Glassy Host](../docs/macos-release.md) for credential setup, versioning, recovery, and a manual CI example. From the source repository, the release command builds and signs the universal app, notarizes and staples it, signs the final archive with Sparkle, and publishes the GitHub release and Cloudflare Pages feed:
+Follow [Release Glassy Desk for Mac](../docs/macos-release.md) for credential setup, versioning, recovery, and a manual CI example. From the source repository, the release command builds and signs the universal app, notarizes and staples it, signs the final archive with Sparkle, and publishes the GitHub release and Cloudflare Pages feed:
 
 ```sh
 ./script/release_host.sh --notes /path/to/release-notes.md

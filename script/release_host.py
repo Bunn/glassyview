@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and publish Glassy Host. Standard library only; no credentials in state."""
+"""Build and publish Glassy Desk. Standard library only; no credentials in state."""
 from __future__ import annotations
 
 import argparse
@@ -236,7 +236,7 @@ def updated_feed(data, state):
             return data
     item = ET.Element("item")
     for name, value in (
-        ("title", f"Glassy Host {state['version']}"), ("pubDate", state["pub_date"]),
+        ("title", f"Glassy Desk {state['version']}"), ("pubDate", state["pub_date"]),
         ("link", state["release_url"]), (f"{{{SPARKLE}}}version", state["build"]),
         (f"{{{SPARKLE}}}shortVersionString", state["version"]),
         (f"{{{SPARKLE}}}minimumSystemVersion", state["minimum_system"]),
@@ -446,14 +446,14 @@ def xcode_notarize(state, work, config, run, save, *,
             allow_failure=True, include_status=True, timeout=max(1, min(180, remaining)))
         if status == 0:
             entries = list(export_path.iterdir()) if export_path.is_dir() else []
-            if len(entries) != 1 or entries[0].name != "Glassy Host.app" or not entries[0].is_dir():
+            if len(entries) != 1 or entries[0].name != "Glassy Desk.app" or not entries[0].is_dir():
                 raise ReleaseError("Xcode returned an unexpected notarized-app export.")
-            replacement = work / ".xcode-notarized-Glassy Host.app"
+            replacement = work / ".xcode-notarized-Glassy Desk.app"
             if replacement.exists():
                 shutil.rmtree(replacement)
             run.run(["ditto", entries[0], replacement], "Stage the notarized app returned by Xcode")
             validate_app(replacement, config, state, run)
-            staged_app = work / "Glassy Host.app"
+            staged_app = work / "Glassy Desk.app"
             if staged_app.exists():
                 shutil.rmtree(staged_app)
             os.replace(replacement, staged_app)
@@ -478,7 +478,7 @@ def finalize(state, work, config, run, sparkle_key, save):
             raise ReleaseError("The recorded release ZIP is missing or changed. Refusing to publish different bytes.")
         verify_signature(archive, state["signature"], config, work, run)
         return archive
-    app = work / "Glassy Host.app"
+    app = work / "Glassy Desk.app"
     run.run(["xcrun", "stapler", "staple", app], "Staple notarization ticket")
     run.run(["xcrun", "stapler", "validate", app], "Validate notarization ticket")
     validate_app(app, config, state, run)
@@ -533,7 +533,7 @@ def publish_asset(state, archive, github, save):
     if release is None:
         release = github.request("POST", "releases", {
             "tag_name": state["tag"], "target_commitish": state["distribution_base"],
-            "name": f"Glassy Host {state['version']}", "body": state["notes"] + "\n\n" + marker,
+            "name": f"Glassy Desk {state['version']}", "body": state["notes"] + "\n\n" + marker,
             "draft": True, "prerelease": False,
         })
     state["release_id"] = release["id"]
@@ -566,7 +566,7 @@ def publish_feed(state, work, config, github, run, cloudflare_token, account_id,
     feed = updated_feed(current, state)
     if feed != current:
         commit = github.request("PUT", f"contents/{config['feed_path']}", {
-            "message": f"Publish Glassy Host {state['version']} update feed",
+            "message": f"Publish Glassy Desk {state['version']} update feed",
             "content": base64.b64encode(feed).decode(), "sha": blob, "branch": config["branch"],
         })
         state["feed_commit"] = commit["commit"]["sha"]
@@ -665,7 +665,7 @@ def execute(args):
     if state["notarization_mode"] == "xcode" and is_ci_environment():
         raise ReleaseError("--xcode-notarization is local-only and cannot run in CI.")
     if args.dry_run:
-        print(f"Glassy Host {state['version']} ({state['build']}) → {config['repository']}")
+        print(f"Glassy Desk {state['version']} ({state['build']}) → {config['repository']}")
         notary_label = "signed-in Xcode account" if state["notarization_mode"] == "xcode" else "notarytool API key"
         print(f"Compile arm64 + x86_64 → Developer ID sign → notarize ({notary_label}) → staple → Sparkle sign → GitHub → Pages")
         print(f"Workspace: {work}\nFeed: {config['feed_url']}")
@@ -721,11 +721,11 @@ def execute(args):
                 if not manifest.exists():
                     with signing_environment(credentials, run, state["identity"]) as env:
                         run.run(["bash", ROOT / "script/package_host_release.sh", "--output-manifest", manifest],
-                                "Compile and Developer ID-sign Glassy Host (arm64 + x86_64)", env=env)
+                                "Compile and Developer ID-sign Glassy Desk (arm64 + x86_64)", env=env)
                 package = json.loads(manifest.read_text())
                 source_app = Path(package["app"])
                 validate_app(source_app, config, state, run)
-                app = work / "Glassy Host.app"
+                app = work / "Glassy Desk.app"
                 if app.exists():
                     shutil.rmtree(app)
                 run.run(["ditto", source_app, app], "Stage app for notarization")
@@ -739,7 +739,7 @@ def execute(args):
                     state["package_archive"] = str(Path(package_archive).resolve())
                 save()
             if not state.get("sha256"):
-                validate_app(work / "Glassy Host.app", config, state, run)
+                validate_app(work / "Glassy Desk.app", config, state, run)
                 if uses_xcode_notary:
                     xcode_notarize(state, work, config, run, save)
                 else:
@@ -752,7 +752,7 @@ def execute(args):
         check_feed(feed, state, allow_existing=True)
         publish_asset(state, archive, github, save)
         publish_feed(state, work, config, github, run, cloudflare, account_id, save)
-        print(f"Released Glassy Host {state['version']} ({state['build']}): {state['release_url']}")
+        print(f"Released Glassy Desk {state['version']} ({state['build']}): {state['release_url']}")
         print(f"Verified production feed: {config['feed_url']}")
 
 

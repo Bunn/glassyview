@@ -152,15 +152,15 @@ enum GlassyStreamClientError: Error, LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .alreadyConnecting:
-            String(localized: "A Glassy Stream connection is already active.")
+            String(localized: "A fast connection is already active.")
         case .cancelled:
-            String(localized: "The Glassy Stream connection was cancelled.")
+            String(localized: "The fast connection was cancelled.")
         case let .connectionFailed(message):
-            String(localized: "Could not connect to Glassy Host: \(message)")
+            String(localized: "Could not connect to Glassy Desk: \(message)")
         case .connectionClosed:
-            String(localized: "Glassy Host closed the connection.")
+            String(localized: "Glassy Desk closed the connection.")
         case .authenticationTimedOut:
-            String(localized: "Glassy Host did not complete the secure connection in time.")
+            String(localized: "Glassy Desk did not complete the secure connection in time.")
         case let .pairingCodeRequired(hostName):
             String(localized: "Enter the pairing code shown by \(hostName).")
         case .invalidPairingCode:
@@ -170,21 +170,21 @@ enum GlassyStreamClientError: Error, LocalizedError, Sendable {
         case .pairingPasswordRequiresTailscale:
             String(localized: "Reusable-password pairing requires an active Tailscale VPN route and a saved Tailscale IP or full .ts.net address.")
         case .pairingPasswordUnsupported:
-            String(localized: "This Glassy Host does not support password pairing.")
+            String(localized: "Glassy Desk on this Mac does not support password pairing.")
         case let .pairingPasswordDerivationFailed(status):
             String(localized: "The pairing password could not be prepared securely (status \(status)).")
         case let .authenticationRejected(message):
-            String(localized: "Glassy Host rejected authentication: \(message)")
+            String(localized: "Glassy Desk rejected authentication: \(message)")
         case .hostIdentityMismatch:
-            String(localized: "This Glassy Host is not the Mac paired with this saved machine.")
+            String(localized: "This is not the Mac paired with this saved machine.")
         case .directInputUnsupported:
-            String(localized: "This version of Glassy Host does not support secure keyboard and pointer input. Update Glassy Host and try again.")
+            String(localized: "This version of Glassy Desk does not support secure keyboard and pointer input. Update Glassy Desk and try again.")
         case let .unsupportedHostVersion(version):
-            String(localized: "Glassy Host protocol version \(version) is not supported.")
+            String(localized: "Glassy Desk protocol version \(version) is not supported.")
         case let .protocolViolation(message):
-            String(localized: "Glassy Host sent an invalid message: \(message)")
+            String(localized: "Glassy Desk sent an invalid message: \(message)")
         case let .credentialStoreFailed(message):
-            String(localized: "Could not access the Glassy Stream credential: \(message)")
+            String(localized: "Could not access the saved connection credential: \(message)")
         }
     }
 }

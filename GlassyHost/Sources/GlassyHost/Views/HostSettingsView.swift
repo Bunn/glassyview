@@ -35,7 +35,7 @@ struct HostSettingsView: View {
     private var general: some View {
         Form {
             Section {
-                Toggle("Open Glassy Host at login", isOn: Binding(get: { controller.startsAtLogin }, set: { controller.setStartsAtLogin($0) }))
+                Toggle("Open Glassy Desk at login", isOn: Binding(get: { controller.startsAtLogin }, set: { controller.setStartsAtLogin($0) }))
                     .disabled(controller.isUpdatingLoginItem)
                 switch controller.loginItemStatus {
                 case .requiresApproval:
@@ -43,7 +43,7 @@ struct HostSettingsView: View {
                         Button("Open Login Items", action: controller.openLoginItemSettings)
                     }
                 case .notFound:
-                    Text("Move Glassy Host to Applications to enable login items.")
+                    Text("Move Glassy Desk to Applications to enable login items.")
                         .foregroundStyle(.secondary)
                 default: EmptyView()
                 }
@@ -53,10 +53,10 @@ struct HostSettingsView: View {
             } header: {
                 Text("Startup")
             } footer: {
-                Text("Glassy Host stays available in the menu bar when you close its window.")
+                Text("Glassy Desk stays available in the menu bar when you close its window.")
             }
             Section("Software updates") {
-                LabeledContent("Glassy Host", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development")
+                LabeledContent("Glassy Desk", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development")
                 CheckForUpdatesView(updater: updater)
             }
         }

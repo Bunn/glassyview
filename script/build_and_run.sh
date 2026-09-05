@@ -3,7 +3,7 @@ set -euo pipefail
 
 MODE="${1:-run}"
 APP_NAME="GlassyHost"
-DISPLAY_NAME="Glassy Host"
+DISPLAY_NAME="Glassy Desk"
 BUNDLE_ID="dev.bunn.glassydesk.host"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,7 +28,7 @@ rm -rf "$STAGED_APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$APP_FRAMEWORKS"
 cp "$BUILD_DIR/$APP_NAME" "$STAGED_APP_BINARY"
 cp "$PACKAGE_DIR/Support/Info.plist" "$APP_CONTENTS/Info.plist"
-cp "$PACKAGE_DIR/Resources/GlassyHostAppIcon.icns" "$APP_RESOURCES/GlassyHostAppIcon.icns"
+cp "$PACKAGE_DIR/Resources/GlassyDeskAppIcon.icns" "$APP_RESOURCES/GlassyDeskAppIcon.icns"
 # Preserve Sparkle's framework symlinks and helper executable permissions.
 /usr/bin/ditto "$BUILD_DIR/Sparkle.framework" "$SPARKLE_FRAMEWORK"
 chmod +x "$STAGED_APP_BINARY"
@@ -95,7 +95,7 @@ install_app() {
 
   install_workspace="$(mktemp -d "/Applications/.glassy-host-install.XXXXXX")"
   install_candidate="$install_workspace/$DISPLAY_NAME.app"
-  previous_install="$install_workspace/Previous Glassy Host.app"
+  previous_install="$install_workspace/Previous Glassy Desk.app"
 
   /usr/bin/ditto "$STAGED_APP_BUNDLE" "$install_candidate"
   /usr/bin/codesign --verify --deep --strict "$install_candidate"

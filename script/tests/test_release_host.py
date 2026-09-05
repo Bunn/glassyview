@@ -392,7 +392,7 @@ class XcodeNotarizationTests(SyntheticCase):
         archive = self.work / "GlassyHost.xcarchive"
         archive.mkdir()
         (archive / "Info.plist").write_bytes(plistlib.dumps({"ArchiveVersion": 2}))
-        (self.work / "Glassy Host.app").mkdir()
+        (self.work / "Glassy Desk.app").mkdir()
         self.state.update(
             notarization_mode="xcode",
             package_archive=str(archive),
@@ -411,7 +411,7 @@ class XcodeNotarizationTests(SyntheticCase):
                 return f'  1) {fingerprint} "{identity}"\n'.encode(), b""
             if label == "Check for the notarized app from Xcode":
                 export_path = Path(args[args.index("-exportPath") + 1])
-                (export_path / "Glassy Host.app").mkdir(parents=True)
+                (export_path / "Glassy Desk.app").mkdir(parents=True)
                 return b"", b"", 0
             if label == "Stage the notarized app returned by Xcode":
                 shutil.copytree(Path(args[1]), Path(args[2]))

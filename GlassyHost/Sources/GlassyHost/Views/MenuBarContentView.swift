@@ -33,7 +33,7 @@ struct MenuBarContentView: View {
         }
         .disabled(!controller.allowsConnections || controller.serverPort == nil || controller.isTransitioning)
 
-        Button("Open Glassy Host") {
+        Button("Open Glassy Desk") {
             openWindow(id: "main")
             NSApp.activate(ignoringOtherApps: true)
         }
@@ -47,7 +47,7 @@ struct MenuBarContentView: View {
 
         Divider()
 
-        Button("Quit Glassy Host") {
+        Button("Quit Glassy Desk") {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")

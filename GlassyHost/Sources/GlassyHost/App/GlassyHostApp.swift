@@ -34,7 +34,7 @@ struct GlassyHostApp: App {
         MenuBarExtra {
             MenuBarContentView(controller: controller, updater: updater)
         } label: {
-            Label("Glassy Host", systemImage: controller.menuBarSystemImage)
+            Label("Glassy Desk", systemImage: controller.menuBarSystemImage)
                 .task {
                     // Local UI previews must not query the production feed or
                     // show Sparkle's first-launch preference prompt.
@@ -57,7 +57,7 @@ struct GlassyHostApp: App {
     }
 
     private var dashboardWindow: some Scene {
-        WindowGroup("Glassy Host", id: "main") {
+        WindowGroup("Glassy Desk", id: "main") {
             HostDashboardView(controller: controller)
                 .frame(minWidth: 820, minHeight: 620)
                 .task {

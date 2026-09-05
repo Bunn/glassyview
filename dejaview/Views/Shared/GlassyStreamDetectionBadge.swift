@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct GlassyStreamDetectionBadge: View {
-    var title: LocalizedStringResource = "Glassy Stream Detected"
+    var title: LocalizedStringResource = "Fast Connection Available"
 
     var body: some View {
         Label {

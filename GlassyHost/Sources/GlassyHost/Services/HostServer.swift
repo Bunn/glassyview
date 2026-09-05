@@ -34,7 +34,7 @@ final class HostServer: @unchecked Sendable {
     private let deviceAccessStore: HostDeviceAccessStore
     private let pairingCodeSource = PairingCodeSource()
 
-    init(serviceName: String = Host.current().localizedName ?? "Glassy Host",
+    init(serviceName: String = Host.current().localizedName ?? "Glassy Desk",
          port: UInt16 = HostProtocol.defaultPort,
          deviceAccessStore: HostDeviceAccessStore = HostDeviceAccessStore()) {
         self.deviceAccessStore = deviceAccessStore
@@ -229,9 +229,9 @@ final class HostServer: @unchecked Sendable {
     static func listenerFailureMessage(for error: NWError,
                                        port: UInt16 = HostProtocol.defaultPort) -> String {
         if isAddressInUse(error) {
-            return "TCP port \(port) is already in use. Quit the other Glassy Host instance or app using this port. Glassy Host will retry automatically every 30 seconds."
+            return "TCP port \(port) is already in use. Quit the other Glassy Desk instance or app using this port. Glassy Desk will retry automatically every 30 seconds."
         }
-        return "Glassy Host could not listen on TCP port \(port): \(error.localizedDescription). It will retry automatically."
+        return "Glassy Desk could not listen on TCP port \(port): \(error.localizedDescription). It will retry automatically."
     }
 
     static func isAddressInUse(_ error: NWError) -> Bool {
@@ -681,7 +681,7 @@ private extension HostServer {
                 if let networkError = error as? NWError {
                     failListenerCreation(networkError)
                 } else {
-                    let message = "Glassy Host could not create its TCP listener on port \(listenerPort): \(error.localizedDescription). It will retry automatically."
+                    let message = "Glassy Desk could not create its TCP listener on port \(listenerPort): \(error.localizedDescription). It will retry automatically."
                     Self.logger.error("Listener creation failed: \(message, privacy: .public)")
                     publishStatus(.failed(message))
                     scheduleListenerRetry(after: nil)
@@ -738,7 +738,7 @@ private extension HostServer {
             case .ready:
                 guard let port = listener.port?.rawValue else {
                     failListener(
-                        "The Glassy Host listener did not receive a TCP port. It will retry automatically.",
+                        "The Glassy Desk listener did not receive a TCP port. It will retry automatically.",
                         listener: listener,
                         retryAfter: nil
                     )
@@ -754,7 +754,7 @@ private extension HostServer {
                 break
             @unknown default:
                 failListener(
-                    "The Glassy Host listener entered an unknown state. It will retry automatically.",
+                    "The Glassy Desk listener entered an unknown state. It will retry automatically.",
                     listener: listener,
                     retryAfter: nil
                 )

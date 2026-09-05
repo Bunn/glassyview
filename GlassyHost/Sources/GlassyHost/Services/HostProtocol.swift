@@ -235,21 +235,21 @@ enum HostProtocol {
         var errorDescription: String? {
             switch self {
             case .invalidMagic:
-                "Invalid Glassy Host frame magic."
+                "Invalid Glassy Desk frame magic."
             case let .unsupportedVersion(version):
-                "Unsupported Glassy Host protocol version \(version)."
+                "Unsupported Glassy Desk protocol version \(version)."
             case let .unknownMessageKind(kind):
-                "Unknown Glassy Host message type \(kind)."
+                "Unknown Glassy Desk message type \(kind)."
             case let .invalidFlags(flags):
-                "Invalid Glassy Host message flags \(flags)."
+                "Invalid Glassy Desk message flags \(flags)."
             case let .payloadTooLarge(length):
-                "Glassy Host payload exceeds the limit (\(length) bytes)."
+                "Glassy Desk payload exceeds the limit (\(length) bytes)."
             case let .malformedPayload(reason):
-                "Malformed Glassy Host payload: \(reason)"
+                "Malformed Glassy Desk payload: \(reason)"
             case .invalidAuthentication:
                 "Authentication failed."
             case .invalidCiphertext:
-                "Encrypted Glassy Host payload could not be authenticated."
+                "Encrypted Glassy Desk payload could not be authenticated."
             }
         }
     }

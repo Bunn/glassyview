@@ -21,13 +21,13 @@ struct RemoteConnectionInfoView: View {
 
                 setupStep(
                     "Open Add Device on the Mac",
-                    detail: "Glassy Host includes the Mac’s current local and VPN addresses in its pairing QR code.",
+                    detail: "Glassy Desk includes the Mac’s current local and VPN addresses in its pairing QR code.",
                     systemImage: "desktopcomputer"
                 )
 
                 setupStep(
                     "Scan and Connect",
-                    detail: "Choose Scan QR Code in Glassy Desk and approve the Mac. Its saved addresses work automatically when you change networks.",
+                    detail: "Choose Add Mac → Set Up Fast Connection in Glassy Desk, scan the code, and confirm the Mac. Its saved addresses work automatically when you change networks.",
                     systemImage: "qrcode.viewfinder"
                 )
             }

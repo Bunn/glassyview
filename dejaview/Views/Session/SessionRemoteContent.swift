@@ -76,7 +76,7 @@ private struct GlassyStreamStatusOverlay: View {
                     .font(.system(size: 36))
                     .foregroundStyle(.orange)
 
-                Text("Glassy Stream Stopped")
+                Text("Connection Stopped")
                     .font(.headline)
 
                 Text(failureMessage)
@@ -92,7 +92,7 @@ private struct GlassyStreamStatusOverlay: View {
             VStack(spacing: 12) {
                 ProgressView()
                     .controlSize(.large)
-                Text("Waiting for Glassy Stream video…")
+                Text("Waiting for your Mac…")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

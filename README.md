@@ -13,7 +13,7 @@ On the target Mac: System Settings → General → Sharing → enable **Screen S
 
 ## macOS companion
 
-[Glassy Host](GlassyHost/README.md) provides authenticated Glassy Stream connections. See [Release Glassy Host](docs/macos-release.md) for the one-command build, notarization, Sparkle signing, and publication workflow, including local credentials and a manual CI example.
+[Glassy Desk for Mac](GlassyHost/README.md) provides authenticated fast, encrypted connections. See [Release Glassy Desk for Mac](docs/macos-release.md) for the one-command build, notarization, Sparkle signing, and publication workflow, including local credentials and a manual CI example.
 
 ## What's included
 
@@ -22,7 +22,7 @@ On the target Mac: System Settings → General → Sharing → enable **Screen S
 - **Rendering**: full-screen framebuffer drawn into a `CALayer` (aspect-fit), status bar and home indicator hidden.
 - **Input**: tap = left click, drag = click-drag; a floating glass pill toggles a keystroke bar and disconnects.
 - **Liquid Glass** styling using iOS 26-native `glassEffect`, `.glass`/`.glassProminent` buttons, and morphing glass controls.
-- **Options menu**: bottom-right glass button with per-machine Glassy Stream quality presets (Data Saver at 720p/15 FPS/~2 Mbps, Balanced at 1080p/30 FPS/~5 Mbps, or Best at up to 4K/60 FPS/~12 Mbps), plus VNC frame-rate, trackpad-mode, and external-display controls. Glassy quality changes reconfigure the host stream without disconnecting the session.
+- **Options menu**: bottom-right glass button with per-machine Fast Connection quality presets (Data Saver at 720p/15 FPS/~2 Mbps, Balanced at 1080p/30 FPS/~5 Mbps, or Best at up to 4K/60 FPS/~12 Mbps), plus VNC frame-rate, trackpad-mode, and external-display controls. Glassy quality changes reconfigure the host stream without disconnecting the session.
 - **Saved machines**: one-tap connect entries with editable name/host/port/login (`MachineStore`). Metadata, encrypted passwords, and connection history are stored in SwiftData with private CloudKit sync; passwords are also cached locally in the Keychain.
 
 ## Notes & next steps

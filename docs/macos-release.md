@@ -1,4 +1,4 @@
-# Release Glassy Host
+# Release Glassy Desk for Mac
 
 Run the release automation from the `Bunn/glassyview` source repository:
 
@@ -122,14 +122,14 @@ Resume uses the saved release state and the same artifact; it never recompiles. 
 
 If credentials, preflight, or compilation failed before a completed packaging receipt (`package.json`) was created, resume refuses to continue. Correct the problem and start a new run with `--notes` and a new workspace. Once an artifact is published, use resume to finish that release; do not replace its signed asset or start a separate release under the same version. Subsequent source changes require a new version and build.
 
-The published feed is [Glassy Host's appcast](https://glassydesk-host.pages.dev/glassy-host/appcast.xml); binaries are in [GitHub Releases](https://github.com/Bunn/GlassyDesk-Host/releases). The script preserves existing feed entries when adding the new release.
+The published feed is [Glassy Desk for Mac's appcast](https://glassydesk-host.pages.dev/glassy-host/appcast.xml); binaries are in [GitHub Releases](https://github.com/Bunn/GlassyDesk-Host/releases). The script preserves existing feed entries when adding the new release.
 
 ## Optional manual GitHub Actions workflow
 
 The following is a template only; this document does not enable a workflow. Add it to the `Bunn/glassyview` source repository if desired, after configuring the secrets and variables. Use a macOS runner with the required Xcode selected. The notes path must point to a reviewed file in the checked-out revision.
 
 ```yaml
-name: Release Glassy Host
+name: Release Glassy Desk for Mac
 
 on:
   workflow_dispatch:

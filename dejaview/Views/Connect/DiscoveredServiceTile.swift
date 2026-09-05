@@ -74,7 +74,7 @@ private extension View {
     @ViewBuilder
     func glassyStreamDetectionAccessibilityValue(_ isDetected: Bool) -> some View {
         if isDetected {
-            accessibilityValue("Glassy Stream detected")
+            accessibilityValue("Fast Connection available")
         } else {
             self
         }

@@ -125,7 +125,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     /// machine UUID and expected host identity are available.
     func connect(host: String, port: UInt16, username: String, password: String) {
         guard let networkPort = NWEndpoint.Port(rawValue: port) else {
-            status = .disconnected("The Glassy Stream port is invalid.")
+            status = .disconnected("The Fast Connection port is invalid.")
             return
         }
 
@@ -719,7 +719,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
             releaseLocalInputState()
             clearGeometry()
             let message = error?.localizedDescription
-                ?? "The Glassy Stream connection ended."
+                ?? "The fast connection ended."
             lastDisconnectMessage = message
 
             if automaticReconnectConnectionGeneration != nil {
@@ -816,7 +816,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         displays = [
             RemoteDisplay(
                 id: 1,
-                name: "Glassy Stream",
+                name: "Fast Connection",
                 frame: CGRect(origin: .zero, size: dimensions)
             )
         ]

@@ -26,12 +26,12 @@ struct GlassyPairingScannerView: View {
                 }
                 .frame(height: 300)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
-                .accessibilityLabel("Camera scanner for the Glassy Host pairing QR code")
+                .accessibilityLabel("Camera scanner for the Glassy Desk pairing QR code")
             case .denied:
                 ContentUnavailableView {
                     Label("Camera Access Needed", systemImage: "camera.fill")
                 } description: {
-                    Text("Allow camera access in Settings to scan your Mac’s QR code, or enter its pairing code below.")
+                    Text("Allow camera access in Settings, or choose Enter a code instead below.")
                 } actions: {
                     Button("Open Settings") {
                         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }

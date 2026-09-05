@@ -7,27 +7,36 @@ struct GlassyPairingReviewView: View {
     let pair: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "desktopcomputer")
-                .font(.system(size: 48))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
+        VStack(spacing: 22) {
+            MacPairingIllustration(isRecognized: true)
 
-            Text("Connect to \(invitation.name)?")
-                .font(.title2.bold())
-                .multilineTextAlignment(.center)
-                .accessibilityAddTraits(.isHeader)
+            VStack(spacing: 8) {
+                Text("There’s your Mac.")
+                    .font(.title.bold())
+                    .accessibilityAddTraits(.isHeader)
+                Text("Make sure this is the Mac you want to view and control.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .multilineTextAlignment(.center)
 
-            Text(invitation.candidate.detail)
-                .font(.callout.monospaced())
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-
-            Text("Confirm this is the Mac you want to view and control. Only scan a code shown on a Mac you trust.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                Text(invitation.name)
+                    .font(.title3.weight(.semibold))
+                Text(invitation.candidate.detail)
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                if invitation.addresses.count > 1 {
+                    Label("Wi-Fi and VPN routes included", systemImage: "network")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .multilineTextAlignment(.center)
+            .padding(20)
+            .frame(maxWidth: .infinity)
+            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 24))
 
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let expired = context.date >= invitation.expiresAt
@@ -42,10 +51,11 @@ struct GlassyPairingReviewView: View {
                         pair()
                     } label: {
                         HStack {
-                            if isPairing { ProgressView() }
+                            if isPairing { ProgressView().tint(.white) }
                             Text(isPairing ? "Connecting…" : "Pair & Connect")
                         }
-                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.glassProminent)
                     .disabled(expired || isPairing)
@@ -53,7 +63,7 @@ struct GlassyPairingReviewView: View {
                 }
             }
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 4)
         .frame(maxWidth: .infinity)
     }
 }
@@ -64,14 +74,14 @@ struct GlassyPairingReviewView: View {
         "glassydesk://pair?v=1&host=Studio-Mac.local&port=51515&name=Studio%20Mac&code=ABCD2345EFGH&expires=\(expiration)"
     )
     NavigationStack {
-        Form {
+        ScrollView {
             if let invitation {
-                Section {
-                    GlassyPairingReviewView(invitation: invitation, isPairing: false, pair: {})
-                }
+                GlassyPairingReviewView(invitation: invitation, isPairing: false, pair: {})
+                    .padding(24)
             }
         }
-        .navigationTitle("Pair Glassy Stream")
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Scan Mac’s Code")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

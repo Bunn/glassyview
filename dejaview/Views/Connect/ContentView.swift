@@ -28,6 +28,7 @@ struct ContentView<Session: RemoteSessionControlling,
     @State private var isSettingsPresented = false
 
     @State private var machineEditorRequest: MachineEditorRequest?
+    @State private var addMachineRequest: AddMachineRequest?
     @State private var pendingConnectionMachine: SavedMachine?
     @State private var pendingConnectionPassword = ""
     @State private var glassyPairingRequest: GlassyStreamPairingRequest?
@@ -116,6 +117,25 @@ struct ContentView<Session: RemoteSessionControlling,
                             discoveredService: request.discoveredService,
                             connectAfterDismiss: queueConnectionAfterEditor)
         }
+        .sheet(item: $addMachineRequest, onDismiss: finishAddingMachine) { request in
+            AddMachineView(
+                store: store,
+                machine: request.machine,
+                initialCandidate: request.candidate,
+                startsWithScreenSharing: request.startsWithScreenSharing,
+                pairAndConnect: { candidate, credential in
+                    try await pairGlassyStream(
+                        candidate: candidate,
+                        bootstrapCredential: credential,
+                        request: GlassyStreamPairingRequest(
+                            machine: request.machine, vncPassword: "", savesNewMachine: true
+                        )
+                    )
+                },
+                connectScreenSharing: queueConnectionAfterEditor
+            )
+            .environment(glassyHostBrowser)
+        }
         .sheet(item: $glassyPairingRequest, onDismiss: finishGlassyPairing) { request in
             GlassyStreamPairingView(
                 machine: request.machine,
@@ -149,7 +169,7 @@ struct ContentView<Session: RemoteSessionControlling,
         } message: {
             Text(wakeFailureMessage)
         }
-        .alert("Glassy Stream", isPresented: $isGlassyConnectionFailurePresented) {
+        .alert("Fast Connection", isPresented: $isGlassyConnectionFailurePresented) {
             if let machine = glassyConnectionFailureMachine {
                 Button("Edit Machine") {
                     glassyConnectionFailureMachine = nil
@@ -231,8 +251,11 @@ struct ContentView<Session: RemoteSessionControlling,
     }
 
     private func suspendGlassyForBackground() {
+        let isAddingGlassyConnection = addMachineRequest != nil
+            && (glassySession.status == .connecting || preparedGlassySession != nil)
         let hasActiveGlassyWork = glassyConnectTask != nil
             || glassyPairingRequest != nil
+            || isAddingGlassyConnection
             || preparedGlassySession != nil
             || sessionMachine?.connectionMode == .glassyStream
         guard hasActiveGlassyWork else { return }
@@ -247,6 +270,7 @@ struct ContentView<Session: RemoteSessionControlling,
         glassyConnectTask?.cancel()
         glassyConnectTask = nil
         glassyPairingRequest = nil
+        if isAddingGlassyConnection { addMachineRequest = nil }
         preparedGlassySession = nil
         glassySession.disconnect()
     }
@@ -277,10 +301,8 @@ struct ContentView<Session: RemoteSessionControlling,
     private var detailToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
             if currentSection != .recents {
-                Menu("Add Host", systemImage: "plus") {
-                    Button("Scan QR Code", systemImage: "qrcode.viewfinder", action: scanGlassyHost)
-                    Button("Enter Address", systemImage: "keyboard", action: addMachine)
-                }
+                Button("Add Mac", systemImage: "plus", action: addMachine)
+                    .accessibilityIdentifier("connection.add-mac")
             }
 
             Menu("More", systemImage: "ellipsis.circle") {
@@ -358,7 +380,7 @@ struct ContentView<Session: RemoteSessionControlling,
             hostGrid
         }
 
-        manualPanel
+        addMacPanel
     }
 
     @ViewBuilder
@@ -457,28 +479,24 @@ struct ContentView<Session: RemoteSessionControlling,
         if isSearching {
             ContentUnavailableView.search
         } else {
-            ContentUnavailableView("No Hosts",
+            ContentUnavailableView("Your Macs Belong Here",
                                    systemImage: "rectangle.connected.to.line.below",
-                                   description: Text("Add a host, discover one nearby, or connect manually."))
+                                   description: Text("Add your Mac to keep your desktop within reach."))
                 .padding(24)
                 .frame(maxWidth: .infinity)
                 .glassPanel(cornerRadius: 28)
         }
     }
 
-    private var manualPanel: some View {
-        VStack(spacing: 12) {
-            Button("Scan QR Code", systemImage: "qrcode.viewfinder", action: scanGlassyHost)
+    private var addMacPanel: some View {
+        Button(action: addMachine) {
+            Label("Add Mac", systemImage: "plus")
                 .font(.headline)
                 .frame(maxWidth: .infinity, minHeight: 52)
-                .buttonStyle(.glassProminent)
-                .accessibilityHint("Scan the code in Glassy Host on your Mac to pair and connect.")
-                .accessibilityIdentifier("connection.scan-qr-code")
-
-            Button("Enter Address Manually", systemImage: "keyboard", action: addMachine)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .buttonStyle(.glass)
         }
+        .buttonStyle(.glassProminent)
+        .accessibilityHint("Set up a connection to your Mac.")
+        .accessibilityIdentifier("connection.add-mac.primary")
     }
 
     private var gridColumns: [GridItem] {
@@ -547,24 +565,12 @@ struct ContentView<Session: RemoteSessionControlling,
 
     // MARK: - Actions
 
-    private func scanGlassyHost() {
-        glassyPairingRequest = GlassyStreamPairingRequest(
+    private func addMachine() {
+        addMachineRequest = AddMachineRequest(
             machine: SavedMachine(
                 name: "", host: "", port: GlassyStreamEndpoint.defaultPort,
                 username: "", connectionMode: .glassyStream
-            ),
-            vncPassword: "",
-            startsWithScanner: true,
-            savesNewMachine: true
-        )
-    }
-
-    private func addMachine() {
-        AppLog.ui.info("Opening New Machine sheet")
-        machineEditorRequest = MachineEditorRequest(
-            machine: SavedMachine(name: "", host: "", username: ""),
-            password: "",
-            discoveredService: nil
+            )
         )
     }
 
@@ -574,16 +580,31 @@ struct ContentView<Session: RemoteSessionControlling,
             return
         }
 
-        let isGlassyHostDetected = matchingGlassyHost(for: service) != nil
-        AppLog.ui.info("Opening New Machine sheet from nearby service '\(service.name, privacy: .public)' at \(serviceHost, privacy: .public):\(servicePort, privacy: .public) glassyHostDetected=\(isGlassyHostDetected, privacy: .public)")
-        machineEditorRequest = MachineEditorRequest(
-            machine: SavedMachine(name: service.name,
-                                  host: serviceHost,
-                                  port: servicePort,
-                                  username: ""),
-            password: "",
-            discoveredService: service
+        if let glassyHost = matchingGlassyHost(for: service) {
+            let machine = SavedMachine(name: service.name, host: "",
+                                       port: GlassyStreamEndpoint.defaultPort, username: "",
+                                       connectionMode: .glassyStream)
+            let candidate = GlassyStreamEndpoint.candidates(for: machine, discoveredHosts: [glassyHost])
+                .first { $0.source == .bonjour }
+            addMachineRequest = AddMachineRequest(machine: machine, candidate: candidate)
+            return
+        }
+
+        addMachineRequest = AddMachineRequest(
+            machine: SavedMachine(name: service.name, host: serviceHost,
+                                  port: servicePort, username: ""),
+            startsWithScreenSharing: true
         )
+    }
+
+    private func finishAddingMachine() {
+        addMachineRequest = nil
+        if preparedGlassySession != nil {
+            finishGlassyPairing()
+        } else {
+            glassySession.disconnect()
+            connectPendingMachine()
+        }
     }
 
     private func edit(_ machine: SavedMachine) {
@@ -943,7 +964,7 @@ struct ContentView<Session: RemoteSessionControlling,
             guard FeatureFlags.isGlassyStreamEnabled else {
                 AppLog.ui.notice("Blocked Glassy Stream connection because the feature is disabled")
                 showGlassyConnectionFailure(
-                    "Glassy Stream is not available in this build.",
+                    "Fast Connection is not available in this build.",
                     machine: machine
                 )
                 return
@@ -983,7 +1004,7 @@ struct ContentView<Session: RemoteSessionControlling,
         guard let candidate = candidates.first else {
             glassySession.reset()
             showGlassyConnectionFailure(
-                "No address for \(machine.displayName) is available. Scan its current Glassy Host QR code, or enter an address reachable through your local network or VPN.",
+                "No address for \(machine.displayName) is available. Scan its current Glassy Desk QR code, or enter an address reachable through your local network or VPN.",
                 machine: machine
             )
             return
@@ -1147,7 +1168,7 @@ struct ContentView<Session: RemoteSessionControlling,
 
     private func glassyConnectionFailureMessage(for error: Error?) -> String {
         guard let error else {
-            return String(localized: "Could not reach Glassy Host. Keep the Mac awake and connect both devices to the same local network or a VPN such as Tailscale or WireGuard, then try again.")
+            return String(localized: "Could not reach Glassy Desk. Keep the Mac awake and connect both devices to the same local network or a VPN such as Tailscale or WireGuard, then try again.")
         }
 
         let description = error.localizedDescription
@@ -1177,7 +1198,7 @@ struct ContentView<Session: RemoteSessionControlling,
         }
         if let sessionError = error as? GlassyStreamSessionError,
            case .transport(.authenticationRejected) = sessionError {
-            return String(localized: "The saved approval was not accepted. Use the current one-time code, or the reusable pairing password configured in Glassy Host, to pair again.")
+            return String(localized: "The saved approval was not accepted. Use the current one-time code, or the reusable pairing password configured in Glassy Desk, to pair again.")
         }
         return error.localizedDescription
     }
@@ -1561,6 +1582,14 @@ struct ContentView<Session: RemoteSessionControlling,
             port: machine.port
         )]
     }
+}
+
+private struct AddMachineRequest: Identifiable {
+    let machine: SavedMachine
+    var candidate: GlassyStreamEndpointCandidate? = nil
+    var startsWithScreenSharing = false
+
+    var id: UUID { machine.id }
 }
 
 private struct MachineEditorRequest: Identifiable {

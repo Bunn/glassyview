@@ -7,7 +7,7 @@ struct HostConnectionsView: View {
     @State private var isPauseConfirmationPresented = false
 
     var body: some View {
-        HostPageHeading(title: "Your Mac, within reach.", subtitle: "Connect with Glassy Desk on your iPhone or iPad.")
+        HostPageHeading(title: "Your Mac, within reach.", subtitle: "Share your Mac with your iPhone or iPad.")
 
         HStack(spacing: 16) {
             Image(systemName: "laptopcomputer")

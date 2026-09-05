@@ -38,7 +38,7 @@ final class HostUpdateController: NSObject, SPUUpdaterDelegate {
         if isInstallationDeferred {
             return "The update will install after all remote sessions disconnect."
         }
-        return "Check for a new version of Glassy Host."
+        return "Check for a new version of Glassy Desk."
     }
 
     init(

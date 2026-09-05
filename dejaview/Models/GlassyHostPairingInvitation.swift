@@ -22,11 +22,11 @@ struct GlassyHostPairingInvitation: Equatable, Sendable {
         var errorDescription: String? {
             switch self {
             case .invalidCode:
-                String(localized: "This isn’t a valid Glassy Host pairing QR code. Scan the code displayed in Glassy Host on your Mac.")
+                String(localized: "This isn’t a valid Glassy Desk pairing QR code. Scan the code displayed in Glassy Desk on your Mac.")
             case .expired:
                 String(localized: "This pairing code has expired. Scan the current QR code on your Mac.")
             case .unsupportedVersion:
-                String(localized: "This Glassy Host uses a newer pairing format. Update Glassy Desk, then scan the QR code again.")
+                String(localized: "This Mac uses a newer pairing format. Update Glassy Desk on your iPhone or iPad, then scan the QR code again.")
             }
         }
     }

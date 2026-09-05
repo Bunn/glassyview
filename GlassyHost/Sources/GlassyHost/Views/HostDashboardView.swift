@@ -37,8 +37,8 @@ struct HostDashboardView: View {
                         .resizable()
                         .frame(width: 40, height: 40)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Glassy Host").font(.headline)
-                        Text("A little closer to your Mac.")
+                        Text("Glassy Desk").font(.headline)
+                        Text("Your Mac, ready to share.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

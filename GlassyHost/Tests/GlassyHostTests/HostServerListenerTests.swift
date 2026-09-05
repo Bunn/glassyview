@@ -2,7 +2,7 @@ import Network
 import Testing
 @testable import GlassyHost
 
-@Test("Glassy Host uses a stable private direct-connect port")
+@Test("Glassy Desk uses a stable private direct-connect port")
 func stableDefaultHostPort() {
     #expect(HostProtocol.defaultPort == 51_515)
     #expect(HostProtocol.defaultPort >= 49_152)
@@ -15,7 +15,7 @@ func listenerPortConflictMessage() {
     )
 
     #expect(message.contains("TCP port 51515 is already in use"))
-    #expect(message.contains("Quit the other Glassy Host instance or app"))
+    #expect(message.contains("Quit the other Glassy Desk instance or app"))
     #expect(message.contains("retry automatically every 30 seconds"))
 }
 

@@ -1,13 +1,16 @@
 # Host connections and QR pairing
 
-Glassy Host now uses a native macOS sidebar with Connections and Display & Control. Login preferences and security options live in a separate Settings window. System materials adapt to appearance and accessibility settings; macOS 26 uses native Liquid Glass buttons, with standard controls on macOS 14–15.
+Glassy Desk for Mac now uses a native macOS sidebar with Connections and Display & Control. Login preferences and security options live in a separate Settings window. System materials adapt to appearance and accessibility settings; macOS 26 uses native Liquid Glass buttons, with standard controls on macOS 14–15.
 
 ## Connect a device
 
-1. Open Glassy Host on the Mac and allow Screen Recording and Accessibility for viewing and control.
+1. Open Glassy Desk for Mac on the Mac and allow Screen Recording and Accessibility for viewing and control.
 2. Choose **Add Device**. Connect the Mac and iPhone or iPad to the same local network, or connect a VPN such as Tailscale or WireGuard that lets them reach each other.
-3. In Glassy Desk, choose **Scan QR Code**. Review the Mac’s name and address, then choose **Pair & Connect**.
-4. Use **Enter Code** on the Mac and **Enter Code Manually** on the client when a camera is unavailable. Existing direct-address and Tailscale password pairing remain available.
+3. In Glassy Desk, choose **Add Mac**. The introduction presents two connection methods: **Fast Connection**, the recommended faster connection requiring the Glassy Desk for Mac download, and **Standard VNC**, which uses built-in macOS Screen Sharing.
+4. Choose **Set Up Fast Connection**. The setup guide includes **Download Glassy Desk for Mac**, which opens the [latest Mac release](https://github.com/Bunn/GlassyDesk-Host/releases/latest). Then choose **Scan Mac’s Code**. Review the Mac’s name and address, then choose **Pair & Connect**. The Mac is saved after authentication succeeds.
+5. **Pair Manually** within Fast Connection offers nearby Macs and address entry. If a camera is unavailable during scanning, choose **Enter a code instead**. Nearby Macs go directly to the code step. Tailscale password pairing appears when the selected address supports it, and custom ports are under **Connection options**.
+
+The add flow uses one sheet with native back navigation, an animated Mac-and-phone illustration, gentle transitions, and haptic feedback when a code is recognized and a connection succeeds. Reduce Motion disables the floating illustration and spatial transitions. Camera access starts only after choosing to scan. Screen Sharing has a dedicated login form and a single **Add & Connect** action; the saved-machine editor remains available for later configuration.
 
 The custom QR code uses an opaque, high-contrast surface, rounded modules, a small display mark, and a four-module quiet zone. Before presentation, Vision verifies that the image decodes to the exact invitation; simpler QR styles are fallback options. Codes refresh automatically every minute. Credentials are passed through the existing authenticated, encrypted handshake and are never logged by the QR flow.
 
@@ -17,7 +20,7 @@ The versioned invitation is `glassydesk://pair`. Version 2 includes `v`, `host`,
 
 ## Local networks and VPNs
 
-Glassy Host discovers its active network interface addresses, including LAN, Tailscale, and WireGuard tunnel addresses, and refreshes them when the network changes. Its Bonjour `.local` name remains a LAN fallback. Down, loopback, multicast, and link-local addresses that require a device-specific scope are excluded. A bounded set of eight routes keeps the QR readable while retaining both local and VPN options.
+Glassy Desk for Mac discovers its active network interface addresses, including LAN, Tailscale, and WireGuard tunnel addresses, and refreshes them when the network changes. Its Bonjour `.local` name remains a LAN fallback. Down, loopback, multicast, and link-local addresses that require a device-specific scope are excluded. A bounded set of eight routes keeps the QR readable while retaining both local and VPN options.
 
 Glassy Desk uses the system’s routing table and tries the advertised routes with short staggered starts. It validates each route’s ServerHello against the scanned or previously pinned Mac identity before selecting one connection. Only the winner proceeds to the existing encrypted authentication exchange. Failed routes do not consume the pairing credential; the remaining connections are cancelled. The app saves the address that authenticated and retains the alternatives for later connections and automatic reconnects. Reachability checks consider the whole saved route set, so an unavailable LAN address does not hide an available VPN route.
 
@@ -33,6 +36,6 @@ Paired devices show their last connection time and current connection status. Ex
 
 ## Preview and validation
 
-Run `./script/build_and_run.sh --preview` to build and launch the local `dist/Glassy Host.app` without replacing the app in Applications. The regular run script’s install behavior is unchanged.
+Run `./script/build_and_run.sh --preview` to build and launch the local `dist/Glassy Desk.app` without replacing the app in Applications. The regular run script’s install behavior is unchanged.
 
 Host tests cover address filtering and ranking, versioned invitation validation, exact Vision QR decoding with mixed LAN/VPN addresses, persisted access and revocation, and existing stream behavior. Client tests cover legacy and v2 parsing, saved-route persistence and identity checks, route selection and cancellation, and the existing encrypted pairing flow. Physical cross-network camera testing requires an iPhone or iPad with both updated apps and a configured VPN.

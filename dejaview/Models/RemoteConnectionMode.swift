@@ -24,18 +24,18 @@ enum RemoteConnectionMode: String, CaseIterable, Codable, Identifiable, Sendable
     var title: String {
         switch self {
         case .vnc:
-            String(localized: "VNC")
+            String(localized: "Standard VNC")
         case .glassyStream:
-            String(localized: "Glassy Stream")
+            String(localized: "Fast Connection")
         }
     }
 
     var description: String {
         switch self {
         case .vnc:
-            String(localized: "Uses standard Screen Sharing. This is the default and does not require the Glassy Host companion app.")
+            String(localized: "Uses built-in macOS Screen Sharing. No extra download needed.")
         case .glassyStream:
-            String(localized: "Uses the faster encrypted Glassy Host video and input stream. It requires the macOS companion app and asks for a pairing code or configured password the first time.")
+            String(localized: "Faster, smoother control with an encrypted connection. Requires Glassy Desk for Mac, then a QR code or manual pairing.")
         }
     }
 

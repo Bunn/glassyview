@@ -75,11 +75,11 @@ fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PACKAGE_DIR="$ROOT_DIR/GlassyHost"
 APP_NAME="GlassyHost"
-DISPLAY_NAME="Glassy Host"
+DISPLAY_NAME="Glassy Desk"
 BUNDLE_ID="dev.bunn.glassydesk.host"
 INFO_PLIST="$PACKAGE_DIR/Support/Info.plist"
 ENTITLEMENTS="$PACKAGE_DIR/Support/GlassyHost.entitlements"
-ICON="$PACKAGE_DIR/Resources/GlassyHostAppIcon.icns"
+ICON="$PACKAGE_DIR/Resources/GlassyDeskAppIcon.icns"
 
 # Resolve only an exact, usable Developer ID Application identity. Never fall
 # back to development or ad-hoc signing, and sign by hash to avoid ambiguity.
@@ -168,7 +168,7 @@ printf 'Release workspace: %s\n' "$RELEASE_DIR"
 mkdir -p "$APP_CONTENTS/MacOS" "$APP_CONTENTS/Resources" "$APP_CONTENTS/Frameworks"
 cp "$BUILD_DIR/$APP_NAME" "$APP_BINARY"
 cp "$INFO_PLIST" "$APP_CONTENTS/Info.plist"
-cp "$ICON" "$APP_CONTENTS/Resources/GlassyHostAppIcon.icns"
+cp "$ICON" "$APP_CONTENTS/Resources/GlassyDeskAppIcon.icns"
 cp "$SPARKLE_ARTIFACT/LICENSE" "$APP_CONTENTS/Resources/Sparkle-LICENSE.txt"
 # Preserve the framework's version symlinks and helper executable permissions.
 /usr/bin/ditto "$BUILD_DIR/Sparkle.framework" "$SPARKLE_FRAMEWORK"

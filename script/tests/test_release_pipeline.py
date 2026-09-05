@@ -76,7 +76,7 @@ class ServiceFixture:
         if args[0] == "bash":
             self.events.append("compile")
             package_dir = self.work / "compiled"
-            app = package_dir / "Glassy Host.app"
+            app = package_dir / "Glassy Desk.app"
             (app / "Contents").mkdir(parents=True)
             shutil.copyfile(release.ROOT / "GlassyHost/Support/Info.plist", app / "Contents/Info.plist")
             submission = package_dir / "submission.zip"
@@ -97,10 +97,10 @@ class ServiceFixture:
             return json.dumps({"status": self.apple_status}).encode(), b""
         elif args[:3] == ["xcrun", "stapler", "staple"]:
             self.events.append("staple")
-            (self.work / "Glassy Host.app/ticket").write_bytes(b"notarized")
+            (self.work / "Glassy Desk.app/ticket").write_bytes(b"notarized")
         elif args[0] == "ditto" and "-c" in args:
             self.events.append("zip")
-            assert (self.work / "Glassy Host.app/ticket").read_bytes() == b"notarized"
+            assert (self.work / "Glassy Desk.app/ticket").read_bytes() == b"notarized"
             Path(args[-1]).write_bytes(b"final-stapled-archive")
         elif args[0].endswith("/sign_update"):
             self.events.append("sign")
