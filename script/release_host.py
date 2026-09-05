@@ -158,7 +158,9 @@ class GitHub:
                    "X-GitHub-Api-Version": "2022-11-28"}
         payload = data if binary else json.dumps(data).encode() if data is not None else None
         if payload is not None:
-            headers["Content-Type"] = "application/zip" if binary else "application/json"
+            asset_name = urllib.parse.parse_qs(urllib.parse.urlparse(path).query).get("name", [""])[0]
+            headers["Content-Type"] = ("application/x-apple-diskimage" if asset_name.endswith(".dmg")
+                                       else "application/zip") if binary else "application/json"
         request = urllib.request.Request(url, data=payload, headers=headers, method=method)
         try:
             with self.opener.open(request, timeout=180) as response:
@@ -361,12 +363,12 @@ def notary_auth(credentials):
         yield args
 
 
-def notarize(state, work, run, auth, save):
+def notarize(state, work, run, auth, save, *, submission=None):
     if state.get("notary_status") == "Accepted":
         return
     if not state.get("notary_id"):
         # Save the submission ID before waiting so a timeout is resumable.
-        output, _ = run.run(["xcrun", "notarytool", "submit", work / "submission.zip", *auth,
+        output, _ = run.run(["xcrun", "notarytool", "submit", submission or work / "submission.zip", *auth,
                              "--output-format", "json", "--no-progress"], "Submit to Apple notarization", sensitive=True)
         result = json.loads(output)
         state["notary_id"] = str(uuid.UUID(result["id"]))
@@ -517,12 +519,12 @@ def verify_public_download(url, expected_hash, expected_size):
             for block in iter(lambda: response.read(1024 * 1024), b""):
                 length += len(block)
                 if length > expected_size:
-                    raise ReleaseError("Published download is larger than the signed ZIP.")
+                    raise ReleaseError("Published download is larger than the signed artifact.")
                 actual.update(block)
     except (urllib.error.URLError, TimeoutError, OSError):
         raise ReleaseError("Could not verify the public download. Resume once it is accessible.") from None
     if length != expected_size or actual.hexdigest() != expected_hash:
-        raise ReleaseError("Published download differs from the signed ZIP. The appcast was not advanced.")
+        raise ReleaseError("Published download differs from the signed artifact. The appcast was not advanced.")
 
 
 def publish_asset(state, archive, github, save):
@@ -551,7 +553,7 @@ def publish_asset(state, archive, github, save):
         raise ReleaseError("GitHub asset upload is incomplete or has conflicting bytes; no assets were overwritten.")
     contents = github.request("GET", f"releases/assets/{asset['id']}", download=True)
     if len(contents) != state["length"] or hashlib.sha256(contents).hexdigest() != state["sha256"]:
-        raise ReleaseError("GitHub asset does not match the signed ZIP; refusing to publish the feed.")
+        raise ReleaseError("GitHub asset does not match the signed artifact; refusing to publish the feed.")
     state["asset_id"] = asset["id"]
     save()
     if release["draft"]:
@@ -634,6 +636,12 @@ def read_config(path):
 
 def execute(args):
     config = read_config(args.config)
+    if getattr(args, "add_dmg", None):
+        if args.resume or args.notes or args.identity or args.work_dir or args.xcode_notarization:
+            raise ReleaseError("--add-dmg uses the existing receipt; do not combine it with new-release options.")
+        from host_release_dmg import add_installer
+        add_installer(args.add_dmg, config, dry_run=args.dry_run)
+        return
     if args.resume:
         work = args.resume.resolve()
         state = json.loads((work / "state.json").read_text())
@@ -651,7 +659,7 @@ def execute(args):
         metadata = app_metadata(ROOT / "GlassyHost/Support/Info.plist", config)
         if not args.notes or not args.notes.is_file() or not args.notes.read_text().strip():
             raise ReleaseError("Provide a nonempty release notes file with --notes FILE.")
-        state = {"schema": 1, "config": config, "id": str(uuid.uuid4()), **metadata,
+        state = {"schema": 1, "config": config, "id": str(uuid.uuid4()), "dmg_required": True, **metadata,
                  "notes": args.notes.read_text().strip(),
                  "pub_date": email.utils.format_datetime(dt.datetime.now(dt.timezone.utc)),
                  "identity": args.identity or os.environ.get("GLASSY_HOST_CODESIGN_IDENTITY") or config["identity"],
@@ -667,7 +675,7 @@ def execute(args):
     if args.dry_run:
         print(f"Glassy Desk {state['version']} ({state['build']}) → {config['repository']}")
         notary_label = "signed-in Xcode account" if state["notarization_mode"] == "xcode" else "notarytool API key"
-        print(f"Compile arm64 + x86_64 → Developer ID sign → notarize ({notary_label}) → staple → Sparkle sign → GitHub → Pages")
+        print(f"Compile arm64 + x86_64 → Developer ID sign → notarize ({notary_label}) → staple → Sparkle ZIP + notarized DMG → GitHub → Pages")
         print(f"Workspace: {work}\nFeed: {config['feed_url']}")
         print("Dry run: local configuration only; no credentials, compilation, uploads, or remote checks.")
         return
@@ -747,10 +755,15 @@ def execute(args):
                         raise ReleaseError("The notarization submission ZIP changed since packaging.")
                     notarize(state, work, run, auth, save)
         archive = finalize(state, work, config, run, sparkle_key, save)
+        if state.get("dmg_required"):
+            from host_release_dmg import prepare as prepare_dmg, publish as publish_dmg
+            dmg, dmg_state = prepare_dmg(state, work, config, credentials)
         # Recheck immediately before publication in case another release advanced the feed.
         feed, _ = github.content(config["feed_path"])
         check_feed(feed, state, allow_existing=True)
         publish_asset(state, archive, github, save)
+        if state.get("dmg_required"):
+            publish_dmg(state, dmg, dmg_state, github)
         publish_feed(state, work, config, github, run, cloudflare, account_id, save)
         print(f"Released Glassy Desk {state['version']} ({state['build']}): {state['release_url']}")
         print(f"Verified production feed: {config['feed_url']}")
@@ -766,6 +779,7 @@ def main(argv=None):
     parser.add_argument("--identity", help="Developer ID Application name or SHA-1")
     parser.add_argument("--work-dir", type=Path, help="New directory for artifacts and resumable state")
     parser.add_argument("--resume", type=Path, help="Continue an existing release without rebuilding")
+    parser.add_argument("--add-dmg", type=Path, help="Add a notarized DMG to an existing release receipt")
     parser.add_argument("--dry-run", action="store_true", help="Inspect the local release plan without side effects")
     parser.add_argument("--xcode-notarization", action="store_true",
                         help="Local only: notarize through the developer account signed into Xcode")
@@ -787,4 +801,7 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    # Installer helpers share these error types and utilities when this module
+    # is launched as a script as well as when tests import it.
+    sys.modules.setdefault("release_host", sys.modules[__name__])
     sys.exit(main())

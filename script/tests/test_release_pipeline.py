@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import release_host as release
+import host_release_dmg as installer
 
 
 OLD_FEED = b'''<?xml version="1.0"?><rss version="2.0"
@@ -150,9 +151,18 @@ class ReleasePipelineTests(unittest.TestCase):
         self.notary_auth = self.patches.enter_context(patch.object(
             release, "notary_auth", side_effect=lambda *args: contextlib.nullcontext(["--key", "/mock/key.p8"])))
         self.download = self.patches.enter_context(patch.object(release, "verify_public_download"))
+        self.dmg_prepare = self.patches.enter_context(patch.object(installer, "prepare", side_effect=self.prepare_dmg))
+        self.dmg_publish = self.patches.enter_context(patch.object(installer, "publish", side_effect=self.publish_dmg))
         self.patches.enter_context(patch.object(release.urllib.request, "urlopen", self.service.public_response))
         self.patches.enter_context(contextlib.redirect_stdout(io.StringIO()))
         self.patches.enter_context(contextlib.redirect_stderr(io.StringIO()))
+
+    def prepare_dmg(self, *args):
+        self.service.events.append("prepare-dmg")
+        return self.work / "installer.dmg", {"verified": True}
+
+    def publish_dmg(self, *args):
+        self.service.events.append("publish-dmg")
 
     def start(self):
         return release.main(["--notes", str(self.notes), "--work-dir", str(self.work)])
@@ -163,7 +173,7 @@ class ReleasePipelineTests(unittest.TestCase):
     def test_full_command_compiles_notarizes_and_publishes_only_verified_download(self):
         self.assertEqual(self.start(), 0)
         self.assertEqual(self.service.events, ["compile", "submit", "wait", "staple", "zip", "sign",
-                                               "verify-signature", "draft", "asset", "publish", "feed", "deploy"])
+                                               "verify-signature", "prepare-dmg", "draft", "asset", "publish", "publish-dmg", "feed", "deploy"])
         state = json.loads((self.work / "state.json").read_text())
         self.assertTrue(state["complete"])
         self.assertEqual(state["notary_status"], "Accepted")
@@ -178,6 +188,21 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertEqual(self.service.events, ["compile", "submit", "wait"])
         self.assertIsNone(self.service.release_value)
         self.assertEqual(self.service.feed, OLD_FEED)
+
+    def test_installer_verification_failure_stops_before_publishing_the_release(self):
+        self.dmg_prepare.side_effect = release.ReleaseError("DMG ticket unavailable")
+        self.assertEqual(self.start(), 1)
+        self.assertIsNone(self.service.release_value)
+        self.assertEqual(self.service.feed, OLD_FEED)
+        self.dmg_publish.assert_not_called()
+
+    def test_installer_upload_failure_stops_before_advancing_sparkle(self):
+        self.dmg_publish.side_effect = release.ReleaseError("DMG upload unavailable")
+        self.assertEqual(self.start(), 1)
+        self.assertEqual(self.service.feed, OLD_FEED)
+        self.dmg_publish.side_effect = self.publish_dmg
+        self.assertEqual(self.resume(), 0)
+        self.assertEqual(self.service.events.count("compile"), 1)
 
     def test_wait_timeout_resumes_same_submission_without_compile_or_resubmit(self):
         self.service.interrupt_wait = True

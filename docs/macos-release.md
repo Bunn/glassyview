@@ -6,18 +6,27 @@ Run the release automation from the `Bunn/glassyview` source repository:
 ./script/release_host.sh --notes /path/to/release-notes.md
 ```
 
-It builds a universal macOS 14+ app, signs it with Developer ID, submits it to Apple for notarization, staples and validates the ticket, and signs the final ZIP with Sparkle. It then publishes the versioned archive through a GitHub Release in `Bunn/GlassyDesk-Host`, updates that repository's appcast while preserving older entries, and deploys the feed directly to Cloudflare Pages project `glassydesk-host`.
+It builds a universal macOS 14+ app, signs it with Developer ID, submits it to Apple for notarization, staples and validates the ticket, and signs the final ZIP with Sparkle. It also creates a branded drag-to-Applications DMG from that same app, signs and notarizes the disk image, and checks both the image and the app inside it. It publishes both files through a GitHub Release in `Bunn/GlassyDesk-Host`, updates that repository's appcast while preserving older entries, and deploys the feed directly to Cloudflare Pages project `glassydesk-host`.
 
-The public distribution repository receives the appcast and site headers; the signed app ZIP is a release asset. The automation does **not** bump source versions or commit or push source changes.
+The website uses `GlassyDesk-VERSION.dmg` for first installs. Sparkle keeps using `GlassyHost-VERSION.zip` for automatic updates. The public distribution repository receives the appcast and site headers; both downloads are release assets. The automation does **not** bump source versions or commit or push source changes.
 
 ## Prepare a new release
 
-1. Install Xcode and its command-line tools, select the intended Xcode with `xcode-select`, and finish its first-run setup. The project requires Xcode 26 or later. Install `python3` and Node.js/npm as well. The script uses the committed Swift dependency lockfile and pins Wrangler to `4.128.0`.
+1. Install Xcode and its command-line tools, select the intended Xcode with `xcode-select`, and finish its first-run setup. The project requires Xcode 26 or later. Install Python 3.10+ and Node.js/npm as well. The script uses the committed Swift dependency lockfile and pins Wrangler to `4.128.0`.
 2. Increment **both** `CFBundleShortVersionString` and `CFBundleVersion` in [`GlassyHost/Support/Info.plist`](../GlassyHost/Support/Info.plist). Version `0.2.0`, build `4`, is already published; choose a new version and a higher build. Sparkle compares build versions when deciding whether an update is newer.
 3. Verify the source changes and run the host tests: `swift test --package-path GlassyHost`.
 4. Write the public release notes in a UTF-8 file. Review the source and notes before starting; the command publishes the release without a further interactive approval.
 
 Public destinations and release settings live in [`script/host-release.json`](../script/host-release.json). Its optional `cloudflare_account_id`, or the `CLOUDFLARE_ACCOUNT_ID` environment variable, selects the Cloudflare account. Account IDs and signing identity names are configuration, not secrets. `--config FILE` selects another public configuration file; its bundle, feed, and Sparkle key settings must match the app.
+
+Install the pinned DMG tools once with a Python 3.10+ interpreter:
+
+```sh
+python3 -m venv .build/dmgbuild
+.build/dmgbuild/bin/python -m pip install -r script/dmg/requirements.txt
+```
+
+The release orchestrator itself still supports Python 3.9. Set `GLASSY_DMG_PYTHON` to an absolute interpreter path if the DMG tools are installed elsewhere. The installer artwork is drawn with AppKit by [`render_background.swift`](../script/dmg/render_background.swift), including standard and Retina TIFF representations. Finder presents the real app and Applications shortcut over the artwork. The layout leaves room for Finder's optional path and status bars. No Finder automation or user preference changes are needed.
 
 ## Credentials
 
@@ -45,6 +54,8 @@ On a development Mac that is already signed into the correct Apple developer acc
 ```
 
 This mode creates a private `ExportOptions.plist`, submits the packaged archive with `xcodebuild -exportArchive`, and checks for the notarized app for up to 20 minutes before asking you to resume. It is local-only: the script rejects it whenever `CI` or `GITHUB_ACTIONS` is enabled. The account must already be authenticated in Xcode, and the exact Developer ID certificate used to package the app must remain available. Use an API key for repeatable CI releases.
+
+The same account also notarizes the DMG. Because Xcode uploads app archives, the automation includes the signed disk image as a resource in a private, separately signed copy of the app archive. Apple scans that nested image. The wrapper is never distributed: the release requires a successful `stapler staple` and `stapler validate` on the **DMG itself**, followed by Gatekeeper assessment and validation of its contents. Acceptance of the wrapper alone cannot publish the installer. With `notarytool`, the DMG is submitted directly. No additional Apple credential is required when using the existing signed-in Xcode account.
 
 ### Save local credentials once
 
@@ -124,6 +135,19 @@ If credentials, preflight, or compilation failed before a completed packaging re
 
 The published feed is [Glassy Desk for Mac's appcast](https://glassydesk-host.pages.dev/glassy-host/appcast.xml); binaries are in [GitHub Releases](https://github.com/Bunn/GlassyDesk-Host/releases). The script preserves existing feed entries when adding the new release.
 
+### Add the installer to an already published release
+
+For an older release that shipped only a ZIP, use its completed local receipt:
+
+```sh
+./script/release_host.sh --add-dmg /path/to/existing-release-workspace --dry-run
+./script/release_host.sh --add-dmg /path/to/existing-release-workspace
+```
+
+This verifies and extracts the original ZIP, adds a signed and notarized DMG to the same owned GitHub release, and verifies the public download. It leaves the original release receipt, app version, ZIP, Sparkle signature, and appcast intact. It needs GitHub access and the existing signing/notarization setup; it does not need Cloudflare or the Sparkle private key. The notarization mode comes from the original receipt.
+
+Progress lives in `dmg/state.json` inside the original release workspace. Repeat the same `--add-dmg` command to resume. The signed submission is kept separately from the stapled download so interrupted stapling can be retried. After the final DMG digest is recorded, changed or missing bytes are rejected. An existing remote asset is reused only when its bytes match; it is never overwritten. New releases create both downloads automatically, while resuming an older receipt preserves its original release plan.
+
 ## Optional manual GitHub Actions workflow
 
 The following is a template only; this document does not enable a workflow. Add it to the `Bunn/glassyview` source repository if desired, after configuring the secrets and variables. Use a macOS runner with the required Xcode selected. The notes path must point to a reviewed file in the checked-out revision.
@@ -154,6 +178,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install DMG packaging tools with Python 3.10+
+        run: |
+          python3 -m venv .build/dmgbuild
+          .build/dmgbuild/bin/python -m pip install -r script/dmg/requirements.txt
       - name: Build, notarize, and publish
         env:
           CI: 'true'
