@@ -1,5 +1,7 @@
 # Release Glassy Desk for Mac
 
+Moving to another computer? Start with [the release migration guide](macos-release-migration.md), which records the production identity, certificate expiry, backup and restore steps, and an existing-user upgrade check. The local setup used for 0.2.7 uses `--xcode-notarization` with the signed-in Xcode account; the default command below uses configured `notarytool` credentials.
+
 Run the release automation from the `Bunn/glassyview` source repository:
 
 ```sh
@@ -13,7 +15,7 @@ The website uses `GlassyDesk-VERSION.dmg` for first installs. Sparkle keeps usin
 ## Prepare a new release
 
 1. Install Xcode and its command-line tools, select the intended Xcode with `xcode-select`, and finish its first-run setup. The project requires Xcode 26 or later. Install Python 3.10+ and Node.js/npm as well. The script uses the committed Swift dependency lockfile and pins Wrangler to `4.128.0`.
-2. Increment **both** `CFBundleShortVersionString` and `CFBundleVersion` in [`GlassyHost/Support/Info.plist`](../GlassyHost/Support/Info.plist). Version `0.2.0`, build `4`, is already published; choose a new version and a higher build. Sparkle compares build versions when deciding whether an update is newer.
+2. Increment **both** `CFBundleShortVersionString` and `CFBundleVersion` in [`GlassyHost/Support/Info.plist`](../GlassyHost/Support/Info.plist) beyond the latest production appcast. Do not reuse a version or build from an old example or local checkout. Sparkle compares build versions when deciding whether an update is newer.
 3. Verify the source changes and run the host tests: `swift test --package-path GlassyHost`.
 4. Write the public release notes in a UTF-8 file. Review the source and notes before starting; the command publishes the release without a further interactive approval.
 
@@ -130,6 +132,8 @@ If a run stops after packaging completed, correct the reported problem and resum
 ```
 
 Resume uses the saved release state and the same artifact; it never recompiles. Keep the workspace contents, the packaged `.xcarchive`, and the release configuration intact, and make the credentials needed for the remaining stages available again. The receipt remembers whether the run uses `notarytool` or the signed-in Xcode account, so resume without repeating `--xcode-notarization`. Do not combine `--resume` with `--notes`, `--identity`, `--work-dir`, or `--xcode-notarization`.
+
+Receipts also contain absolute archive/tool paths; copying a workspace to a new checkout path does not automatically relocate an unfinished run. Prefer completing the release before a computer migration. See [migration and recovery](macos-release-migration.md#first-release-and-recovery-commands).
 
 If credentials, preflight, or compilation failed before a completed packaging receipt (`package.json`) was created, resume refuses to continue. Correct the problem and start a new run with `--notes` and a new workspace. Once an artifact is published, use resume to finish that release; do not replace its signed asset or start a separate release under the same version. Subsequent source changes require a new version and build.
 

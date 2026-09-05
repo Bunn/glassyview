@@ -15,6 +15,8 @@ On the target Mac: System Settings → General → Sharing → enable **Screen S
 
 [Glassy Desk for Mac](GlassyHost/README.md) provides authenticated fast, encrypted connections. See [Release Glassy Desk for Mac](docs/macos-release.md) for the one-command build, notarization, Sparkle signing, and publication workflow, including local credentials and a manual CI example.
 
+For a replacement development computer, follow [Move Mac releases to another computer](docs/macos-release-migration.md) to restore signing credentials and preserve updates, app identity, and existing users' setup.
+
 ## What's included
 
 - **Bonjour discovery** of `_rfb._tcp` services. Each discovered Mac is eagerly resolved to an IPv4 address (shown in the row); tapping fills host + port.

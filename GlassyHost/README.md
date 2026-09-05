@@ -77,6 +77,8 @@ Follow [Release Glassy Desk for Mac](../docs/macos-release.md) for credential se
 ./script/release_host.sh --notes /path/to/release-notes.md
 ```
 
+For the existing signed-in Xcode account workflow, append `--xcode-notarization`. Before moving releases to another computer, follow [the migration guide](../docs/macos-release-migration.md) for the Developer ID identity, Sparkle key, account access, and upgrade continuity checks.
+
 Increment both version and build in `Support/Info.plist` before a new release. The automation does not bump versions or commit or push source changes. The lower-level `package_host_release.sh` remains available for packaging only; its notarization ZIP is not a finished release.
 
 ## Software updates
