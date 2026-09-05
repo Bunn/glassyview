@@ -15,6 +15,7 @@ struct HostPermissionsView: View {
 
     private var allowedCount: Int {
         (screenRecordingAllowed ? 1 : 0) + (accessibilityAllowed ? 1 : 0)
+            + (controller.permissions.canCaptureScreen ? 1 : 0)
     }
 
     var body: some View {
@@ -23,21 +24,21 @@ struct HostPermissionsView: View {
                 Text(compact ? "Finish setting up your Mac" : "Permissions")
                     .font(.headline)
                 Spacer()
-                Text(allowedCount == 2 ? "Ready to share" : "\(allowedCount) of 2 allowed")
+                Text(allowedCount == 3 ? "Ready to share" : "\(allowedCount) of 3 complete")
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(allowedCount == 2 ? Color.green : Color.secondary)
+                    .foregroundStyle(allowedCount == 3 ? Color.green : Color.secondary)
                     .monospacedDigit()
             }
 
             HostContentCard {
-                if allowedCount < 2 {
+                if allowedCount < 3 {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("A quick setup for your screen, keyboard, and pointer.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
-                        ProgressView(value: Double(allowedCount), total: 2)
+                        ProgressView(value: Double(allowedCount), total: 3)
                             .accessibilityLabel("Permission setup")
-                            .accessibilityValue("\(allowedCount) of 2 permissions allowed")
+                            .accessibilityValue("\(allowedCount) of 3 permission steps complete")
                     }
                     .padding(.top, 20)
                 }
@@ -57,11 +58,23 @@ struct HostPermissionsView: View {
                     allowed: accessibilityAllowed,
                     allow: controller.requestAccessibilityPermission
                 )
+                Divider()
+                permissionRow(
+                    title: "Direct Screen Access",
+                    detail: "Confirm access before your first connection. Choose Allow when macOS asks to bypass the system private window picker.",
+                    symbol: "checkmark.shield",
+                    allowed: controller.permissions.canCaptureScreen,
+                    allow: controller.requestDirectScreenAccessPermission,
+                    actionTitle: "Confirm…",
+                    completionTitle: "Confirmed",
+                    isBusy: controller.permissions.isConfirmingScreenAccess,
+                    isEnabled: screenRecordingAllowed && !controller.permissions.isRefreshing
+                )
             }
 
-            if allowedCount < 2 {
+            if allowedCount < 3 {
                 Label {
-                    Text("Turn on Glassy Desk in System Settings. If it’s missing, drag the app from the floating guide into the list. Your progress updates when you return.")
+                    Text("Enable Screen Recording and Accessibility in System Settings, then confirm Direct Screen Access here. Glassy Desk shares your display only, even when macOS mentions audio.")
                 } icon: {
                     Image(systemName: "hand.draw")
                         .accessibilityHidden(true)
@@ -69,15 +82,31 @@ struct HostPermissionsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            }
 
-                if !screenRecordingAllowed {
-                    Text("If macOS asks you to quit and reopen Glassy Desk, do so to finish enabling Screen Recording.")
+            if let error = controller.permissions.errorMessage {
+                Label(error, systemImage: "exclamationmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 8) {
+                Button("Check Again", systemImage: "arrow.clockwise") {
+                    Task { await controller.refreshAuthorizationStatuses() }
+                }
+                .disabled(controller.permissions.isRefreshing || controller.permissions.isConfirmingScreenAccess)
+                if controller.permissions.isRefreshing {
+                    ProgressView().controlSize(.small)
+                        .accessibilityLabel("Checking permissions")
+                } else {
+                    Text("Permissions also update when you return to Glassy Desk.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
+        .task { await controller.refreshAuthorizationStatuses() }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: allowedCount)
     }
 
@@ -86,23 +115,33 @@ struct HostPermissionsView: View {
         detail: String,
         symbol: String,
         allowed: Bool,
-        allow: @escaping () -> Void
+        allow: @escaping () -> Void,
+        actionTitle: String = "Enable…",
+        completionTitle: String = "Allowed",
+        isBusy: Bool = false,
+        isEnabled: Bool = true
     ) -> some View {
         HStack(spacing: 12) {
             HostSettingLabel(title: title, detail: detail, symbol: symbol)
             Spacer(minLength: 12)
             if allowed {
-                Label("Allowed", systemImage: "checkmark.circle.fill")
+                Label(completionTitle, systemImage: "checkmark.circle.fill")
                     .font(.callout)
                     .foregroundStyle(.green)
                     .fixedSize()
                     .accessibilityLabel("\(title) allowed")
+            } else if isBusy {
+                ProgressView().controlSize(.small)
+                    .accessibilityLabel("Confirming \(title)")
             } else {
-                Button("Enable…", systemImage: "arrow.up.forward", action: allow)
+                Button(actionTitle, systemImage: "arrow.up.forward", action: allow)
                     .modifier(HostPrimaryActionStyle())
                     .fixedSize()
-                    .help("Open a guide to enable \(title) in System Settings")
-                    .accessibilityLabel("Enable \(title)")
+                    .disabled(!isEnabled)
+                    .help(title == "Direct Screen Access"
+                          ? "Briefly check screen access locally and show the macOS approval dialog if needed"
+                          : "Open a guide to enable \(title) in System Settings")
+                    .accessibilityLabel("\(actionTitle.replacingOccurrences(of: "…", with: "")) \(title)")
             }
         }
         .padding(.vertical, 18)

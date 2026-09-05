@@ -152,12 +152,16 @@ private struct MyMacsWidgetView: View {
         VStack(alignment: .leading, spacing: 9) {
             header
 
-            HStack(spacing: 8) {
-                ForEach(entry.machines.prefix(3)) { machine in
-                    machineLink(machine, style: .medium)
+            if entry.machines.count == 1, let machine = entry.machines.first {
+                machineLink(machine, style: .featured)
+            } else {
+                HStack(spacing: 8) {
+                    ForEach(entry.machines.prefix(3)) { machine in
+                        machineLink(machine, style: .medium)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -180,9 +184,9 @@ private struct MyMacsWidgetView: View {
         case 1:
             machineLink(machines[0], style: .hero)
         case 2:
-            HStack(spacing: 10) {
-                machineLink(machines[0], style: .portrait)
-                machineLink(machines[1], style: .portrait)
+            VStack(spacing: 10) {
+                machineLink(machines[0], style: .featured)
+                machineLink(machines[1], style: .featured)
             }
         case 3:
             VStack(spacing: 10) {
@@ -490,7 +494,6 @@ private struct MyMacsWidgetView: View {
 private enum MyMacsTileStyle {
     case medium
     case hero
-    case portrait
     case featured
     case standard
     case compact
@@ -534,10 +537,8 @@ private enum MyMacsTileStyle {
             40
         case .featured:
             48
-        case .portrait:
-            62
         case .hero:
-            78
+            96
         }
     }
 
@@ -547,8 +548,6 @@ private enum MyMacsTileStyle {
             .system(.subheadline, design: .rounded, weight: .semibold)
         case .standard, .featured:
             .system(.headline, design: .rounded, weight: .semibold)
-        case .portrait:
-            .system(.title3, design: .rounded, weight: .semibold)
         case .hero:
             .system(.title2, design: .rounded, weight: .semibold)
         }
@@ -564,20 +563,44 @@ private struct MyMacsMachineTile: View {
 
     var body: some View {
         Group {
-            if style.isHorizontal {
+            if style == .hero {
+                heroContent
+            } else if style.isHorizontal {
                 horizontalContent
             } else {
                 verticalContent
             }
         }
         .padding(style.padding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: style.isHorizontal ? .leading : .topLeading
+        )
         .background(tileFill, in: RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous)
                 .stroke(tileStroke, lineWidth: 0.75)
         }
         .privacySensitive()
+    }
+
+    private var heroContent: some View {
+        VStack(spacing: 14) {
+            MyMacsScreenMark(connectionKind: machine.connectionKind, size: style.markSize)
+
+            VStack(spacing: 6) {
+                Text(machine.displayName)
+                    .font(style.nameFont)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+
+                MyMacsStatusLabel(status: machine.reachability)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .topTrailing) { destinationSymbol }
     }
 
     private var verticalContent: some View {
@@ -842,11 +865,17 @@ private enum MyMacsPalette {
 #Preview(as: .systemMedium) {
     MyMacsWidget()
 } timeline: {
+    MyMacsEntry(date: .now, machines: Array(MyMacsEntry.placeholder.machines.prefix(1)), state: .ready)
+    MyMacsEntry(date: .now, machines: Array(MyMacsEntry.placeholder.machines.prefix(2)), state: .ready)
     MyMacsEntry.placeholder
+    MyMacsEntry(date: .now, machines: [], state: .noSavedMacs)
 }
 
 #Preview(as: .systemLarge) {
     MyMacsWidget()
 } timeline: {
+    MyMacsEntry(date: .now, machines: Array(MyMacsEntry.placeholder.machines.prefix(1)), state: .ready)
+    MyMacsEntry(date: .now, machines: Array(MyMacsEntry.placeholder.machines.prefix(2)), state: .ready)
     MyMacsEntry.placeholder
+    MyMacsEntry(date: .now, machines: [], state: .noSavedMacs)
 }

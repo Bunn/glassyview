@@ -4,6 +4,7 @@ import CoreGraphics
 import Foundation
 import Observation
 import PermissionFlow
+import ScreenCaptureKit
 
 @MainActor
 @Observable
@@ -16,8 +17,15 @@ final class HostController {
     }
 
     private(set) var runState: HostRunState = .stopped
-    private(set) var screenRecordingAuthorization: ScreenRecordingAuthorization = .unknown
-    private(set) var accessibilityAuthorization: AccessibilityAuthorization = .unknown
+    let permissions = HostPermissionController()
+
+    var screenRecordingAuthorization: ScreenRecordingAuthorization {
+        permissions.screenRecordingAuthorization
+    }
+
+    var accessibilityAuthorization: AccessibilityAuthorization {
+        permissions.accessibilityAuthorization
+    }
     private(set) var displays: [CaptureDisplay] = []
     private(set) var isStreaming = false
     private(set) var clientCount = 0
@@ -155,9 +163,11 @@ final class HostController {
         // refresh permissions when the guide was opened without a main window.
         authorizationActivationObserver = NotificationCenter.default
             .publisher(for: NSApplication.didBecomeActiveNotification)
+            .merge(with: NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification))
+            .debounce(for: .milliseconds(150), scheduler: RunLoop.main)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                self?.refreshAuthorizationStatuses()
+                Task { await self?.refreshAuthorizationStatuses() }
             }
     }
 
@@ -245,7 +255,7 @@ final class HostController {
             }
         }
         runState = .starting
-        refreshAuthorizationStatuses()
+        await refreshAuthorizationStatuses()
         refreshLoginItemStatus()
         remoteInputService.setDisplayID(selectedDisplayID)
         hostServer.setRemoteInputHandler { [remoteInputService] event in
@@ -274,7 +284,7 @@ final class HostController {
             return
         }
 
-        if screenRecordingAuthorization == .granted {
+        if permissions.canCaptureScreen {
             await refreshDisplays()
         }
     }
@@ -419,7 +429,7 @@ final class HostController {
         let streamConfiguration = HostStreamQualityConfiguration(quality: quality)
 
         let requestedOwnership = streamingDemand.ownership
-        updateScreenRecordingAuthorization()
+        await refreshAuthorizationStatuses()
         if screenRecordingAuthorization != .granted {
             // A remote connection must never cause a macOS consent prompt.
             // Permission requests remain tied to an explicit local user action.
@@ -434,9 +444,18 @@ final class HostController {
             }
         }
 
+        guard permissions.canCaptureScreen else {
+            if requestedOwnership == .manual {
+                requestDirectScreenAccessPermission()
+            }
+            lastError = "Confirm Direct Screen Access in Permissions on this Mac, then reconnect or start sharing again."
+            return .terminalFailure
+        }
+
         runState = .starting
         lastError = nil
         await refreshDisplays()
+        guard permissions.canCaptureScreen else { return .terminalFailure }
         guard allowsConnections, isServerReady, streamingDemand.wantsCapture else {
             return .superseded
         }
@@ -540,6 +559,12 @@ final class HostController {
             }
             await encoder.finish()
             await hostServer.clearVideoState()
+            if let streamError = error as? SCStreamError, streamError.code == .userDeclined {
+                permissions.invalidateDirectScreenAccess()
+                await refreshAuthorizationStatuses()
+                lastError = "Screen access was declined. Confirm Direct Screen Access in Permissions on this Mac, then reconnect."
+                return .terminalFailure
+            }
             fail(with: error)
             return .retryableFailure
         }
@@ -589,26 +614,32 @@ final class HostController {
     }
 
     func requestScreenRecordingPermission() {
-        guidePermission(.screenRecording)
+        Task { await guidePermission(.screenRecording) }
     }
 
     func requestAccessibilityPermission() {
-        guidePermission(.accessibility)
+        Task { await guidePermission(.accessibility) }
     }
 
-    func refreshAuthorizationStatuses() {
-        let previouslyAllowedScreenRecording = screenRecordingAuthorization == .granted
-        updateScreenRecordingAuthorization()
-        accessibilityAuthorization = RemoteInputService.isAccessibilityGranted
-            ? .granted
-            : .denied
+    func requestDirectScreenAccessPermission() {
+        permissionFlowController?.closePanel()
+        permissionFlowController = nil
+        Task {
+            if let availableDisplays = await permissions.confirmDirectScreenAccess() {
+                updateDisplays(availableDisplays)
+                lastError = nil
+            }
+        }
+    }
 
-        // Preparing the host loads displays separately. After a Settings visit,
-        // make the display picker available as soon as macOS reports access.
-        if !previouslyAllowedScreenRecording,
-           screenRecordingAuthorization == .granted,
-           isServerReady {
-            Task { await refreshDisplays() }
+    func refreshAuthorizationStatuses() async {
+        let previouslyCouldCapture = permissions.canCaptureScreen
+        let changed = await permissions.refresh()
+        if changed, !previouslyCouldCapture, permissions.canCaptureScreen, isServerReady {
+            await refreshDisplays()
+        } else if !permissions.canCaptureScreen {
+            displays = []
+            selectedDisplayID = nil
         }
 
         if let pane = permissionFlowController?.currentPane,
@@ -619,8 +650,8 @@ final class HostController {
         }
     }
 
-    private func guidePermission(_ pane: PermissionFlowPane) {
-        refreshAuthorizationStatuses()
+    private func guidePermission(_ pane: PermissionFlowPane) async {
+        await refreshAuthorizationStatuses()
         guard (pane == .screenRecording && screenRecordingAuthorization != .granted)
             || (pane == .accessibility && accessibilityAuthorization != .granted) else { return }
 
@@ -774,18 +805,24 @@ final class HostController {
     }
 
     func refreshDisplays() async {
+        guard permissions.canCaptureScreen else { return }
         do {
             let availableDisplays = try await captureService.availableDisplays()
-            displays = availableDisplays
-            if selectedDisplayID == nil
-                || !availableDisplays.contains(where: { $0.id == selectedDisplayID }) {
-                selectedDisplayID = availableDisplays.first(where: \.isMain)?.id
-                    ?? availableDisplays.first?.id
-            }
+            updateDisplays(availableDisplays)
         } catch {
             displays = []
             lastError = error.localizedDescription
-            updateScreenRecordingAuthorization()
+            permissions.invalidateDirectScreenAccess()
+            await refreshAuthorizationStatuses()
+        }
+    }
+
+    private func updateDisplays(_ availableDisplays: [CaptureDisplay]) {
+        displays = availableDisplays
+        if selectedDisplayID == nil
+            || !availableDisplays.contains(where: { $0.id == selectedDisplayID }) {
+            selectedDisplayID = availableDisplays.first(where: \.isMain)?.id
+                ?? availableDisplays.first?.id
         }
     }
 
@@ -1237,12 +1274,6 @@ final class HostController {
             0,
             Int(ceil(code.expiresAt.timeIntervalSinceNow))
         )
-    }
-
-    private func updateScreenRecordingAuthorization() {
-        screenRecordingAuthorization = CGPreflightScreenCaptureAccess()
-            ? .granted
-            : .denied
     }
 
     private func handleCaptureEvent(_ event: ScreenCaptureEvent) {

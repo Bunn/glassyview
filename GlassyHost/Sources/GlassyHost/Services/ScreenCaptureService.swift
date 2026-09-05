@@ -94,6 +94,45 @@ actor ScreenCaptureService {
             false,
             onScreenWindowsOnly: true
         )
+        return await Self.captureDisplays(in: content)
+    }
+
+    /// Exercises the same direct-capture path as a connection, from an explicit
+    /// local setup action. Frames are discarded, audio is off, and this stream
+    /// never reaches the encoder or server. Keep it separate from live capture.
+    static func confirmDirectScreenAccess() async throws -> [CaptureDisplay] {
+        let content = try await SCShareableContent.excludingDesktopWindows(
+            false,
+            onScreenWindowsOnly: true
+        )
+        let display = try selectDisplay(from: content.displays, requestedDisplayID: nil)
+        let configuration = SCStreamConfiguration()
+        configuration.width = 64
+        configuration.height = 64
+        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 1)
+        configuration.showsCursor = false
+        configuration.capturesAudio = false
+        let stream = SCStream(
+            filter: SCContentFilter(display: display, excludingWindows: []),
+            configuration: configuration,
+            delegate: nil
+        )
+        let output = PermissionCheckOutput()
+        try stream.addStreamOutput(output, type: .screen, sampleHandlerQueue: output.queue)
+        do {
+            try await stream.startCapture()
+            try Task.checkCancellation()
+            try await stream.stopCapture()
+        } catch {
+            try? await stream.stopCapture()
+            try? stream.removeStreamOutput(output, type: .screen)
+            throw error
+        }
+        try? stream.removeStreamOutput(output, type: .screen)
+        return await captureDisplays(in: content)
+    }
+
+    private static func captureDisplays(in content: SCShareableContent) async -> [CaptureDisplay] {
         let namesByDisplayID = await Self.displayNamesByID()
         let mainDisplayID = CGMainDisplayID()
 
@@ -335,6 +374,15 @@ struct CaptureFrameRelay<Element: Sendable>: Sendable {
 
     func finish() {
         continuation.finish()
+    }
+}
+
+private final class PermissionCheckOutput: NSObject, SCStreamOutput, @unchecked Sendable {
+    let queue = DispatchQueue(label: "dev.bunn.glassydesk.host.permission-check")
+
+    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
+                of outputType: SCStreamOutputType) {
+        // This local permission check intentionally discards every frame.
     }
 }
 

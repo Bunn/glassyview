@@ -18,9 +18,13 @@ Grant Screen Recording and Accessibility access locally, then leave Glassy Desk 
 
 ### Guided permission setup
 
-Choose **Enable…** beside Screen Recording or Accessibility in Connections or Display & Control. [PermissionFlow](https://github.com/jaywcjlove/PermissionFlow) opens the matching System Settings page with a floating Glassy Desk app card. Turn on Glassy Desk in the list, or drag the card into the list if the app is missing. Return to Glassy Desk to see the completed step; the display picker refreshes when Screen Recording becomes available. If macOS asks you to quit and reopen the app, follow that prompt to apply the change.
+Setup has three steps in Connections and Display & Control: **Screen Recording**, **Accessibility**, and **Direct Screen Access**. Choose **Enable…** beside Screen Recording or Accessibility. [PermissionFlow](https://github.com/jaywcjlove/PermissionFlow) opens the matching System Settings page with a floating Glassy Desk app card. Turn on Glassy Desk in the list, or drag the card into the list if the app is missing.
 
-PermissionFlow supplies the guidance; the host continues checking macOS Screen Recording and Accessibility authorization directly. Requests remain tied to local **Enable…** or **Share Continuously** actions. The guide does not request Accessibility just to track the Settings window. Both local and release app bundles include PermissionFlow’s localized resources and license.
+After enabling Screen Recording, choose **Confirm…** beside Direct Screen Access. This performs a brief local capture check and presents macOS’s additional approval to “bypass the system private window picker” when required. Choose **Allow**. The check discards its frames, captures no audio, and sends nothing to another device. It fills the display picker on success. Finish this step before connecting a device; a connection cannot initiate first-time permission setup. macOS can request approval again later, so completing setup does not override future system prompts.
+
+Permission status refreshes when the app becomes active or a window regains focus, and **Check Again** offers a manual refresh. The app checks Screen Recording and Accessibility through a short-lived instance of its own signed executable to avoid stale in-process permission results. That process only reads status and exits; it does not create windows, access pairing credentials, start services, or request permissions. If macOS itself requires a relaunch before capture can work, the confirmation step explains that separately.
+
+PermissionFlow supplies the Settings guidance; the host continues checking macOS authorization directly. Requests remain tied to local setup or **Share Continuously** actions. The guide does not request Accessibility just to track the Settings window. Both local and release app bundles include PermissionFlow’s localized resources and license. QR pairing always uses the current format with automatic Wi-Fi and VPN route selection.
 
 ### Pair new devices with a QR code, code, or password
 

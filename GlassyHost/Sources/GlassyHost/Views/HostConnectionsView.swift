@@ -46,7 +46,7 @@ struct HostConnectionsView: View {
             }
         }
 
-        if controller.screenRecordingAuthorization != .granted || controller.accessibilityAuthorization != .granted {
+        if !controller.permissions.canCaptureScreen || controller.accessibilityAuthorization != .granted {
             HostPermissionsView(controller: controller, compact: true)
         }
 
