@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct GlassyStreamSetupView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let scan: () -> Void
     let pairManually: () -> Void
 
@@ -8,9 +9,11 @@ struct GlassyStreamSetupView: View {
         ScrollView {
             VStack(spacing: 24) {
                 VStack(spacing: 6) {
-                    MacPairingIllustration()
-                        .scaleEffect(0.8)
-                        .frame(height: 200)
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        MacPairingIllustration()
+                            .scaleEffect(0.65)
+                            .frame(height: 148)
+                    }
                     Text("Make the fast connection.")
                         .font(.title.bold())
                         .tracking(-0.8)
@@ -26,7 +29,7 @@ struct GlassyStreamSetupView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 0) {
                         instruction(number: "1", title: "Install Glassy Desk for Mac",
-                                    detail: "The companion app powers your connection.")
+                                    detail: "Download the app and follow its permission prompts.")
                         GlassyHostDownloadLink()
                             .padding(.leading, 42)
                     }
@@ -37,10 +40,29 @@ struct GlassyStreamSetupView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 24))
 
-                Text("Use the same Wi-Fi network, or connect your VPN.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                NavigationLink {
+                    RemoteConnectionInfoView()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "globe")
+                            .font(.title2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Connect away from home")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Use Tailscale on a different Wi-Fi or mobile network.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .padding(.vertical, 8)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+                .accessibilityIdentifier("connection.glassy-stream.remote-guide")
             }
             .frame(maxWidth: 460)
             .padding(.horizontal, 24)

@@ -42,6 +42,17 @@ struct SettingsView: View {
             }
 
             Section("Getting Started") {
+                if FeatureFlags.isGlassyStreamEnabled {
+                    GlassyHostDownloadLink()
+                }
+
+                NavigationLink {
+                    RemoteConnectionInfoView(usesVNC: !FeatureFlags.isGlassyStreamEnabled)
+                } label: {
+                    Label("Connect away from home", systemImage: "globe")
+                }
+                .accessibilityIdentifier("settings.remote-guide")
+
                 NavigationLink {
                     OnboardingView()
                 } label: {

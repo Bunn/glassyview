@@ -281,7 +281,7 @@ struct EditMachineView<Store: MachineStoring>: View {
 
                 Section {
                     NavigationLink(value: EditMachineRoute.remoteConnectionInfo) {
-                        Label("Remote Connection Info", systemImage: "questionmark.circle")
+                        Label("Connect away from home", systemImage: "globe")
                     }
                     .accessibilityHint("Explains how to securely connect to a Mac outside your local network.")
                     .accessibilityIdentifier("connection.remote-access-info")
@@ -292,7 +292,7 @@ struct EditMachineView<Store: MachineStoring>: View {
             .navigationDestination(for: EditMachineRoute.self) { destination in
                 switch destination {
                 case .remoteConnectionInfo:
-                    RemoteConnectionInfoView()
+                    RemoteConnectionInfoView(usesVNC: connectionMode == .vnc)
                 }
             }
             .onChange(of: connectionMode) { oldMode, newMode in

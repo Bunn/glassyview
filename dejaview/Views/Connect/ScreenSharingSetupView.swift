@@ -42,6 +42,15 @@ struct ScreenSharingSetupView<Store: MachineStoring>: View {
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
             }
 
+            Section {
+                NavigationLink {
+                    RemoteConnectionInfoView(usesVNC: true)
+                } label: {
+                    Label("Connect away from home", systemImage: "globe")
+                }
+                .accessibilityIdentifier("connection.vnc.remote-guide")
+            }
+
             Section("Mac Address") {
                 TextField("Host name or IP address", text: $host)
                     .textInputAutocapitalization(.never)

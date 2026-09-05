@@ -22,7 +22,7 @@ struct FAQView: View {
         if FeatureFlags.isGlassyStreamEnabled {
             items.insert(
                 SettingsFAQItem(question: "Why is my remote Mac not shown nearby?",
-                                answer: "Nearby discovery shows Macs on your local network. To pair from another network, connect Tailscale or WireGuard, then scan the Mac’s Glassy Desk QR code. Glassy Desk selects a working address automatically and remembers the alternatives."),
+                                answer: "Nearby discovery only shows Macs on your local network. From elsewhere, connect Tailscale on both devices and use your saved Mac or its Tailscale address. Open Connect away from home in Settings for the full guide."),
                 at: 2
             )
             items.insert(
@@ -37,15 +37,15 @@ struct FAQView: View {
 
     private let compatibilityItems = [
         SettingsFAQItem(question: "Which Macs are supported?",
-                        answer: "Glassy Desk is built for Macs exposing macOS Screen Sharing or Remote Management through the classic VNC/RFB path. Multiple displays may appear as separate choices or as one combined desktop depending on what the Mac exposes."),
+                        answer: "Fast Connection supports Macs running Glassy Desk for Mac on macOS 14 or later, with Apple silicon or Intel. Standard VNC uses macOS Screen Sharing. Display choices depend on the connection and the Mac’s setup."),
         SettingsFAQItem(question: "Does it work with non-Mac VNC servers?",
                         answer: "Standard VNC/RFB servers may work, but the app is tuned and tested around macOS Screen Sharing behavior."),
         SettingsFAQItem(question: "Can I connect when away from home?",
                         answer: FeatureFlags.isGlassyStreamEnabled
-                            ? "Yes. Connect the iPhone or iPad and the Mac with Tailscale or WireGuard, then scan the Mac’s QR code. Glassy Desk automatically uses a reachable local or VPN address. If you paired before configuring the VPN, scan a fresh QR code to add its addresses."
+                            ? "Yes. Set up Tailscale on the Mac and your iPhone or iPad, then pair while you’re at your Mac with Tailscale connected. Keep the Mac awake and online. Open Connect away from home in Settings for the full guide, including manual pairing."
                             : "Yes. Use a trusted VPN such as Tailscale on the iPad and Mac, then save the Mac's VPN address and VNC port. Glassy Desk does not include a cloud relay service."),
         SettingsFAQItem(question: "Does it use Apple's high-performance Screen Sharing protocol?",
-                        answer: "No. Third-party clients use the classic VNC/RFB Screen Sharing path exposed by macOS.")
+                        answer: "No. Fast Connection uses Glassy Desk’s own streaming connection through the Mac companion. Standard VNC uses the classic VNC/RFB Screen Sharing service.")
     ]
 
     private let sessionItems = [

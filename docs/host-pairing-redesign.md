@@ -36,6 +36,12 @@ Paired devices show their last connection time and current connection status. Ex
 
 ## Preview and validation
 
-Run `./script/build_and_run.sh --preview` to build and launch the local `dist/Glassy Desk.app` without replacing the app in Applications. The regular run script’s install behavior is unchanged.
+Run `./script/build_and_run.sh --preview` to build and launch the local `dist/Glassy Desk.app` without replacing or stopping the installed app. The visual preview does not load pairing credentials, start a network listener, or check for updates. Live connection testing uses the regular run mode.
 
 Host tests cover address filtering and ranking, versioned invitation validation, exact Vision QR decoding with mixed LAN/VPN addresses, persisted access and revocation, and existing stream behavior. Client tests cover legacy and v2 parsing, saved-route persistence and identity checks, route selection and cancellation, and the existing encrypted pairing flow. Physical cross-network camera testing requires an iPhone or iPad with both updated apps and a configured VPN.
+
+## Download and remote setup help
+
+The iOS setup flow, onboarding, and Settings link to the stable Mac companion page at `https://bunn.dev/glassydesk/mac/`. The first Add Mac screen retains its single Fast Connection setup action. The dedicated page includes the download, installation, macOS permissions, QR/manual pairing, and a Tailscale guide at `#tailscale`.
+
+**Connect away from home** is available in Fast Connection setup, Standard VNC setup, the saved machine editor, and Settings. Its steps distinguish Fast Connection pairing from entering a VNC address. The guide recommends configuring Tailscale before pairing and leaving the Mac awake; it does not change pairing trust or network settings.

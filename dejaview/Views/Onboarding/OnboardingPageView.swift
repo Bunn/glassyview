@@ -24,6 +24,10 @@ struct OnboardingPageView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            if page == .setup, FeatureFlags.isGlassyStreamEnabled {
+                GlassyHostDownloadLink()
+            }
+
             VStack(spacing: 10) {
                 ForEach(page.bullets) { bullet in
                     OnboardingBulletRow(bullet: bullet)

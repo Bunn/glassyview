@@ -26,13 +26,13 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .welcome:
-            String(localized: "Glassy Desk connects your iPhone or iPad to macOS Screen Sharing so you can view and control your desktop from the devices you already carry.")
+            String(localized: "View and control your Mac from your iPhone or iPad. Bring your desktop, apps, and familiar shortcuts with you.")
         case .setup:
-            String(localized: "A good session starts with the Mac advertising Screen Sharing and being reachable from your current network.")
+            String(localized: "Choose Fast Connection for the smoothest experience, or use your Mac’s built-in Screen Sharing with Standard VNC.")
         case .connect:
             String(localized: "Use nearby discovery when it is available, or save a host manually for one-tap connections later.")
         case .supported:
-            String(localized: "Glassy Desk is tuned for Apple's classic Screen Sharing path over VNC/RFB.")
+            String(localized: "Fast Connection works with Glassy Desk for Mac. Standard VNC works with macOS Screen Sharing.")
         }
     }
 
@@ -66,11 +66,11 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
         case .setup:
             [
                 OnboardingBullet(systemImage: "switch.2",
-                                 title: "Turn on Screen Sharing",
-                                 detail: "On the Mac, open System Settings > General > Sharing, then enable Screen Sharing or Remote Management."),
+                                 title: "Get Glassy Desk for Mac",
+                                 detail: "For Fast Connection, install the Mac companion and allow Screen Recording and Accessibility. For Standard VNC, turn on Screen Sharing in your Mac’s Sharing settings."),
                 OnboardingBullet(systemImage: "network",
                                  title: "Use a reachable network",
-                                 detail: "Your iPhone or iPad and Mac need to be on the same local network, or connected through a VPN that can reach the Mac."),
+                                 detail: "Use the same Wi-Fi network. To connect away from home, set up Tailscale on both devices with our guide in Settings."),
                 OnboardingBullet(systemImage: "powerplug",
                                  title: "Keep the Mac available",
                                  detail: "The Mac must be awake and allowed through any firewall before Glassy Desk can connect.")
@@ -79,10 +79,10 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
             [
                 OnboardingBullet(systemImage: "plus.circle",
                                  title: "Add or pick a host",
-                                 detail: "Tap a nearby Mac, or choose New Machine and enter a hostname, IP address, and port. Screen Sharing usually uses port 5900."),
+                                 detail: "Choose Add Mac, then Set Up Fast Connection or Standard VNC. You can save either connection for next time."),
                 OnboardingBullet(systemImage: "person.badge.key",
-                                 title: "Sign in with macOS credentials",
-                                 detail: "Use a Mac account that is allowed to share the screen. Legacy VNC servers may only need a password."),
+                                 title: "Pair with your Mac",
+                                 detail: "For Fast Connection, scan the code in Add Device on your Mac or enter it manually. Standard VNC uses your Mac’s Screen Sharing login."),
                 OnboardingBullet(systemImage: "slider.horizontal.3",
                                  title: "Tune each session",
                                  detail: "Session controls include display selection, zoom, trackpad mode, and frame rate.")
@@ -91,7 +91,7 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
             [
                 OnboardingBullet(systemImage: "desktopcomputer",
                                  title: "Best with Macs",
-                                 detail: "Use Macs that expose macOS Screen Sharing or Remote Management over VNC/RFB."),
+                                 detail: "Glassy Desk for Mac supports macOS 14 or later, on Apple silicon and Intel. Standard VNC uses built-in macOS Screen Sharing."),
                 OnboardingBullet(systemImage: "server.rack",
                                  title: "Other VNC servers may work",
                                  detail: "Standard VNC/RFB servers can be reachable, but the app is designed and tested around macOS behavior."),
