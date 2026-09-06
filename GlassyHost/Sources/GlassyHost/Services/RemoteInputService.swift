@@ -9,6 +9,7 @@ final class RemoteInputService: @unchecked Sendable {
     private let queue: DispatchQueue
     private let clipboardPaste: HostClipboardPasteService
     private let accessibilityCheck: @Sendable () -> Bool
+    private let postKeyboardEvent: @Sendable (CGEvent) -> Void
 
     private var selectedDisplayID: CGDirectDisplayID?
     private var isEnabled = false
@@ -22,10 +23,12 @@ final class RemoteInputService: @unchecked Sendable {
         qos: .userInteractive
     ),
          clipboardPaste: HostClipboardPasteService = HostClipboardPasteService(),
-         accessibilityCheck: @escaping @Sendable () -> Bool = { AXIsProcessTrusted() }) {
+         accessibilityCheck: @escaping @Sendable () -> Bool = { AXIsProcessTrusted() },
+         postKeyboardEvent: @escaping @Sendable (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }) {
         queue = inputQueue
         self.clipboardPaste = clipboardPaste
         self.accessibilityCheck = accessibilityCheck
+        self.postKeyboardEvent = postKeyboardEvent
     }
 
     static var isAccessibilityGranted: Bool {
@@ -247,8 +250,8 @@ final class RemoteInputService: @unchecked Sendable {
                     unicodeString: baseAddress
                 )
             }
-            keyDown.post(tap: .cghidEventTap)
-            keyUp.post(tap: .cghidEventTap)
+            postKeyboardEvent(keyDown)
+            postKeyboardEvent(keyUp)
         }
     }
 
@@ -312,7 +315,15 @@ final class RemoteInputService: @unchecked Sendable {
                                   virtualKey: keyCode,
                                   keyDown: isDown) else { return }
         event.flags = flags
-        event.post(tap: .cghidEventTap)
+        // Setting flags does not update Quartz's Unicode payload. Supply the
+        // printable character as well so receivers do not fall back to the
+        // unshifted key. Shortcut chords must retain native key translation:
+        // overriding their text also changes AppKit's charactersIgnoringModifiers.
+        if let text = Self.printableText(for: keyCode, flags: flags) {
+            let units = Array(text.utf16)
+            event.keyboardSetUnicodeString(stringLength: units.count, unicodeString: units)
+        }
+        postKeyboardEvent(event)
     }
 }
 
@@ -321,6 +332,30 @@ private extension RemoteInputService {
         let keyCode: CGKeyCode
         var requiredFlags: CGEventFlags = []
         var modifierFlag: CGEventFlags?
+    }
+
+    // Derive both character variants from the same ANSI mapping used for
+    // incoming text/keysyms. This stays on the input queue without calling
+    // AppKit's main-thread keyboard-layout APIs.
+    static let printableCharacters: [CGKeyCode: (plain: String?, shifted: String?)] = {
+        var characters: [CGKeyCode: (plain: String?, shifted: String?)] = [:]
+        for keysym in UInt32(0x20)...0x7E {
+            guard let mapping = printableASCIIKeyMapping(for: keysym),
+                  let scalar = Unicode.Scalar(keysym) else { continue }
+            if mapping.requiredFlags.contains(.maskShift) {
+                characters[mapping.keyCode, default: (nil, nil)].shifted = String(scalar)
+            } else {
+                characters[mapping.keyCode, default: (nil, nil)].plain = String(scalar)
+            }
+        }
+        return characters
+    }()
+
+    static func printableText(for keyCode: CGKeyCode, flags: CGEventFlags) -> String? {
+        let shortcutFlags: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate]
+        guard flags.intersection(shortcutFlags).isEmpty,
+              let characters = printableCharacters[keyCode] else { return nil }
+        return flags.contains(.maskShift) ? characters.shifted ?? characters.plain : characters.plain
     }
 
     static func cgEventFlags(for mask: HostProtocol.TextModifierMask) -> CGEventFlags {

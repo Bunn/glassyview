@@ -1,0 +1,1 @@
+Fixes external keyboard typing in Fast Connection. Shift plus a letter now reliably produces a capital, and shifted punctuation arrives correctly. Command, Control, and Option shortcuts retain their normal behavior.
