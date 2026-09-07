@@ -2,10 +2,9 @@ import Foundation
 import SwiftUI
 
 enum AnalyticsPreference {
-    // A fresh key requires an explicit choice even for installations where the
-    // older analytics scope was enabled by default.
+    // Keep the existing key so saved choices override the default.
     static let collectionEnabledKey = "optionalProductAnalyticsEnabledV2"
-    static let defaultCollectionEnabled = false
+    static let defaultCollectionEnabled = true
 }
 
 enum AnalyticsEventName: String, Codable, Sendable {

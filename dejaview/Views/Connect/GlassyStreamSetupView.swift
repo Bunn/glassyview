@@ -31,6 +31,8 @@ struct GlassyStreamSetupView: View {
                         instruction(number: "1", title: "Install Glassy Desk for Mac",
                                     detail: "Download the app and follow its permission prompts.")
                         GlassyHostDownloadLink()
+                            .font(.subheadline.weight(.medium))
+                            .frame(minHeight: 44)
                             .padding(.leading, 42)
                     }
                     instruction(number: "2", title: "Open Add Device on your Mac",

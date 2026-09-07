@@ -8,11 +8,11 @@ approach used by BreadCount:
 2. Fixed, privacy-safe milestones are written to the existing anonymous
    RevenueCat customer so behavior can be related to later conversion.
 
-Optional analytics is disabled by default and can be enabled in onboarding or
-Settings with **Share Optional Analytics**. A new preference key requires an
-explicit choice on existing installations too. Disabling it cancels in-flight
-aggregate uploads, drops queued events immediately, clears local funnel state,
-and requests removal of optional RevenueCat attributes on the SDK’s next sync.
+Optional analytics is enabled by default and can be changed in onboarding or
+Settings with **Share Optional Analytics**. Existing saved choices are preserved.
+Disabling it cancels in-flight aggregate uploads, drops queued events immediately,
+clears local funnel state, and requests removal of optional RevenueCat attributes
+on the SDK’s next sync.
 No final opt-out analytics event is sent. Data already received by a server
 cannot be recalled. RevenueCat purchase verification and transaction history
 continue independently of this optional setting.

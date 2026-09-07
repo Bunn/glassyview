@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import GlassyDesk
 
@@ -79,10 +80,27 @@ struct AnalyticsTests {
         osMajor: 26
     )
 
-    @Test("Optional collection requires new explicit consent")
-    func collectionRequiresExplicitConsent() {
-        #expect(!AnalyticsPreference.defaultCollectionEnabled)
-        #expect(AnalyticsPreference.collectionEnabledKey != "privacyPreservingAnalyticsEnabled")
+    @Test("Optional collection defaults on and preserves a saved opt-out")
+    func collectionDefaultsOnAndPreservesOptOut() throws {
+        let suiteName = "AnalyticsTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let preference = AppStorage(
+            wrappedValue: AnalyticsPreference.defaultCollectionEnabled,
+            AnalyticsPreference.collectionEnabledKey,
+            store: defaults
+        )
+        #expect(preference.wrappedValue)
+
+        preference.wrappedValue = false
+
+        let restoredPreference = AppStorage(
+            wrappedValue: AnalyticsPreference.defaultCollectionEnabled,
+            AnalyticsPreference.collectionEnabledKey,
+            store: defaults
+        )
+        #expect(!restoredPreference.wrappedValue)
     }
 
     @Test("Payload contains only allowlisted aggregate fields")
@@ -185,6 +203,7 @@ struct AnalyticsTests {
             metadata: metadata,
             retryDelays: []
         )
+        tracker.setCollectionEnabled(false)
 
         tracker.track(.appOpened)
         await tracker.waitForPendingDelivery()

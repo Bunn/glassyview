@@ -71,14 +71,10 @@ struct SettingsView: View {
                 }
             }
 
-            Section {
+            Section("Privacy") {
                 Toggle("Share Optional Analytics", isOn: $analyticsEnabled)
                 Link("Privacy Policy", destination: GlassyDeskLinks.privacyPolicy)
                 Link("Terms of Use", destination: GlassyDeskLinks.termsOfUse)
-            } header: {
-                Text("Privacy")
-            } footer: {
-                Text("Off by default. Share aggregate app events through Cloudflare and limited usage milestones linked to your anonymous RevenueCat purchase profile. Screen content, input, Mac addresses, and credentials are never included. Turn this off to stop collection and request removal of optional profile attributes. Purchase verification continues.")
             }
 
             #if DEBUG

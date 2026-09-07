@@ -26,6 +26,8 @@ struct OnboardingPageView: View {
 
             if page == .setup, FeatureFlags.isGlassyStreamEnabled {
                 GlassyHostDownloadLink()
+                    .font(.subheadline.weight(.medium))
+                    .frame(minHeight: 44)
             }
 
             VStack(spacing: 10) {
