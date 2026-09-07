@@ -42,3 +42,14 @@ func conservativeStreamQualityArbitration() {
     #expect(arbitration.qualityToPublish(for: []) == nil)
     #expect(arbitration.qualityToPublish(for: [], force: true) == .best)
 }
+
+@Test("Identical decoder configuration is not republished across encoder recreation")
+func identicalCodecConfigurationDoesNotResetViewer() {
+    var cache = HostVideoBootstrapCache()
+    let configuration = Data([0x67, 0x01, 0x68, 0x02])
+    #expect(cache.storeCodecConfiguration(configuration) == true)
+    #expect(cache.storeCodecConfiguration(configuration) == false)
+    #expect(cache.storeCodecConfiguration(Data([0x67, 0x03, 0x68, 0x04])) == true)
+    cache.clear()
+    #expect(cache.storeCodecConfiguration(configuration) == true)
+}

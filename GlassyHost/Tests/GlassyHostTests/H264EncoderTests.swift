@@ -39,12 +39,17 @@ private final class EncoderProbeOutput: @unchecked Sendable {
     private let lock = NSLock()
     private var units: [H264AccessUnit] = []
     private var failures: [String] = []
+    private var configurations: [H264CodecConfiguration] = []
     func accept(_ output: H264EncoderOutput) {
-        if case .accessUnit(let unit) = output { lock.withLock { units.append(unit) } }
+        switch output {
+        case .accessUnit(let unit): lock.withLock { units.append(unit) }
+        case .codecConfiguration(let configuration): lock.withLock { configurations.append(configuration) }
+        }
     }
     func fail(_ error: H264EncoderError) { lock.withLock { failures.append(error.localizedDescription) } }
     var frames: [H264AccessUnit] { lock.withLock { units } }
     var errors: [String] { lock.withLock { failures } }
+    var configurationCount: Int { lock.withLock { configurations.count } }
 }
 
 @Test("Idle recovery reencodes a retained capture once, with fresh timing, then stops", arguments: [960, 640, 320])
@@ -129,4 +134,29 @@ func encoderRateChangesDoNotForceRecovery() async throws {
     #expect(output.frames.count == 1)
     #expect(output.errors.isEmpty)
     await encoder.finish()
+}
+
+@Test("Recovery IDRs and rate changes do not repeatedly publish decoder configuration")
+func repeatedRecoveryKeepsDecoderConfiguration() async throws {
+    let output = EncoderProbeOutput()
+    let encoder = H264Encoder(configuration: .init(expectedFrameRate: 30, averageBitRate: 5_000_000,
+                                                  maximumWidth: 1280, maximumHeight: 720),
+                              outputHandler: { output.accept($0) }, errorHandler: { output.fail($0) })
+    let buffer = try makeEncoderProbeBuffer(width: 640, height: 360, noise: true)
+    try await encoder.encode(.init(pixelBuffer: buffer, presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()),
+                                   duration: CMTime(value: 1, timescale: 30)))
+    for _ in 0..<40 {
+        if !output.frames.isEmpty { break }
+        try await Task.sleep(for: .milliseconds(25))
+    }
+    for (rate, fps) in [(6_000_000, 30), (8_000_000, 60), (12_000_000, 60)] {
+        try await encoder.updateConfiguration(.init(expectedFrameRate: fps, averageBitRate: rate,
+                                                    maximumWidth: 1280, maximumHeight: 720))
+        encoder.requestKeyFrame()
+        try await Task.sleep(for: .milliseconds(350))
+    }
+    await encoder.finish()
+    #expect(output.frames.filter(\.isKeyFrame).count == 4)
+    #expect(output.configurationCount == 1)
+    #expect(output.errors.isEmpty)
 }

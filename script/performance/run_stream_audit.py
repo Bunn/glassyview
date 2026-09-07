@@ -33,7 +33,7 @@ def declaration(path, start):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scenario", choices=["healthy-best", "slow-bootstrap", "regression"])
+    parser.add_argument("--scenario", choices=["healthy-best", "slow-bootstrap", "regression", "codec-ordering"])
     parser.add_argument("--compatibility", choices=["legacy-client", "legacy-host"],
                         help="Compile the selected peer's pre-adaptive committed source against the current other peer")
     parser.add_argument("--legacy-revision", default="485335bc393c173d5f6e39cd5ef73932036ee6fa",
@@ -98,6 +98,14 @@ enum GlassyStreamEndpoint {
         assert server.count(advertisement) == 1
         server = server.replace(advertisement, "// Probe is loopback-only; no advertisement.")
         (work / "HostServer.swift").write_text(server)
+        # Snapshot the source list before compilation: parallel UI work must
+        # not invalidate a long Swift frontend read midway through this probe.
+        snapshots = []
+        for index, source in enumerate(compile_sources):
+            snapshot = work / (str(index) + "-" + source.name)
+            snapshot.write_text(source.read_text())
+            snapshots.append(snapshot)
+        compile_sources = snapshots
         binary = work / "stream-audit"
         subprocess.run(
             ["xcrun", "swiftc", "-O", "-swift-version", "6", "-parse-as-library",

@@ -28,9 +28,13 @@ final class GlassyStreamEventDelivery: @unchecked Sendable {
     private var active = true
     private var waitingForKeyFrame = true
     private var recoveryRequested = false
+    private var currentConfiguration: GlassyStreamVideoConfiguration?
 
+    // Match one host credit window so a fresh TCP/Wi-Fi burst does not discard
+    // a valid reference chain. Byte and 150 ms age limits remain independent;
+    // this is a capacity ceiling, never a target to buffer before displaying.
     init(queue: DispatchQueue, callbacks: GlassyStreamClientCallbacks,
-         maximumFrames: Int = 3, maximumBytes: Int = 16 * 1_024 * 1_024,
+         maximumFrames: Int = 16, maximumBytes: Int = 16 * 1_024 * 1_024,
          maximumAge: TimeInterval = 0.15,
          now: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
          onRetired: @escaping @Sendable (UInt64, UInt32) -> Void = { _, _ in },
@@ -53,7 +57,12 @@ final class GlassyStreamEventDelivery: @unchecked Sendable {
         lock.lock()
         guard active else { lock.unlock(); return }
         switch event {
-        case .videoConfiguration:
+        case .videoConfiguration(let configuration):
+            // Repeating identical SPS/PPS does not invalidate the reference
+            // chain. Forwarding it would discard valid queued frames and make
+            // the renderer flush an image that can continue to be displayed.
+            guard currentConfiguration != configuration else { lock.unlock(); return }
+            currentConfiguration = configuration
             retired = removeVideoLocked()
             entries.removeAll { if case .videoConfiguration = $0.event { return true }; return false }
             waitingForKeyFrame = true
@@ -101,6 +110,7 @@ final class GlassyStreamEventDelivery: @unchecked Sendable {
         lock.lock()
         active = false
         entries.removeAll()
+        currentConfiguration = nil
         lock.unlock()
     }
 

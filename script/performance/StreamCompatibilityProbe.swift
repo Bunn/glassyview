@@ -5,6 +5,7 @@ import Network
 private final class CompatibilityState: @unchecked Sendable {
     private let lock = NSLock()
     private var frameCount = 0
+    private var configurationCount = 0
     private var pong = false
     private var inputs: [String] = []
     private var failures: [String] = []
@@ -13,6 +14,7 @@ private final class CompatibilityState: @unchecked Sendable {
         lock.withLock {
             switch event {
             case .videoAccessUnit: frameCount += 1
+            case .videoConfiguration: configurationCount += 1
             case .pong: pong = true
             case .hostStreamStatus: statusCount += 1
             default: break
@@ -24,9 +26,9 @@ private final class CompatibilityState: @unchecked Sendable {
     }
     func failure(_ error: Error) { lock.withLock { failures.append(error.localizedDescription) } }
     var report: [String: Any] { lock.withLock {
-        ["frames_received": frameCount, "pong_received": pong, "input_received": inputs,
+        ["frames_received": frameCount, "configurations_received": configurationCount, "pong_received": pong, "input_received": inputs,
          "errors": failures, "unnegotiated_status_messages": statusCount,
-         "passed": frameCount > 0 && pong && inputs == ["compatibility"] && failures.isEmpty && statusCount == 0]
+         "passed": frameCount > 0 && configurationCount == 1 && pong && inputs == ["compatibility"] && failures.isEmpty && statusCount == 0]
     } }
 }
 
@@ -69,6 +71,7 @@ private struct CompatibilityCredentialStore: GlassyStreamResumeCredentialStoring
         var iterator = authentication.stream.makeAsyncIterator()
         guard await iterator.next() == true else { throw CompatibilityError(message: "Authentication failed") }
         client.sendTextInput("compatibility")
+        host.broadcastCodecConfiguration(parameterSets: [Data([0x67, 0x42]), Data([0x68, 1])], nalUnitHeaderLength: 4)
         for index in 0..<20 {
             host.broadcastVideoAccessUnit(Data(repeating: 0x55, count: 256),
                                           presentationTimeSeconds: ProcessInfo.processInfo.systemUptime,

@@ -123,7 +123,9 @@ private struct GlassyStreamStatusOverlay: View {
     }
 
     private var isWaitingForVideo: Bool {
-        guard controller.state != .failed else { return false }
+        // Recovery can keep the last decoded image visible while a fresh
+        // keyframe arrives. Show progress only when there is no image yet.
+        guard controller.state != .failed, !controller.renderer.isDisplayingVideo else { return false }
 
         return switch controller.renderer.state {
         case .waitingForConfiguration, .waitingForKeyFrame:

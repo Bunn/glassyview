@@ -33,7 +33,7 @@ send a fresh keyframe. It must never acknowledge video it has not received. The
 current client coalesces feedback for 30 ms. Duplicate/older acknowledgements are
 harmless; acknowledgements beyond the last sent video sequence are rejected.
 
-The host retains a small sequence/size/send-time ledger. No more than three
+The host retains a small sequence/size/send-time ledger. No more than sixteen
 unacknowledged video frames are admitted, and an additional byte limit scales
 with bitrate. Thus Network.framework accepting bytes into TCP does not create
 fresh media credit. Age is measured on the host's monotonic clock; the client
@@ -61,10 +61,22 @@ not permission to inject input when the runtime status says view-only.
 
 Pending host packets retain plaintext until final send order. Control responses
 can pass unsent media before sequence assignment and encryption, preserving
-strict authenticated ordering without reordering ciphertext. Codec changes
-remove obsolete queued video. Pending media has a 150 ms age budget and a small
+strict authenticated ordering without reordering ciphertext. Each coalesced
+video frame carries its matching SPS/PPS snapshot; the network drain emits a
+changed configuration immediately before its corresponding frame. A newer IDR
+therefore cannot overtake its own configuration when it replaces an older
+pending IDR. Identical SPS/PPS from a recreated encoder is deduplicated. Codec
+changes remove obsolete queued video. Pending media has a 150 ms age budget and a small
 frame limit. Dropping a dependent frame discards the unsent dependency chain;
 recovery resumes at a fresh IDR. New pending IDRs replace obsolete pending IDRs.
+
+The client callback mailbox also admits sixteen fresh frames so a complete
+host credit window arriving in one TCP/Wi-Fi burst does not discard a valid
+reference chain. Its independent 16 MiB and 150 ms age limits still apply;
+frames drain immediately rather than waiting to fill this capacity. An exact
+repeat of the current SPS/PPS and NAL header length preserves queued media.
+Changed decoder configuration still retires the old dependency chain, and a
+new connection always receives its own configuration.
 
 The user-selected quality remains the target and ceiling: Best starts with a
 12 Mbps budget. Each newly negotiated viewer receives one 640-pixel preview
@@ -149,6 +161,9 @@ display the newly negotiated view-only explanation.
 ## Verification
 
 Run host tests with `swift test --package-path GlassyHost`.
+`--scenario codec-ordering` pauses the real host network queue, submits two
+configuration/IDR generations, then checks the surviving IDR receives its own
+configuration and an identical reconfiguration produces no extra event.
 `script/performance/run_stream_audit.py` compiles current host/client transport
 in a temporary loopback-only fixture, exercises bounded delivery and an adaptive
 500 kbps synthetic source, and checks real VideoToolbox idle recovery. A separate

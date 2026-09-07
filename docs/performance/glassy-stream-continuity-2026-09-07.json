@@ -1,0 +1,277 @@
+{
+  "glassy-black-flash-healthy-best": {
+    "best_100ms_rtt": {
+      "cached_full_size_encoder": false,
+      "emergency_widths": [
+        640,
+        320
+      ],
+      "encoded_widths": [
+        3840,
+        640,
+        320,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840
+      ],
+      "errors": [],
+      "first_callback_seconds": 0.621428000042215,
+      "first_keyframe_bytes": 63135,
+      "full_resolution_callback_seconds": 1.2278425416443497,
+      "full_resolution_frames_delivered": 6,
+      "input_width": 3840,
+      "link_bits_per_second": 100000000,
+      "minimum_periodic_observation_seconds": 11,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": true,
+      "observation_duration_seconds": 12.450696249958128,
+      "passed": true,
+      "periodic_real_keyframe_requests": 5,
+      "rate_changes": [
+        12000000
+      ],
+      "round_trip_delay_ms": 100
+    },
+    "cached_best_new_viewer_100ms_rtt": {
+      "cached_full_size_encoder": true,
+      "emergency_widths": [
+        640,
+        320
+      ],
+      "encoded_widths": [
+        3840,
+        3840,
+        640,
+        320,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840
+      ],
+      "errors": [],
+      "first_callback_seconds": 0.5881325418595225,
+      "first_keyframe_bytes": 63135,
+      "full_resolution_callback_seconds": 1.2017461250070482,
+      "full_resolution_frames_delivered": 6,
+      "input_width": 3840,
+      "link_bits_per_second": 100000000,
+      "minimum_periodic_observation_seconds": 11,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": true,
+      "observation_duration_seconds": 12.442113291705027,
+      "passed": true,
+      "periodic_real_keyframe_requests": 5,
+      "rate_changes": [
+        12000000
+      ],
+      "round_trip_delay_ms": 100
+    },
+    "sixty_fps_100ms_rtt": {
+      "consumer_stall_seconds": 0,
+      "errors": [],
+      "frames_delivered": 589,
+      "frames_offered": 600,
+      "frames_over_100ms_old": 1,
+      "frames_over_500ms_old": 0,
+      "host_adaptive_bitrate_events": [
+        12000000
+      ],
+      "host_effective_quality_events": [
+        "best"
+      ],
+      "last_third_maximum_callback_age_ms": 61.58349965699017,
+      "last_third_p95_callback_age_ms": 59.624542016536,
+      "link_bits_per_second": 100000000,
+      "maximum_callback_age_ms": 115.54912477731705,
+      "nominal_source_fps": 60,
+      "observation_duration_seconds": 15.197175333509222,
+      "offered_payload_mbps": 9.86509185445847,
+      "p95_callback_age_ms": 59.41199930384755,
+      "payload_bytes_per_frame": 25000,
+      "pong_delay_ms": 108.76441677100956,
+      "producer_duration_seconds": 12.164103666786104,
+      "round_trip_delay_ms": 100,
+      "source_follows_adaptive_budget": false
+    },
+    "unrestricted_best": {
+      "cached_full_size_encoder": false,
+      "emergency_widths": [
+        640,
+        320
+      ],
+      "encoded_widths": [
+        640,
+        320,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840
+      ],
+      "errors": [],
+      "first_callback_seconds": 0.367606041720137,
+      "first_keyframe_bytes": 63135,
+      "full_resolution_callback_seconds": 0.6372461249120533,
+      "full_resolution_frames_delivered": 6,
+      "input_width": 3840,
+      "link_bits_per_second": null,
+      "minimum_periodic_observation_seconds": 11,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": true,
+      "observation_duration_seconds": 11.8978426665999,
+      "passed": true,
+      "periodic_real_keyframe_requests": 5,
+      "rate_changes": [
+        12000000
+      ],
+      "round_trip_delay_ms": 0
+    }
+  },
+  "glassy-black-flash-legacy-client": {
+    "configurations_received": 1,
+    "errors": [],
+    "frames_received": 20,
+    "input_received": [
+      "compatibility"
+    ],
+    "mode": "legacy-client",
+    "passed": true,
+    "pong_received": true,
+    "unnegotiated_status_messages": 0
+  },
+  "glassy-black-flash-legacy-host": {
+    "configurations_received": 1,
+    "errors": [],
+    "frames_received": 20,
+    "input_received": [
+      "compatibility"
+    ],
+    "mode": "legacy-host",
+    "passed": true,
+    "pong_received": true,
+    "unnegotiated_status_messages": 0
+  },
+  "glassy-black-flash-slow-bootstrap": {
+    "desktop_pattern_3840_source": {
+      "cached_full_size_encoder": false,
+      "emergency_widths": [
+        640
+      ],
+      "encoded_widths": [
+        3840,
+        640
+      ],
+      "errors": [],
+      "first_callback_seconds": 0.6902324999682605,
+      "first_keyframe_bytes": 33803,
+      "full_resolution_callback_seconds": null,
+      "full_resolution_frames_delivered": 0,
+      "input_width": 3840,
+      "link_bits_per_second": 500000,
+      "minimum_periodic_observation_seconds": 0,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": false,
+      "observation_duration_seconds": 0.9281226249877363,
+      "passed": true,
+      "periodic_real_keyframe_requests": 0,
+      "rate_changes": [
+        12000000,
+        391409
+      ],
+      "round_trip_delay_ms": 0
+    },
+    "noise_3840_source": {
+      "cached_full_size_encoder": false,
+      "emergency_widths": [
+        640,
+        320,
+        640
+      ],
+      "encoded_widths": [
+        3840,
+        640,
+        320,
+        640
+      ],
+      "errors": [],
+      "first_callback_seconds": 1.547105708392337,
+      "first_keyframe_bytes": 63135,
+      "full_resolution_callback_seconds": null,
+      "full_resolution_frames_delivered": 0,
+      "input_width": 3840,
+      "link_bits_per_second": 500000,
+      "minimum_periodic_observation_seconds": 0,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": true,
+      "observation_duration_seconds": 1.7945801250170916,
+      "passed": true,
+      "periodic_real_keyframe_requests": 0,
+      "rate_changes": [
+        12000000,
+        388350
+      ],
+      "round_trip_delay_ms": 0
+    },
+    "noise_native_640_source": {
+      "cached_full_size_encoder": false,
+      "emergency_widths": [
+        640,
+        320,
+        640
+      ],
+      "encoded_widths": [
+        640,
+        640,
+        320,
+        640
+      ],
+      "errors": [],
+      "first_callback_seconds": 3.355904124910012,
+      "first_keyframe_bytes": 190137,
+      "full_resolution_callback_seconds": null,
+      "full_resolution_frames_delivered": 0,
+      "input_width": 640,
+      "link_bits_per_second": 500000,
+      "minimum_periodic_observation_seconds": 0,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": true,
+      "observation_duration_seconds": 3.574346666689962,
+      "passed": true,
+      "periodic_real_keyframe_requests": 0,
+      "rate_changes": [
+        12000000,
+        397745
+      ],
+      "round_trip_delay_ms": 0
+    }
+  },
+  "glassy-codec-order-after": {
+    "all_frame_pairs": [
+      "66:66",
+      "66:66"
+    ],
+    "coalesced_frame_pairs": [
+      "66:66"
+    ],
+    "configuration_events_after_duplicate": 1,
+    "configuration_events_after_first_drain": 1,
+    "errors": [],
+    "passed": true
+  },
+  "glassy-codec-order-before": {
+    "all_frame_pairs": [
+      "66:66"
+    ],
+    "coalesced_frame_pairs": [],
+    "configuration_events_after_duplicate": 2,
+    "configuration_events_after_first_drain": 2,
+    "errors": [],
+    "passed": false
+  }
+}

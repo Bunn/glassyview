@@ -31,6 +31,11 @@ private struct CallbackStats {
 private enum StreamAuditProbe {
     static func main() async throws {
         let directory = URL(fileURLWithPath: CommandLine.arguments[1])
+        if CommandLine.arguments.dropFirst(2).first == "codec-ordering" {
+            let result = try await codecOrderingProbe(directory: directory)
+            print(String(decoding: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), as: UTF8.self))
+            return
+        }
         if CommandLine.arguments.dropFirst(2).first == "healthy-best" {
             let direct = try await emergencyIdleBootstrapProbe(directory: directory, linkBitsPerSecond: nil)
             let latency = try await emergencyIdleBootstrapProbe(directory: directory, linkBitsPerSecond: 100_000_000, roundTripDelay: 0.1)
@@ -70,6 +75,69 @@ private enum StreamAuditProbe {
         ]
         let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
         print(String(decoding: data, as: UTF8.self))
+    }
+
+    /// Hold the production network queue while two complete format generations
+    /// arrive. The latest coalesced IDR must retain its own SPS/PPS, not the
+    /// configuration that happened to precede the original scheduled drain.
+    private static func codecOrderingProbe(directory: URL) async throws -> [String: Any] {
+        let statuses = AsyncStream<HostServer.Status>.makeStream()
+        let host = HostServer(serviceName: "Glassy Codec Probe", port: 0,
+                              deviceAccessStore: HostDeviceAccessStore(fileURL: directory.appendingPathComponent(UUID().uuidString)))
+        let secret = Data(repeating: 0x44, count: 32)
+        host.start(pairingSecret: secret, onStatusChange: { statuses.continuation.yield($0) })
+        defer { host.stop(); statuses.continuation.finish() }
+        var port: UInt16?
+        for await status in statuses.stream {
+            if case .listening(let value) = status { port = value; break }
+        }
+        guard let port, let code = host.currentPairingCode()?.value else { throw ProbeError(message: "No codec probe host") }
+        let authenticated = AsyncStream<Bool>.makeStream()
+        let observed = Locked<(UInt8?, [String], Int)>((nil, [], 0))
+        let errors = Locked<[String]>([])
+        let client = GlassyStreamClient(credentialStore: ProbeCredentialStore())
+        defer { client.disconnect(); authenticated.continuation.finish() }
+        client.connect(configuration: .init(endpoint: .hostPort(host: "127.0.0.1", port: .init(rawValue: port)!),
+                                            savedMachineID: UUID(), bootstrapCredential: .oneTimeCode(code),
+                                            expectedHostIdentifier: HostServer.makeHostIdentifier(from: secret)),
+                       callbackQueue: .main, callbacks: .init(onEvent: { event in
+            switch event {
+            case .authenticated: authenticated.continuation.yield(true)
+            case .videoConfiguration(let config): observed.update { $0.0 = config.parameterSets.first?.last; $0.2 += 1 }
+            case .videoAccessUnit(let unit): observed.update { $0.1.append("\($0.0 ?? 0):\(unit.data.last ?? 0)") }
+            default: break
+            }
+        }, onCompletion: { result in
+            if case .failure(let error) = result { errors.update { $0.append(error.localizedDescription) }; authenticated.continuation.yield(false) }
+        }))
+        var authIterator = authenticated.stream.makeAsyncIterator()
+        guard await authIterator.next() == true else { throw ProbeError(message: "Codec probe authentication failed") }
+        try await Task.sleep(for: .milliseconds(100))
+        let entered = AsyncStream<Bool>.makeStream()
+        let release = DispatchSemaphore(value: 0)
+        host.setStreamQualityHandler { _ in entered.continuation.yield(true); _ = release.wait(timeout: .now() + 5) }
+        var enteredIterator = entered.stream.makeAsyncIterator()
+        _ = await enteredIterator.next()
+        entered.continuation.finish()
+        for marker: UInt8 in [0x41, 0x42] {
+            host.broadcastCodecConfiguration(parameterSets: [Data([0x67, marker]), Data([0x68, 1])], nalUnitHeaderLength: 4)
+            host.broadcastVideoAccessUnit(Data([marker]), presentationTimeSeconds: ProcessInfo.processInfo.systemUptime,
+                                          durationSeconds: 1.0 / 60, isKeyFrame: true, encodedWidth: 320)
+        }
+        release.signal()
+        try await Task.sleep(for: .milliseconds(300))
+        let first = observed.update { $0 }
+        // A recreated encoder can emit the same SPS/PPS. It must not reset an
+        // already-configured viewer merely because its encoder instance changed.
+        host.broadcastCodecConfiguration(parameterSets: [Data([0x67, 0x42]), Data([0x68, 1])], nalUnitHeaderLength: 4)
+        host.broadcastVideoAccessUnit(Data([0x42]), presentationTimeSeconds: ProcessInfo.processInfo.systemUptime,
+                                      durationSeconds: 1.0 / 60, isKeyFrame: true, encodedWidth: 320)
+        try await Task.sleep(for: .milliseconds(200))
+        let final = observed.update { $0 }
+        return ["coalesced_frame_pairs": first.1, "all_frame_pairs": final.1,
+                "configuration_events_after_first_drain": first.2, "configuration_events_after_duplicate": final.2,
+                "errors": errors.update { $0 },
+                "passed": first.1 == ["66:66"] && final.2 == first.2 && errors.update { $0.isEmpty }]
     }
 
     // The main-queue callback is the same dispatch target used by the iOS

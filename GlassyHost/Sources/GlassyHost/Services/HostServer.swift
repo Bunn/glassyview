@@ -580,23 +580,26 @@ private extension HostServer {
         }
 
         func broadcastCodecConfiguration(_ payload: Data) {
-            queue.async { [weak self] in
-                guard let self else { return }
-                videoBootstrapCache.storeCodecConfiguration(payload)
-                for client in authenticatedClients where client.isMediaReady {
-                    client.removeQueuedVideoPackets()
-                    client.needsKeyFrame = true
-                    client.keyFrameRequestOutstanding = false
-                    _ = enqueueEncrypted(payload,
-                                         kind: .videoConfiguration,
-                                         flags: [],
-                                         policy: .codecConfiguration,
-                                         for: client)
-                }
-                // The encoder emits configuration immediately before its
-                // already-encoded IDR. Requesting another here duplicates that
-                // large image; maintenance recovers if the IDR is lost.
+            // Configuration and frames must enter the same coalescing path.
+            // A later IDR can replace an earlier pending IDR before the network
+            // drain runs; it must bring its own SPS/PPS snapshot with it.
+            mediaIngress.updateCodecConfiguration(payload)
+        }
+
+        private func sendCodecConfigurationIfChanged(_ payload: Data) {
+            guard videoBootstrapCache.storeCodecConfiguration(payload) else { return }
+            for client in authenticatedClients where client.isMediaReady {
+                client.removeQueuedVideoPackets()
+                client.needsKeyFrame = true
+                client.keyFrameRequestOutstanding = false
+                _ = enqueueEncrypted(payload,
+                                     kind: .videoConfiguration,
+                                     flags: [],
+                                     policy: .codecConfiguration,
+                                     for: client)
             }
+            // The accompanying IDR follows in this same network-queue drain.
+            // A recreated encoder with identical SPS/PPS needs no viewer reset.
         }
 
         private func clearVideoStateLocked() {
@@ -660,6 +663,9 @@ private extension HostServer {
                 }
 
                 guard let item = drain.item else { continue }
+                if let configuration = item.codecConfiguration {
+                    sendCodecConfigurationIfChanged(configuration)
+                }
                 let flags: HostProtocol.Flags = item.isKeyFrame ? [.keyFrame] : []
                 let policy: SendPolicy = item.isKeyFrame ? .keyFrame : .deltaFrame
                 for client in authenticatedClients where client.isMediaReady {
@@ -1634,6 +1640,7 @@ private extension HostServer.Core {
         let payload: Data
         let isKeyFrame: Bool
         let encodedWidth: Int?
+        var codecConfiguration: Data? = nil
     }
 
     /// A one-item, lock-protected ingress buffer. This bounds work *before* the
@@ -1646,13 +1653,20 @@ private extension HostServer.Core {
 
         private let lock = NSLock()
         private var pending: VideoBroadcast?
+        private var codecConfiguration: Data?
         private var drainIsScheduled = false
         private var awaitingKeyFrame = false
         private var keyFrameRequestWasReported = false
 
+        func updateCodecConfiguration(_ payload: Data) {
+            lock.withLock { codecConfiguration = payload }
+        }
+
         /// Returns true exactly when the caller must schedule a drain.
         func submit(_ item: VideoBroadcast) -> Bool {
             lock.withLock {
+                var item = item
+                item.codecConfiguration = codecConfiguration
                 if item.isKeyFrame {
                     // An IDR repairs any dependency chain broken by an ingress
                     // drop, so it supersedes whatever has not reached Core.
@@ -1703,6 +1717,7 @@ private extension HostServer.Core {
         func reset() {
             lock.withLock {
                 pending = nil
+                codecConfiguration = nil
                 drainIsScheduled = false
                 awaitingKeyFrame = false
                 keyFrameRequestWasReported = false
@@ -1857,8 +1872,11 @@ struct HostAuthenticatedClientRegistry: Sendable {
 struct HostVideoBootstrapCache: Sendable {
     private(set) var codecConfiguration: Data?
 
-    mutating func storeCodecConfiguration(_ payload: Data) {
+    @discardableResult
+    mutating func storeCodecConfiguration(_ payload: Data) -> Bool {
+        guard codecConfiguration != payload else { return false }
         codecConfiguration = payload
+        return true
     }
 
     mutating func clear() {
