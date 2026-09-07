@@ -36,6 +36,7 @@ struct ContentView<Session: RemoteSessionControlling,
     @State private var glassyConnectTask: Task<Void, Never>?
     @State private var pendingDeletionMachine: SavedMachine?
     @State private var isDeleteConfirmationPresented = false
+    @State private var isDeletionFailurePresented = false
     @State private var isClearRecentConnectionsConfirmationPresented = false
     @State private var sessionMachine: SavedMachine?
     @State private var sessionPreferences = SessionPreferences.default
@@ -78,6 +79,11 @@ struct ContentView<Session: RemoteSessionControlling,
             detailRoot
         }
         .navigationSplitViewStyle(.balanced)
+        .alert("Could Not Forget Mac", isPresented: $isDeletionFailurePresented) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The local pairing credentials could not be removed from Keychain. The saved Mac has been kept. Unlock your device and try again.")
+        }
         .fullScreenCover(isPresented: $isSessionPresented, onDismiss: handleSessionDismissed) {
             if sessionMachine?.connectionMode == .glassyStream {
                 SessionView(session: glassySession,
@@ -627,6 +633,11 @@ struct ContentView<Session: RemoteSessionControlling,
         pendingDeletionMachine = nil
         isDeleteConfirmationPresented = false
 
+        guard store.delete(machine) else {
+            isDeletionFailurePresented = true
+            return
+        }
+
         if machineEditorRequest?.machine.id == machine.id {
             machineEditorRequest = nil
         }
@@ -642,7 +653,6 @@ struct ContentView<Session: RemoteSessionControlling,
 
         machineReachabilityStatuses[machine.id] = nil
         machineReachabilityEndpoints[machine.id] = nil
-        store.delete(machine)
     }
 
     private func refreshMachines() {

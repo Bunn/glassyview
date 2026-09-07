@@ -16,6 +16,15 @@ final class SubscriptionStore {
 
     var isErrorPresented = false
     var errorMessage = ""
+    var isRestoreResultPresented = false
+    private(set) var restoreResultMessage = ""
+
+    @ObservationIgnored private let client: any SubscriptionClient
+
+    init(client: any SubscriptionClient = RevenueCatSubscriptionClient()) {
+        self.client = client
+        applyCachedCustomerInfo()
+    }
 
     var hasProAccess: Bool {
         proEntitlement?.isActive == true
@@ -45,17 +54,39 @@ final class SubscriptionStore {
     }
 
     func refresh() async {
-        guard isConfigured else { return }
+        guard isConfigured, !isRefreshing else { return }
 
+        applyCachedCustomerInfo()
         isRefreshing = true
         defer { isRefreshing = false }
 
-        do {
-            let offerings = try await Purchases.shared.offerings()
-            apply(offerings)
+        // Product discovery must not delay access to an existing purchase.
+        async let customerUpdate: Void = refreshCustomerInfo()
+        async let productUpdate: Void = refreshOfferings()
+        _ = await (customerUpdate, productUpdate)
+    }
 
-            let customerInfo = try await Purchases.shared.customerInfo()
-            apply(customerInfo)
+    func applyCachedCustomerInfo() {
+        guard client.isConfigured, customerInfo == nil,
+              let cachedCustomerInfo = client.cachedCustomerInfo else { return }
+        apply(cachedCustomerInfo)
+    }
+
+    private func refreshCustomerInfo() async {
+        do {
+            apply(try await client.customerInfo())
+        } catch is CancellationError {
+            return
+        } catch {
+            present(error)
+        }
+    }
+
+    private func refreshOfferings() async {
+        do {
+            apply(try await client.offerings())
+        } catch is CancellationError {
+            return
         } catch {
             present(error)
         }
@@ -77,7 +108,7 @@ final class SubscriptionStore {
         defer { isPurchasing = false }
 
         do {
-            let result = try await Purchases.shared.purchase(package: package)
+            let result = try await client.purchase(package)
             guard !result.userCancelled else { return }
 
             apply(result.customerInfo)
@@ -93,8 +124,12 @@ final class SubscriptionStore {
         defer { isRestoring = false }
 
         do {
-            let customerInfo = try await Purchases.shared.restorePurchases()
+            let customerInfo = try await client.restorePurchases()
             apply(customerInfo)
+            restoreResultMessage = hasProAccess
+                ? String(localized: "Your Glassy Desk Pro access has been restored.")
+                : String(localized: "No active Glassy Desk Pro purchase was found. Check that you’re using the Apple Account used for your purchase.")
+            isRestoreResultPresented = true
         } catch {
             present(error)
         }
@@ -103,7 +138,9 @@ final class SubscriptionStore {
     func observeCustomerInfoUpdates() async {
         guard isConfigured else { return }
 
-        for await customerInfo in Purchases.shared.customerInfoStream {
+        applyCachedCustomerInfo()
+        for await customerInfo in client.customerInfoStream {
+            guard !Task.isCancelled else { return }
             apply(customerInfo)
         }
     }
@@ -114,8 +151,8 @@ final class SubscriptionStore {
     }
 
     private var isConfigured: Bool {
-        guard Purchases.isConfigured else {
-            present(message: String(localized: "RevenueCat is not configured. Set the RevenueCatAPIKey Info.plist value before using purchases."))
+        guard client.isConfigured else {
+            present(message: String(localized: "Purchases are temporarily unavailable. Please try again later."))
             return false
         }
 

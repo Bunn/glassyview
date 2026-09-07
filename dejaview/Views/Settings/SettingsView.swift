@@ -34,10 +34,13 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
 
-                if let managementURL = subscriptionStore.managementURL {
-                    Link(destination: managementURL) {
-                        Label("Manage Subscription", systemImage: "link")
-                    }
+                Button("Restore Purchases", systemImage: "arrow.uturn.backward") {
+                    Task { await subscriptionStore.restorePurchases() }
+                }
+                .disabled(subscriptionStore.isRestoring)
+
+                Link(destination: subscriptionStore.managementURL ?? GlassyDeskLinks.manageSubscriptions) {
+                    Label("Manage Subscriptions", systemImage: "link")
                 }
             }
 
@@ -69,11 +72,13 @@ struct SettingsView: View {
             }
 
             Section {
-                Toggle("Share Anonymous Analytics", isOn: $analyticsEnabled)
+                Toggle("Share Optional Analytics", isOn: $analyticsEnabled)
+                Link("Privacy Policy", destination: GlassyDeskLinks.privacyPolicy)
+                Link("Terms of Use", destination: GlassyDeskLinks.termsOfUse)
             } header: {
                 Text("Privacy")
             } footer: {
-                Text("Your analytics are private. No identifiable information is ever sent.")
+                Text("Off by default. Share aggregate app events through Cloudflare and limited usage milestones linked to your anonymous RevenueCat purchase profile. Screen content, input, Mac addresses, and credentials are never included. Turn this off to stop collection and request removal of optional profile attributes. Purchase verification continues.")
             }
 
             #if DEBUG
@@ -97,6 +102,10 @@ struct SettingsView: View {
         .alert("Subscription Error", isPresented: $subscriptionStore.isErrorPresented) {
         } message: {
             Text(subscriptionStore.errorMessage)
+        }
+        .alert("Restore Purchases", isPresented: $subscriptionStore.isRestoreResultPresented) {
+        } message: {
+            Text(subscriptionStore.restoreResultMessage)
         }
         .sheet(isPresented: $isPaywallPresented) {
             RevenueCatPaywallSheet()

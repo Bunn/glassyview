@@ -7,6 +7,7 @@ capture the desktop or send input. Only the temporary host copy changes binding:
 loopback, ephemeral port, no Bonjour advertisement. Results are not device FPS.
 """
 
+import argparse
 import json
 from pathlib import Path
 import subprocess
@@ -30,6 +31,12 @@ def declaration(path, start):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--compatibility", choices=["legacy-client", "legacy-host"],
+                        help="Compile the selected peer's pre-adaptive committed source against the current other peer")
+    parser.add_argument("--legacy-revision", default="485335bc393c173d5f6e39cd5ef73932036ee6fa",
+                        help="Pre-adaptive commit used for compatibility peers")
+    args = parser.parse_args()
     host = "GlassyHost/Sources/GlassyHost/"
     client = "dejaview/Services/GlassyStream/"
     sources = [
@@ -37,16 +44,19 @@ def main():
         host + "Services/HostDeviceAccessStore.swift",
         host + "Services/PairingPasswordStore.swift",
         host + "Services/H264Encoder.swift",
+        host + "Models/HostAdaptiveStreamPolicy.swift",
+        host + "Models/HostStreamQualityConfiguration.swift",
         host + "Models/HostPairedDevice.swift",
         host + "Support/HostLog.swift",
         client + "GlassyStreamClient.swift",
+        client + "GlassyStreamEventDelivery.swift",
         client + "GlassyStreamWire.swift",
         client + "GlassyStreamTypes.swift",
         client + "GlassyStreamRouteRace.swift",
         client + "GlassyStreamPairingPassword.swift",
         client + "GlassyStreamResumeCredentialStore.swift",
         "dejaview/Infrastructure/AppLog.swift",
-        "script/performance/StreamAuditProbe.swift",
+        "script/performance/StreamCompatibilityProbe.swift" if args.compatibility else "script/performance/StreamAuditProbe.swift",
     ]
     with tempfile.TemporaryDirectory(prefix="glassy-stream-audit-") as directory:
         work = Path(directory)
@@ -55,6 +65,7 @@ def main():
         support += declaration("dejaview/Models/RemoteSessionTypes.swift", "enum RemoteSessionQuality:")
         support += "\n" + declaration(client + "GlassyStreamEndpoint.swift", "struct GlassyStreamDirectAddress:")
         support += "\n" + declaration(host + "Services/ScreenCaptureService.swift", "struct CapturedScreenFrame:")
+        support += "\n" + declaration(host + "Services/ScreenCaptureService.swift", "struct ScreenCaptureConfiguration:")
         support += """
 enum GlassyStreamEndpoint {
     static func isRecognizedTailscaleEndpoint(_ endpoint: NWEndpoint) -> Bool {
@@ -63,7 +74,21 @@ enum GlassyStreamEndpoint {
 }
 """
         (work / "Support.swift").write_text(support)
-        server = (ROOT / (host + "Services/HostServer.swift")).read_text()
+        compile_sources = [ROOT / source for source in sources]
+        def committed_source(source):
+            return subprocess.run(["git", "show", args.legacy_revision + ":" + source], cwd=ROOT,
+                                  check=True, text=True, capture_output=True).stdout
+        legacy_sources = []
+        if args.compatibility == "legacy-client":
+            legacy_sources = [client + "GlassyStreamClient.swift"]
+        elif args.compatibility == "legacy-host":
+            legacy_sources = [host + "Services/HostProtocol.swift"]
+        for source in legacy_sources:
+            legacy = work / ("Legacy" + Path(source).name)
+            legacy.write_text(committed_source(source))
+            compile_sources[compile_sources.index(ROOT / source)] = legacy
+        server = (committed_source(host + "Services/HostServer.swift") if args.compatibility == "legacy-host"
+                  else (ROOT / (host + "Services/HostServer.swift")).read_text())
         binding = "let parameters = NWParameters(tls: nil, tcp: tcpOptions)"
         assert server.count(binding) == 1
         server = server.replace(binding, binding + '\n                parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)')
@@ -74,12 +99,13 @@ enum GlassyStreamEndpoint {
         binary = work / "stream-audit"
         subprocess.run(
             ["xcrun", "swiftc", "-O", "-swift-version", "6", "-parse-as-library",
-             *[str(ROOT / source) for source in sources],
+             *[str(source) for source in compile_sources],
              str(work / "Support.swift"), str(work / "HostServer.swift"),
              "-o", str(binary)], check=True, cwd=ROOT, timeout=180,
         )
-        result = subprocess.run([str(binary), str(work)], check=True, text=True,
-                                capture_output=True, timeout=60)
+        probe_args = [str(binary), str(work)] + ([args.compatibility] if args.compatibility else [])
+        result = subprocess.run(probe_args, check=True, text=True,
+                                capture_output=True, timeout=120)
         print(json.dumps(json.loads(result.stdout), indent=2))
 
 

@@ -21,6 +21,7 @@ struct EditMachineView<Store: MachineStoring>: View {
     @State private var vncPortText: String
     @State private var glassyStreamPortText: String
     @State private var macAddress: String
+    @State private var isCredentialCleanupErrorPresented = false
 
     private let isNew: Bool
 
@@ -118,6 +119,7 @@ struct EditMachineView<Store: MachineStoring>: View {
     }
 
     private var isMACAddressValid: Bool {
+        guard connectionMode == .vnc else { return true }
         let value = macAddress.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty || MACAddress(value) != nil
     }
@@ -237,23 +239,25 @@ struct EditMachineView<Store: MachineStoring>: View {
                     .id(glassyHostIdentifier)
                 }
 
-                Section {
-                    TextField("MAC Address (optional)", text: $macAddress)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .keyboardType(.asciiCapable)
-                        .textContentType(.none)
+                if connectionMode == .vnc {
+                    Section {
+                        TextField("MAC Address (optional)", text: $macAddress)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .keyboardType(.asciiCapable)
+                            .textContentType(.none)
 
-                    if !isMACAddressValid {
-                        Label("Enter six hexadecimal pairs, such as A1:B2:C3:D4:E5:F6.",
-                              systemImage: "exclamationmark.triangle.fill")
-                            .font(.footnote)
-                            .foregroundStyle(.red)
+                        if !isMACAddressValid {
+                            Label("Enter six hexadecimal pairs, such as A1:B2:C3:D4:E5:F6.",
+                                  systemImage: "exclamationmark.triangle.fill")
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+                    } header: {
+                        Text("Wake on LAN")
+                    } footer: {
+                        Text("When this Mac is unreachable, Glassy Desk can wake it and connect automatically. Enable “Wake for network access” in macOS System Settings.")
                     }
-                } header: {
-                    Text("Wake on LAN")
-                } footer: {
-                    Text("When this Mac is unreachable, Glassy Desk can wake it and connect automatically. Enable “Wake for network access” in macOS System Settings.")
                 }
 
                 if isNew, connectAfterDismiss != nil {
@@ -273,7 +277,10 @@ struct EditMachineView<Store: MachineStoring>: View {
                 if !isNew {
                     Section {
                         Button("Delete Machine", role: .destructive) {
-                            store.delete(machine)
+                            guard store.delete(machine) else {
+                                isCredentialCleanupErrorPresented = true
+                                return
+                            }
                             dismiss()
                         }
                     }
@@ -288,6 +295,10 @@ struct EditMachineView<Store: MachineStoring>: View {
                 }
             }
             .navigationTitle(isNew ? "New Machine" : "Edit Machine")
+            .alert("Couldn’t Update Saved Mac", isPresented: $isCredentialCleanupErrorPresented) {
+            } message: {
+                Text("Unlock this device and try again. The saved Mac has been kept because its credentials could not be removed.")
+            }
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: EditMachineRoute.self) { destination in
                 switch destination {
@@ -322,7 +333,10 @@ struct EditMachineView<Store: MachineStoring>: View {
         if isNew {
             store.add(prepared, password: password)
         } else {
-            store.update(prepared, password: password)
+            guard store.update(prepared, password: password) else {
+                isCredentialCleanupErrorPresented = true
+                return
+            }
         }
 
         dismiss()
@@ -342,7 +356,10 @@ struct EditMachineView<Store: MachineStoring>: View {
         if isNew {
             store.add(prepared, password: password)
         } else {
-            store.update(prepared, password: password)
+            guard store.update(prepared, password: password) else {
+                isCredentialCleanupErrorPresented = true
+                return
+            }
         }
 
         connectAfterDismiss?(prepared, password)

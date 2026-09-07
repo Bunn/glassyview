@@ -17,6 +17,7 @@ struct H264AccessUnit: Equatable, Sendable {
     let presentationTimeSeconds: Double
     let durationSeconds: Double?
     let isKeyFrame: Bool
+    var encodedWidth: Int? = nil
 }
 
 enum H264EncoderOutput: Equatable, Sendable {
@@ -28,15 +29,21 @@ struct H264EncoderConfiguration: Sendable {
     var expectedFrameRate: Int
     var averageBitRate: Int
     var keyFrameIntervalSeconds: Double
+    var maximumWidth: Int?
+    var maximumHeight: Int?
 
     init(
         expectedFrameRate: Int = 60,
         averageBitRate: Int = 12_000_000,
-        keyFrameIntervalSeconds: Double = 2
+        keyFrameIntervalSeconds: Double = 2,
+        maximumWidth: Int? = nil,
+        maximumHeight: Int? = nil
     ) {
         self.expectedFrameRate = max(1, expectedFrameRate)
         self.averageBitRate = max(100_000, averageBitRate)
         self.keyFrameIntervalSeconds = max(0.25, keyFrameIntervalSeconds)
+        self.maximumWidth = maximumWidth
+        self.maximumHeight = maximumHeight
     }
 }
 
@@ -76,7 +83,7 @@ final class H264Encoder: @unchecked Sendable {
     typealias OutputHandler = @Sendable (H264EncoderOutput) -> Void
     typealias ErrorHandler = @Sendable (H264EncoderError) -> Void
 
-    private let configuration: H264EncoderConfiguration
+    private var configuration: H264EncoderConfiguration
     private let queue = DispatchQueue(
         label: "dev.bunn.glassydesk.host.h264-encoder",
         qos: .userInteractive
@@ -84,9 +91,15 @@ final class H264Encoder: @unchecked Sendable {
     private let callbackContext: H264CallbackContext
 
     private var compressionSession: VTCompressionSession?
+    private var pixelTransferSession: VTPixelTransferSession?
     private var sessionWidth = 0
     private var sessionHeight = 0
     private var forceNextKeyFrame = true
+    private var latestFrame: CapturedScreenFrame?
+    private var lastSubmittedTimestamp: CMTime = .invalid
+    private var recoveryWorkItem: DispatchWorkItem?
+    private var lastRecoveryTime: TimeInterval = -.infinity
+    private var isFinished = false
 
     init(
         configuration: H264EncoderConfiguration = .init(),
@@ -101,6 +114,7 @@ final class H264Encoder: @unchecked Sendable {
     }
 
     deinit {
+        if let pixelTransferSession { VTPixelTransferSessionInvalidate(pixelTransferSession) }
         if let compressionSession {
             VTCompressionSessionCompleteFrames(
                 compressionSession,
@@ -124,17 +138,71 @@ final class H264Encoder: @unchecked Sendable {
         }
     }
 
-    /// Forces the next submitted frame to be independently decodable. Use this when a
-    /// newly authenticated viewer joins an existing host session.
+    /// Re-encode the most recent valid capture when a desktop is idle. At most
+    /// one request is pending, and new capture input can satisfy it first.
     func requestKeyFrame() {
         queue.async { [weak self] in
-            self?.forceNextKeyFrame = true
+            guard let self, !isFinished else { return }
+            forceNextKeyFrame = true
+            guard latestFrame != nil, recoveryWorkItem == nil else { return }
+            let delay = max(0, 0.25 - (ProcessInfo.processInfo.systemUptime - lastRecoveryTime))
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                recoveryWorkItem = nil
+                guard !isFinished, forceNextKeyFrame, let latestFrame else { return }
+                let hostNow = CMClockGetTime(CMClockGetHostTimeClock())
+                let nextTime = lastSubmittedTimestamp.isValid
+                    ? CMTimeMaximum(hostNow, CMTimeAdd(lastSubmittedTimestamp, CMTime(value: 1, timescale: 1_000_000)))
+                    : hostNow
+                let recovery = CapturedScreenFrame(pixelBuffer: latestFrame.pixelBuffer,
+                                                   presentationTimeStamp: nextTime,
+                                                   duration: latestFrame.duration)
+                do {
+                    lastRecoveryTime = ProcessInfo.processInfo.systemUptime
+                    try encodeOnQueue(recovery, forceKeyFrame: true)
+                } catch let error as H264EncoderError {
+                    callbackContext.report(error: error)
+                } catch { }
+            }
+            recoveryWorkItem = work
+            queue.asyncAfter(deadline: .now() + delay, execute: work)
+        }
+    }
+
+    /// Update rate limits without rebuilding capture or resetting decoder state.
+    func updateConfiguration(_ updated: H264EncoderConfiguration) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async { [self] in
+                do {
+                    if let session = compressionSession, !isFinished {
+                        try setProperty(kVTCompressionPropertyKey_AverageBitRate,
+                                        value: NSNumber(value: updated.averageBitRate), on: session)
+                        try setProperty(kVTCompressionPropertyKey_DataRateLimits,
+                                        value: [NSNumber(value: updated.averageBitRate / 8), NSNumber(value: 1)] as CFArray,
+                                        on: session)
+                        try setProperty(kVTCompressionPropertyKey_ExpectedFrameRate,
+                                        value: NSNumber(value: updated.expectedFrameRate), on: session)
+                        try setProperty(kVTCompressionPropertyKey_MaxKeyFrameInterval,
+                                        value: NSNumber(value: Int(Double(updated.expectedFrameRate) * updated.keyFrameIntervalSeconds)),
+                                        on: session)
+                    }
+                    configuration = updated
+                    requestKeyFrame()
+                    continuation.resume()
+                } catch { continuation.resume(throwing: error) }
+            }
         }
     }
 
     func finish() async {
         await withCheckedContinuation { continuation in
             queue.async { [self] in
+                isFinished = true
+                recoveryWorkItem?.cancel()
+                recoveryWorkItem = nil
+                latestFrame = nil
+                if let pixelTransferSession { VTPixelTransferSessionInvalidate(pixelTransferSession) }
+                pixelTransferSession = nil
                 invalidateSessionOnQueue(completeFrames: true)
                 continuation.resume()
             }
@@ -145,8 +213,10 @@ final class H264Encoder: @unchecked Sendable {
         _ frame: CapturedScreenFrame,
         forceKeyFrame requestedKeyFrame: Bool
     ) throws {
-        let width = CVPixelBufferGetWidth(frame.pixelBuffer)
-        let height = CVPixelBufferGetHeight(frame.pixelBuffer)
+        guard !isFinished else { return }
+        let pixelBuffer = try preparedPixelBuffer(frame.pixelBuffer)
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        let height = CVPixelBufferGetHeight(pixelBuffer)
         try prepareSessionOnQueue(width: width, height: height)
 
         guard let compressionSession else { return }
@@ -158,10 +228,13 @@ final class H264Encoder: @unchecked Sendable {
             : nil
 
         var infoFlags = VTEncodeInfoFlags()
+        let timestamp = lastSubmittedTimestamp.isValid
+            ? CMTimeMaximum(frame.presentationTimeStamp, CMTimeAdd(lastSubmittedTimestamp, CMTime(value: 1, timescale: 1_000_000)))
+            : frame.presentationTimeStamp
         let status = VTCompressionSessionEncodeFrame(
             compressionSession,
-            imageBuffer: frame.pixelBuffer,
-            presentationTimeStamp: frame.presentationTimeStamp,
+            imageBuffer: pixelBuffer,
+            presentationTimeStamp: timestamp,
             duration: frame.duration,
             frameProperties: frameProperties,
             sourceFrameRefcon: nil,
@@ -170,6 +243,37 @@ final class H264Encoder: @unchecked Sendable {
         guard status == noErr else {
             throw H264EncoderError(operation: "Encode frame", status: status)
         }
+        latestFrame = frame
+        lastSubmittedTimestamp = timestamp
+    }
+
+    /// Enforce the current tier even while ScreenCaptureKit is applying its
+    /// configuration, and resize retained idle capture for immediate recovery.
+    /// Keep latestFrame in its original captured form for later reuse.
+    private func preparedPixelBuffer(_ source: CVPixelBuffer) throws -> CVPixelBuffer {
+        let width = CVPixelBufferGetWidth(source), height = CVPixelBufferGetHeight(source)
+        let scale = min(1, configuration.maximumWidth.map { Double($0) / Double(width) } ?? 1,
+                        configuration.maximumHeight.map { Double($0) / Double(height) } ?? 1)
+        guard scale < 1 else { return source }
+        let outputWidth = max(2, Int(Double(width) * scale)) & ~1
+        let outputHeight = max(2, Int(Double(height) * scale)) & ~1
+        var destination: CVPixelBuffer?
+        let allocation = CVPixelBufferCreate(kCFAllocatorDefault, outputWidth, outputHeight,
+                                             CVPixelBufferGetPixelFormatType(source),
+                                             [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary,
+                                             &destination)
+        guard allocation == kCVReturnSuccess, let destination else {
+            throw H264EncoderError(operation: "Allocate adaptive capture buffer", status: allocation)
+        }
+        if pixelTransferSession == nil {
+            let status = VTPixelTransferSessionCreate(allocator: kCFAllocatorDefault,
+                                                    pixelTransferSessionOut: &pixelTransferSession)
+            guard status == noErr else { throw H264EncoderError(operation: "Create adaptive image scaler", status: status) }
+        }
+        guard let pixelTransferSession else { throw H264EncoderError(operation: "Create adaptive image scaler", status: -1) }
+        let status = VTPixelTransferSessionTransferImage(pixelTransferSession, from: source, to: destination)
+        guard status == noErr else { throw H264EncoderError(operation: "Resize adaptive capture", status: status) }
+        return destination
     }
 
     private func prepareSessionOnQueue(width: Int, height: Int) throws {
@@ -373,7 +477,8 @@ private final class H264CallbackContext: @unchecked Sendable {
                     durationSeconds: duration.isFinite && duration > 0
                         ? duration
                         : nil,
-                    isKeyFrame: isKeyFrame
+                    isKeyFrame: isKeyFrame,
+                    encodedWidth: sampleBuffer.formatDescription.map { Int(CMVideoFormatDescriptionGetDimensions($0).width) }
                 )
             )
         )

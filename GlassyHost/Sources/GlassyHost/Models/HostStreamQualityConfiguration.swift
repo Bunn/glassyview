@@ -1,8 +1,8 @@
 struct HostStreamQualityConfiguration: Equatable, Sendable {
-    let maximumWidth: Int
-    let maximumHeight: Int
-    let framesPerSecond: Int
-    let averageBitRate: Int
+    var maximumWidth: Int
+    var maximumHeight: Int
+    var framesPerSecond: Int
+    var averageBitRate: Int
 
     init(quality: HostProtocol.StreamQuality) {
         switch quality {
@@ -24,6 +24,28 @@ struct HostStreamQualityConfiguration: Equatable, Sendable {
         }
     }
 
+    init(quality: HostProtocol.StreamQuality, availableBitRate: Int?, maximumCaptureWidth: Int? = nil) {
+        self.init(quality: quality)
+        guard let availableBitRate else { return }
+        averageBitRate = max(HostAdaptiveRatePolicy.minimumBitRate, min(averageBitRate, availableBitRate))
+        let dimensions: (Int, Int, Int)
+        switch averageBitRate {
+        case ..<700_000: dimensions = (960, 540, 8)
+        case ..<1_500_000: dimensions = (1280, 720, 12)
+        case ..<3_000_000: dimensions = (1280, 720, 15)
+        case ..<7_000_000: dimensions = (1920, 1080, 30)
+        default: dimensions = (3840, 2160, 60)
+        }
+        maximumWidth = min(maximumWidth, dimensions.0)
+        maximumHeight = min(maximumHeight, dimensions.1)
+        framesPerSecond = min(framesPerSecond, dimensions.2)
+        if let maximumCaptureWidth {
+            self.maximumWidth = min(self.maximumWidth, maximumCaptureWidth)
+            maximumHeight = min(maximumHeight, maximumCaptureWidth * 9 / 16)
+            framesPerSecond = min(framesPerSecond, maximumCaptureWidth <= 320 ? 6 : 8)
+        }
+    }
+
     var screenCaptureConfiguration: ScreenCaptureConfiguration {
         ScreenCaptureConfiguration(
             framesPerSecond: framesPerSecond,
@@ -37,7 +59,9 @@ struct HostStreamQualityConfiguration: Equatable, Sendable {
         H264EncoderConfiguration(
             expectedFrameRate: framesPerSecond,
             averageBitRate: averageBitRate,
-            keyFrameIntervalSeconds: 2
+            keyFrameIntervalSeconds: 2,
+            maximumWidth: maximumWidth,
+            maximumHeight: maximumHeight
         )
     }
 }

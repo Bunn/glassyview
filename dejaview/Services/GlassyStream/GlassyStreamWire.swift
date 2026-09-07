@@ -28,6 +28,7 @@ enum GlassyStreamWire {
         static let cursorPositionUpdates = Capabilities(rawValue: 1 << 4)
         static let pairingPassword = Capabilities(rawValue: 1 << 5)
         static let clipboardPaste = Capabilities(rawValue: 1 << 6)
+        static let adaptiveStream = Capabilities(rawValue: 1 << 7)
     }
 
     enum MessageKind: UInt8, Sendable {
@@ -43,6 +44,8 @@ enum GlassyStreamWire {
         case streamQualityRequest = 0x13
         case cursorPositionSubscription = 0x14
         case cursorPosition = 0x15
+        case streamFeedback = 0x16
+        case hostStreamStatus = 0x17
         case pointerInput = 0x20
         case scrollInput = 0x21
         case keyInput = 0x22
@@ -235,6 +238,7 @@ enum GlassyStreamWire {
                      sequence: UInt64,
                      material: SessionMaterial,
                      serverToClient: Bool) throws -> Data {
+        try validateNonceDirections(material)
         let encryptedFlags = flags.union(.encrypted)
         let nonce = try makeNonce(prefix: serverToClient
                                   ? material.serverToClientNoncePrefix
@@ -259,6 +263,7 @@ enum GlassyStreamWire {
                      sequence: UInt64,
                      material: SessionMaterial,
                      serverToClient: Bool) throws -> Data {
+        try validateNonceDirections(material)
         guard flags.contains(.encrypted),
               ciphertextAndTag.count >= authenticationTagLength else {
             throw violation("encrypted message is missing its authentication tag")
@@ -282,6 +287,14 @@ enum GlassyStreamWire {
             )
         } catch {
             throw violation("message authentication failed")
+        }
+    }
+
+    private static func validateNonceDirections(_ material: SessionMaterial) throws {
+        // Preserve the v1 key schedule, but never permit a shared key to use
+        // the same nonce domain for both directions.
+        guard material.serverToClientNoncePrefix != material.clientToServerNoncePrefix else {
+            throw violation("session nonce directions overlap")
         }
     }
 
@@ -366,6 +379,28 @@ enum GlassyStreamWire {
 
     static func encodeKeyFrameRequest() -> Data {
         Data()
+    }
+
+    static func encodeStreamFeedback(sequence: UInt64, queueAgeMilliseconds: UInt32) -> Data {
+        var writer = GlassyByteWriter(capacity: 16)
+        writer.write(sequence)
+        writer.write(queueAgeMilliseconds)
+        writer.write(UInt32(0))
+        return writer.data
+    }
+
+    static func decodeHostStreamStatus(_ data: Data) throws -> GlassyStreamHostStatus {
+        var reader = GlassyByteReader(data: data)
+        guard let state = GlassyStreamHostStatus.State(rawValue: try reader.readUInt8()) else {
+            throw violation("unknown host stream state")
+        }
+        let flags = try reader.readUInt8()
+        guard flags & ~UInt8(3) == 0, try reader.readUInt16() == 0 else {
+            throw violation("invalid host stream status flags")
+        }
+        try reader.requireEnd()
+        return GlassyStreamHostStatus(state: state, accessibilityGranted: flags & 1 != 0,
+                                     ownsInput: flags & 2 != 0)
     }
 
     static func encodeStreamQualityRequest(_ quality: RemoteSessionQuality) -> Data {

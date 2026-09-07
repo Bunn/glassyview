@@ -9,33 +9,37 @@ enum PairingSecretStoreError: LocalizedError {
     case keychain(OSStatus)
     case randomGeneration(OSStatus)
     case invalidFallbackFile
+    case invalidKeychainData
 
     var errorDescription: String? {
         switch self {
         case .keychain(let status):
-            "The pairing key could not be stored securely (Keychain status \(status))."
+            "The pairing key is unavailable (Keychain status \(status)). Unlock your login Keychain or restore Glassy Desk's access, then try again."
         case .randomGeneration(let status):
             "A secure pairing key could not be generated (Security status \(status))."
         case .invalidFallbackFile:
             "The local pairing key file is invalid."
+        case .invalidKeychainData:
+            "The stored pairing key is invalid. Restore Keychain access or explicitly reset pairing."
         }
     }
 }
 
 struct PairingSecretStore: Sendable {
-    private enum StorageMode: Sendable {
+    enum StorageMode: Sendable {
         case keychain
         case protectedFile
     }
 
-    private let service = "dev.bunn.glassydesk.host.pairing"
-    private let account = "primary-host-key"
     private let storageMode: StorageMode
+    private let keychain: any PairingSecretKeychainStoring
 
-    init() {
-        storageMode = Bundle.main.object(
+    init(storageMode: StorageMode? = nil,
+         keychain: any PairingSecretKeychainStoring = SystemPairingSecretKeychain()) {
+        self.storageMode = storageMode ?? (Bundle.main.object(
             forInfoDictionaryKey: "GlassyHostPairingSecretStorage"
-        ) as? String == "keychain" ? .keychain : .protectedFile
+        ) as? String == "protected-file" ? .protectedFile : .keychain)
+        self.keychain = keychain
     }
 
     func loadOrCreate() throws -> PairingSecret {
@@ -46,19 +50,13 @@ struct PairingSecretStore: Sendable {
             return try loadOrCreateFallbackFile()
         }
 
-        do {
-            if let existing = try load() {
-                return existing
-            }
-
-            return try replaceInKeychain()
-        } catch PairingSecretStoreError.keychain(let status)
-            where Self.shouldUseFileFallback(for: status) {
-            HostLog.security.warning(
-                "Keychain identity is unavailable for this local signature; using a protected Application Support key"
-            )
-            return try loadOrCreateFallbackFile()
+        // Keychain errors must never create a second host identity. A locked
+        // Keychain or changed signing ACL is recoverable without re-pairing.
+        if let data = try keychain.load() {
+            guard data.count == 32 else { throw PairingSecretStoreError.invalidKeychainData }
+            return PairingSecret(keyData: data)
         }
+        return try replaceInKeychain()
     }
 
     func replace() throws -> PairingSecret {
@@ -68,19 +66,12 @@ struct PairingSecretStore: Sendable {
             return secret
         }
 
-        do {
-            return try replaceInKeychain()
-        } catch PairingSecretStoreError.keychain(let status)
-            where Self.shouldUseFileFallback(for: status) {
-            let secret = try makeSecret()
-            try saveFallbackFile(secret)
-            return secret
-        }
+        return try replaceInKeychain()
     }
 
     private func replaceInKeychain() throws -> PairingSecret {
         let secret = try makeSecret()
-        try save(secret)
+        try keychain.save(secret.keyData)
         return secret
     }
 
@@ -92,64 +83,6 @@ struct PairingSecretStore: Sendable {
         }
 
         return PairingSecret(keyData: Data(bytes))
-    }
-
-    private func load() throws -> PairingSecret? {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account,
-            kSecUseAuthenticationUI: kSecUseAuthenticationUISkip,
-            kSecReturnData: true,
-            kSecMatchLimit: kSecMatchLimitOne
-        ]
-
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        switch status {
-        case errSecSuccess:
-            guard let data = result as? Data else {
-                throw PairingSecretStoreError.keychain(errSecDecode)
-            }
-            guard data.count == 32 else { return nil }
-            return PairingSecret(keyData: data)
-        case errSecItemNotFound:
-            return nil
-        default:
-            throw PairingSecretStoreError.keychain(status)
-        }
-    }
-
-    private func save(_ secret: PairingSecret) throws {
-        let identity: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account,
-            kSecUseAuthenticationUI: kSecUseAuthenticationUISkip
-        ]
-
-        let updateStatus = SecItemUpdate(
-            identity as CFDictionary,
-            [kSecValueData: secret.keyData] as CFDictionary
-        )
-
-        if updateStatus == errSecSuccess {
-            return
-        }
-
-        guard updateStatus == errSecItemNotFound else {
-            throw PairingSecretStoreError.keychain(updateStatus)
-        }
-
-        var add = identity
-        add.removeValue(forKey: kSecUseAuthenticationUI)
-        add[kSecValueData] = secret.keyData
-        add[kSecAttrAccessible] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-
-        let addStatus = SecItemAdd(add as CFDictionary, nil)
-        guard addStatus == errSecSuccess else {
-            throw PairingSecretStoreError.keychain(addStatus)
-        }
     }
 
     private func loadOrCreateFallbackFile() throws -> PairingSecret {
@@ -194,10 +127,74 @@ struct PairingSecretStore: Sendable {
         )
         return directory.appendingPathComponent("pairing-secret-v1")
     }
+}
 
-    private static func shouldUseFileFallback(for status: OSStatus) -> Bool {
-        status == errSecInteractionNotAllowed
-            || status == errSecAuthFailed
-            || status == errSecUserCanceled
+/// The production namespace and Security.framework behavior remain isolated
+/// here so identity recovery can be tested without accessing a user's keys.
+protocol PairingSecretKeychainStoring: Sendable {
+    func load() throws -> Data?
+    func save(_ data: Data) throws
+}
+
+struct SystemPairingSecretKeychain: PairingSecretKeychainStoring {
+    private let service = "dev.bunn.glassydesk.host.pairing"
+    private let account = "primary-host-key"
+
+    func load() throws -> Data? {
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service,
+            kSecAttrAccount: account,
+            kSecUseAuthenticationUI: kSecUseAuthenticationUISkip,
+            kSecReturnData: true,
+            kSecMatchLimit: kSecMatchLimitOne
+        ]
+
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        switch status {
+        case errSecSuccess:
+            guard let data = result as? Data else {
+                throw PairingSecretStoreError.keychain(errSecDecode)
+            }
+            return data
+        case errSecItemNotFound:
+            return nil
+        default:
+            throw PairingSecretStoreError.keychain(status)
+        }
     }
+
+    func save(_ data: Data) throws {
+        let identity: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service,
+            kSecAttrAccount: account,
+            kSecUseAuthenticationUI: kSecUseAuthenticationUISkip
+        ]
+
+        let updateStatus = SecItemUpdate(
+            identity as CFDictionary,
+            [kSecValueData: data] as CFDictionary
+        )
+
+        if updateStatus == errSecSuccess {
+            return
+        }
+
+        guard updateStatus == errSecItemNotFound else {
+            throw PairingSecretStoreError.keychain(updateStatus)
+        }
+
+        var add = identity
+        add.removeValue(forKey: kSecUseAuthenticationUI)
+        add[kSecValueData] = data
+        add[kSecAttrAccessible] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+
+        let addStatus = SecItemAdd(add as CFDictionary, nil)
+        guard addStatus == errSecSuccess else {
+            throw PairingSecretStoreError.keychain(addStatus)
+        }
+    }
+
 }

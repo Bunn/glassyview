@@ -178,7 +178,6 @@ final class CloudflareAnalyticsTracker: AnalyticsTracking {
     private let retryDelays: [Duration]
 
     private var isCollectionEnabled = false
-    private var isOptingOut = false
     private var queue: [AnalyticsEvent] = []
     private var deliveryTask: Task<Void, Never>?
     private var deliveryGeneration = 0
@@ -209,7 +208,6 @@ final class CloudflareAnalyticsTracker: AnalyticsTracking {
         #endif
 
         isCollectionEnabled = enabled
-        isOptingOut = false
 
         if enabled {
             scheduleDeliveryIfNeeded()
@@ -221,33 +219,11 @@ final class CloudflareAnalyticsTracker: AnalyticsTracking {
         }
     }
 
-    func disableCollectionAfterTrackingOptOut() async {
-        guard isCollectionEnabled else { return }
-
-        if isOptingOut {
-            await deliveryTask?.value
-            return
-        }
-
-        track(
-            .analyticsDisabled,
-            context: AnalyticsEventContext(source: .settings, outcome: .success)
-        )
-        isOptingOut = true
-
-        await deliveryTask?.value
-
-        // Re-enabling collection invalidates an opt-out that is still being delivered.
-        guard isOptingOut else { return }
-        setCollectionEnabled(false)
-    }
-
     func track(_ event: AnalyticsEventName, context: AnalyticsEventContext?) {
-        guard isCollectionEnabled, !isOptingOut else {
+        guard isCollectionEnabled else {
             #if DEBUG
-            let reason = isOptingOut ? "collection_disabling" : "collection_disabled"
             AppLog.analytics.debug(
-                "Ignored event; name=\(event.rawValue, privacy: .public) reason=\(reason, privacy: .public)"
+                "Ignored event; name=\(event.rawValue, privacy: .public) reason=collection_disabled"
             )
             #endif
             return

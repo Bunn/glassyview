@@ -6,8 +6,8 @@ import Security
 /// An encrypted Glassy Host transport selected from bounded concurrent routes.
 ///
 /// `connect` is callback-first so media can move directly from the Network
-/// queue to a renderer queue without MainActor work. `eventStream` is provided
-/// for consumers that continuously drain an async sequence.
+/// queue to a renderer queue without MainActor work. Media delivery is bounded
+/// before entering the consumer queue, including while that queue is stalled.
 final class GlassyStreamClient: @unchecked Sendable {
     private struct PendingAuthentication: Sendable {
         let material: GlassyStreamWire.SessionMaterial
@@ -18,6 +18,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         let supportsStreamQuality: Bool
         let supportsCursorPositionUpdates: Bool
         let supportsClipboardPaste: Bool
+        let supportsAdaptiveStream: Bool
     }
 
     private enum State: Sendable {
@@ -48,12 +49,19 @@ final class GlassyStreamClient: @unchecked Sendable {
     private var supportsStreamQuality = false
     private var supportsCursorPositionUpdates = false
     private var supportsClipboardPaste = false
+    private var supportsAdaptiveStream = false
+    private var eventDelivery: GlassyStreamEventDelivery?
+    private var lastHandledVideoSequence: UInt64 = 0
+    private var pendingFeedbackAge: UInt32 = 0
+    private var feedbackWorkItem: DispatchWorkItem?
 
     init(credentialStore: any GlassyStreamResumeCredentialStoring = GlassyStreamKeychainCredentialStore()) {
         self.credentialStore = credentialStore
     }
 
     deinit {
+        feedbackWorkItem?.cancel()
+        eventDelivery?.cancel()
         authenticationTimeoutWorkItem?.cancel()
         connection?.stateUpdateHandler = nil
         connection?.viabilityUpdateHandler = nil
@@ -70,37 +78,6 @@ final class GlassyStreamClient: @unchecked Sendable {
             self?.start(configuration: configuration,
                         callbackQueue: callbackQueue,
                         callbacks: callbacks)
-        }
-    }
-
-    /// Async-sequence convenience. This stream is intentionally unbounded:
-    /// the media renderer must drain it continuously so decoder configuration
-    /// can never be discarded ahead of the keyframe that depends on it. The
-    /// callback API is preferred when the consumer has its own bounded queue.
-    func eventStream(configuration: GlassyStreamConnectionConfiguration,
-                     callbackQueue: DispatchQueue = .main)
-        -> AsyncThrowingStream<GlassyStreamEvent, Error> {
-        AsyncThrowingStream { continuation in
-            connect(
-                configuration: configuration,
-                callbackQueue: callbackQueue,
-                callbacks: GlassyStreamClientCallbacks(
-                    onEvent: { event in
-                        continuation.yield(event)
-                    },
-                    onCompletion: { result in
-                        switch result {
-                        case .success:
-                            continuation.finish()
-                        case let .failure(error):
-                            continuation.finish(throwing: error)
-                        }
-                    }
-                )
-            )
-            continuation.onTermination = { [weak self] _ in
-                self?.disconnect()
-            }
         }
     }
 
@@ -265,6 +242,24 @@ final class GlassyStreamClient: @unchecked Sendable {
             target: callbackQueue
         )
         self.callbacks = callbacks
+        eventDelivery = GlassyStreamEventDelivery(queue: self.callbackQueue!, callbacks: callbacks,
+            onRetired: { [weak self] sequence, age in
+                self?.queue.async { [weak self] in
+                    self?.reportHandledVideo(sequence: sequence, age: age, generation: activeGeneration)
+                }
+            },
+            onRecovery: { [weak self] in
+                self?.queue.async { [weak self] in
+                    guard let self, self.generation == activeGeneration,
+                          case let .authenticated(material) = self.state else { return }
+                    do {
+                        try self.sendEncrypted(Data(), kind: .keyFrameRequest, flags: [],
+                                               material: material, generation: activeGeneration)
+                    } catch {
+                        self.finish(.failure(self.clientError(error)), generation: activeGeneration)
+                    }
+                }
+            })
         // Route selection hands this client a copy-on-write Data value. If the
         // prefetched ServerHello consumes that buffer completely while the
         // selection still retains its copy, Foundation can trap when an empty
@@ -574,7 +569,8 @@ final class GlassyStreamClient: @unchecked Sendable {
                                   resumedSession: resumedSession,
                                   supportsStreamQuality: capabilities.contains(.streamQualityControl),
                                   supportsCursorPositionUpdates: capabilities.contains(.cursorPositionUpdates),
-                                  supportsClipboardPaste: capabilities.contains(.clipboardPaste))
+                                  supportsClipboardPaste: capabilities.contains(.clipboardPaste),
+                                  supportsAdaptiveStream: capabilities.contains(.adaptiveStream))
         )
         try sendPlaintext(GlassyStreamWire.encodeClientHello(hello),
                           kind: .clientHello,
@@ -626,6 +622,11 @@ final class GlassyStreamClient: @unchecked Sendable {
         supportsStreamQuality = pending.supportsStreamQuality
         supportsCursorPositionUpdates = pending.supportsCursorPositionUpdates
         supportsClipboardPaste = pending.supportsClipboardPaste
+        supportsAdaptiveStream = pending.supportsAdaptiveStream
+        if supportsAdaptiveStream {
+            try sendEncrypted(GlassyStreamWire.encodeStreamFeedback(sequence: 0, queueAgeMilliseconds: 0),
+                              kind: .streamFeedback, flags: [], material: pending.material, generation: generation)
+        }
         if pending.supportsStreamQuality {
             try sendEncrypted(
                 GlassyStreamWire.encodeStreamQualityRequest(configuration.desiredQuality),
@@ -686,7 +687,12 @@ final class GlassyStreamClient: @unchecked Sendable {
                     plaintext,
                     isKeyFrame: frame.flags.contains(.keyFrame)
                 )
-            ))
+            ), videoSequence: frame.sequence)
+        case .hostStreamStatus:
+            guard supportsAdaptiveStream, !frame.flags.contains(.keyFrame) else {
+                throw GlassyStreamClientError.protocolViolation("host stream status was not negotiated")
+            }
+            deliver(.hostStreamStatus(try GlassyStreamWire.decodeHostStreamStatus(plaintext)))
         case .pong:
             guard !frame.flags.contains(.keyFrame), plaintext.count <= 64 else {
                 throw GlassyStreamClientError.protocolViolation("invalid pong")
@@ -792,11 +798,33 @@ final class GlassyStreamClient: @unchecked Sendable {
         return nextOutboundSequence
     }
 
-    private func deliver(_ event: GlassyStreamEvent) {
-        guard let callbackQueue, let callbacks else { return }
-        callbackQueue.async {
-            callbacks.onEvent(event)
+    private func deliver(_ event: GlassyStreamEvent, videoSequence: UInt64 = 0) {
+        eventDelivery?.offer(event, sequence: videoSequence)
+    }
+
+    private func reportHandledVideo(sequence: UInt64, age: UInt32, generation activeGeneration: UUID) {
+        guard activeGeneration == generation, supportsAdaptiveStream,
+              case .authenticated = state else { return }
+        lastHandledVideoSequence = max(lastHandledVideoSequence, sequence)
+        pendingFeedbackAge = max(pendingFeedbackAge, age)
+        guard feedbackWorkItem == nil else { return }
+        let item = DispatchWorkItem { [weak self] in
+            guard let self, activeGeneration == self.generation,
+                  case let .authenticated(material) = self.state else { return }
+            self.feedbackWorkItem = nil
+            let age = self.pendingFeedbackAge
+            self.pendingFeedbackAge = 0
+            do {
+                try self.sendEncrypted(
+                    GlassyStreamWire.encodeStreamFeedback(sequence: self.lastHandledVideoSequence,
+                                                          queueAgeMilliseconds: age),
+                    kind: .streamFeedback, flags: [], material: material, generation: activeGeneration)
+            } catch {
+                self.finish(.failure(self.clientError(error)), generation: activeGeneration)
+            }
         }
+        feedbackWorkItem = item
+        queue.asyncAfter(deadline: .now() + .milliseconds(30), execute: item)
     }
 
     private var connectedAddress: GlassyStreamDirectAddress? {
@@ -814,6 +842,10 @@ final class GlassyStreamClient: @unchecked Sendable {
                         generation activeGeneration: UUID) {
         guard activeGeneration == generation, callbacks != nil else { return }
         cancelAuthenticationTimeout()
+        feedbackWorkItem?.cancel()
+        feedbackWorkItem = nil
+        eventDelivery?.cancel()
+        eventDelivery = nil
         routeRace?.cancel()
         routeRace = nil
         connection?.stateUpdateHandler = nil
@@ -825,6 +857,9 @@ final class GlassyStreamClient: @unchecked Sendable {
         supportsStreamQuality = false
         supportsCursorPositionUpdates = false
         supportsClipboardPaste = false
+        supportsAdaptiveStream = false
+        lastHandledVideoSequence = 0
+        pendingFeedbackAge = 0
         configuration = nil
         // Do not preserve storage inherited from the route-race handoff. A
         // fully consumed, shared Data slice can trap inside Foundation when

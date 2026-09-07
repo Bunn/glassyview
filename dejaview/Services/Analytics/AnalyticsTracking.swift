@@ -2,8 +2,10 @@ import Foundation
 import SwiftUI
 
 enum AnalyticsPreference {
-    static let collectionEnabledKey = "privacyPreservingAnalyticsEnabled"
-    static let defaultCollectionEnabled = true
+    // A fresh key requires an explicit choice even for installations where the
+    // older analytics scope was enabled by default.
+    static let collectionEnabledKey = "optionalProductAnalyticsEnabledV2"
+    static let defaultCollectionEnabled = false
 }
 
 enum AnalyticsEventName: String, Codable, Sendable {
@@ -162,7 +164,6 @@ struct AnalyticsAppMetadata: Equatable, Sendable {
 @MainActor
 protocol AnalyticsTracking: Sendable {
     func setCollectionEnabled(_ enabled: Bool)
-    func disableCollectionAfterTrackingOptOut() async
     func track(_ event: AnalyticsEventName, context: AnalyticsEventContext?)
     func flush()
 }
@@ -176,7 +177,6 @@ extension AnalyticsTracking {
 @MainActor
 struct NoOpAnalyticsTracker: AnalyticsTracking {
     func setCollectionEnabled(_ enabled: Bool) {}
-    func disableCollectionAfterTrackingOptOut() async {}
     func track(_ event: AnalyticsEventName, context: AnalyticsEventContext?) {}
     func flush() {}
 }
@@ -203,16 +203,6 @@ final class DebugConsoleAnalyticsTracker: AnalyticsTracking {
         AppLog.analytics.info(
             "Debug analytics collection changed; enabled=\(enabled, privacy: .public) sent=false"
         )
-    }
-
-    func disableCollectionAfterTrackingOptOut() async {
-        guard isCollectionEnabled else { return }
-
-        track(
-            .analyticsDisabled,
-            context: AnalyticsEventContext(source: .settings, outcome: .success)
-        )
-        setCollectionEnabled(false)
     }
 
     func track(_ event: AnalyticsEventName, context: AnalyticsEventContext?) {

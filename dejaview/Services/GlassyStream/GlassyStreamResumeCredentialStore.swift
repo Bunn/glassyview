@@ -16,11 +16,19 @@ protocol GlassyStreamResumeCredentialStoring: Sendable {
                           hostIdentifier: Data) throws
 }
 
+protocol GlassyStreamResumeCredentialRemoving: Sendable {
+    func removeCredentials(savedMachineID: UUID) throws
+}
+
 /// Device-local resume storage. The account includes both identities so a
 /// discovered host cannot receive a credential issued for another Mac.
-struct GlassyStreamKeychainCredentialStore: GlassyStreamResumeCredentialStoring {
-    private static let service = "dev.bunn.glassydesk.glassy-stream.resume.v1"
+struct GlassyStreamKeychainCredentialStore: GlassyStreamResumeCredentialStoring, GlassyStreamResumeCredentialRemoving {
+    private let service: String
     private static let encodedLength = 56
+
+    init(service: String = "dev.bunn.glassydesk.glassy-stream.resume.v1") {
+        self.service = service
+    }
 
     func credential(savedMachineID: UUID,
                     hostIdentifier: Data) throws -> GlassyStreamResumeCredential? {
@@ -87,11 +95,48 @@ struct GlassyStreamKeychainCredentialStore: GlassyStreamResumeCredentialStoring 
         }
     }
 
+    /// Forget every local host binding for this saved record, including older
+    /// bindings. Read attributes only; credential bytes never leave Keychain.
+    func removeCredentials(savedMachineID: UUID) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrSynchronizable as String: false,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status != errSecItemNotFound else { return }
+        guard status == errSecSuccess else { throw storeError(status) }
+        guard let items = result as? [[String: Any]] else {
+            throw storeError(errSecDecode)
+        }
+        for item in items {
+            guard let account = item[kSecAttrAccount as String] as? String,
+                  Self.account(account, belongsTo: savedMachineID) else { continue }
+            let identity: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrSynchronizable as String: false,
+                kSecAttrAccount as String: account
+            ]
+            let deletion = SecItemDelete(identity as CFDictionary)
+            guard deletion == errSecSuccess || deletion == errSecItemNotFound else {
+                throw storeError(deletion)
+            }
+        }
+    }
+
+    static func account(_ account: String, belongsTo savedMachineID: UUID) -> Bool {
+        account.hasPrefix("\(savedMachineID.uuidString.lowercased()):")
+    }
+
     private func baseQuery(savedMachineID: UUID,
                            hostIdentifier: Data) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.service,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: account(savedMachineID: savedMachineID,
                                                hostIdentifier: hostIdentifier),
             kSecAttrSynchronizable as String: false

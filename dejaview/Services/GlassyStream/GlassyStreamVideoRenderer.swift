@@ -34,70 +34,164 @@ enum GlassyStreamVideoRendererError: Error, Equatable, LocalizedError, Sendable 
     }
 }
 
-/// Converts Glassy Host's H.264 configuration and AVCC access units into
-/// hardware-decoded sample buffers for an ``AVSampleBufferDisplayLayer``.
-///
-/// All renderer and display-layer interaction is main-actor isolated. A
-/// network client can call these methods with `await` from its receive task.
-/// The raw overloads deliberately mirror the host protocol so the transport
-/// does not need to expose Core Media types.
+/// Main-actor view state. Compressed media and AVFoundation decoding requests
+/// run on one serial worker; no frame-sized payload is dispatched to main.
 @MainActor
 @Observable
 final class GlassyStreamVideoRenderer {
-    private(set) var state: GlassyStreamVideoRendererState = .waitingForConfiguration {
-        didSet {
-            guard state != oldValue else { return }
-            onStateChanged?(state)
-        }
-    }
-    private(set) var renderedFrameCount = 0
+    private(set) var state: GlassyStreamVideoRendererState = .waitingForConfiguration
+    private(set) var enqueuedFrameCount = 0
     private(set) var droppedFrameCount = 0
     private(set) var videoDimensions: CGSize?
+    private(set) var isDisplayingVideo = false
 
-    /// Called once when a dropped dependency or decoder reset requires a new
-    /// independently decodable access unit. The transport may map this to a
-    /// keyframe request; periodic host keyframes remain a fallback.
-    @ObservationIgnored
-    var onKeyFrameNeeded: (@MainActor @Sendable () -> Void)?
+    @ObservationIgnored var onKeyFrameNeeded: (@MainActor @Sendable () -> Void)?
+    @ObservationIgnored var onError: (@MainActor @Sendable (GlassyStreamVideoRendererError) -> Void)?
+    @ObservationIgnored var onStateChanged: (@MainActor @Sendable (GlassyStreamVideoRendererState) -> Void)?
+    @ObservationIgnored var onVideoDimensionsChanged: (@MainActor @Sendable (CGSize?) -> Void)?
+    @ObservationIgnored var onPresentationReady: (@MainActor @Sendable () -> Void)?
+    @ObservationIgnored var onPresentationLost: (@MainActor @Sendable () -> Void)?
+    @ObservationIgnored private let worker: GlassyStreamVideoWorker
+    @ObservationIgnored private var generation = UUID()
+    @ObservationIgnored private weak var displayLayer: AVSampleBufferDisplayLayer?
+    @ObservationIgnored private var readyObserver: NSKeyValueObservation?
 
-    @ObservationIgnored
-    var onError: (@MainActor @Sendable (GlassyStreamVideoRendererError) -> Void)?
+    var mediaQueue: DispatchQueue { worker.queue }
 
-    @ObservationIgnored
-    var onStateChanged: (@MainActor @Sendable (GlassyStreamVideoRendererState) -> Void)?
+    init() {
+        worker = GlassyStreamVideoWorker()
+        worker.notify = { [weak self] generation, event in
+            Task { @MainActor [weak self] in
+                guard let self, self.generation == generation else { return }
+                switch event {
+                case .snapshot(let state, let dimensions, let enqueued, let dropped):
+                    self.enqueuedFrameCount = enqueued
+                    self.droppedFrameCount = dropped
+                    if self.videoDimensions != dimensions {
+                        self.videoDimensions = dimensions
+                        self.onVideoDimensionsChanged?(dimensions)
+                    }
+                    if self.state != state {
+                        self.state = state
+                        if (state == .waitingForConfiguration || state == .waitingForKeyFrame),
+                           self.displayLayer?.isReadyForDisplay != true {
+                            self.setPresentationReady(false)
+                        }
+                        self.onStateChanged?(state)
+                    }
+                case .keyFrameNeeded: self.onKeyFrameNeeded?()
+                case .error(let error): self.onError?(error)
+                }
+            }
+        }
+        reset()
+    }
 
-    @ObservationIgnored
-    var onVideoDimensionsChanged: (@MainActor @Sendable (CGSize?) -> Void)?
+    /// Invoke only on mediaQueue. The session captures this after each reset,
+    /// so delayed events from an earlier connection cannot reach a new decoder.
+    func makeMediaConsumer() -> @Sendable (GlassyStreamEvent) -> Bool {
+        let generation = generation
+        let worker = worker
+        return { event in
+            dispatchPrecondition(condition: .onQueue(worker.queue))
+            guard worker.generation == generation else { return true }
+            do { return try worker.consume(event) }
+            catch { return true } // Worker already reports the fatal error.
+        }
+    }
 
-    @ObservationIgnored
-    private weak var displayLayer: AVSampleBufferDisplayLayer?
+    func reset() {
+        generation = UUID()
+        let generation = generation
+        state = .waitingForConfiguration
+        videoDimensions = nil
+        enqueuedFrameCount = 0
+        droppedFrameCount = 0
+        isDisplayingVideo = false
+        if let displayLayer { observePresentation(on: displayLayer) }
+        worker.queue.async { [worker] in worker.reset(generation: generation) }
+    }
 
-    @ObservationIgnored
-    private weak var sampleBufferRenderer: AVSampleBufferVideoRenderer?
+    func attach(to layer: AVSampleBufferDisplayLayer) {
+        guard displayLayer !== layer else { return }
+        readyObserver = nil
+        displayLayer = layer
+        isDisplayingVideo = false
+        let renderer = layer.sampleBufferRenderer
+        worker.queue.async { [worker] in worker.attach(renderer) }
+        observePresentation(on: layer)
+    }
 
-    @ObservationIgnored
+    private func observePresentation(on layer: AVSampleBufferDisplayLayer) {
+        let identity = ObjectIdentifier(layer)
+        let generation = generation
+        readyObserver = layer.observe(\.isReadyForDisplay, options: [.new]) { [weak self] _, change in
+            guard let ready = change.newValue else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.generation == generation,
+                      let layer = self.displayLayer, ObjectIdentifier(layer) == identity,
+                      layer.isReadyForDisplay == ready else { return }
+                self.setPresentationReady(ready)
+                if ready {
+                    self.worker.queue.async { [worker = self.worker] in
+                        worker.presentationReady(generation: generation)
+                    }
+                }
+            }
+        }
+    }
+
+    private func setPresentationReady(_ ready: Bool) {
+        guard isDisplayingVideo != ready else { return }
+        isDisplayingVideo = ready
+        if ready { onPresentationReady?() } else { onPresentationLost?() }
+    }
+
+    func detach(from layer: AVSampleBufferDisplayLayer) {
+        guard displayLayer === layer else { return }
+        readyObserver = nil
+        displayLayer = nil
+        setPresentationReady(false)
+        worker.queue.async { [worker] in worker.attach(nil) }
+    }
+}
+
+/// Every mutable member below belongs to queue. Layer layout and attachment
+/// identity stay in the facade; only its thread-safe sample renderer crosses.
+final class GlassyStreamVideoWorker: @unchecked Sendable {
+    enum Update: Sendable {
+        case snapshot(GlassyStreamVideoRendererState, CGSize?, Int, Int)
+        case keyFrameNeeded
+        case error(GlassyStreamVideoRendererError)
+    }
+    let queue = DispatchQueue(label: "dev.bunn.glassydesk.video.media", qos: .userInteractive)
+    var notify: (@Sendable (UUID, Update) -> Void)?
+    private(set) var generation = UUID()
+    private(set) var state: GlassyStreamVideoRendererState = .waitingForConfiguration {
+        didSet { if state != oldValue { publishSnapshot() } }
+    }
+    private var enqueuedFrameCount = 0
+    private var droppedFrameCount = 0
+    private var videoDimensions: CGSize?
+    private var sampleBufferRenderer: AVSampleBufferVideoRenderer?
     private var decoderFailureObserver: NSObjectProtocol?
-
-    @ObservationIgnored
     private var formatDescription: CMVideoFormatDescription?
-
-    @ObservationIgnored
     private var nalUnitHeaderLength = 0
-
-    @ObservationIgnored
     private var pendingAccessUnit: PendingAccessUnit?
-
-    @ObservationIgnored
     private var isRequestingMediaData = false
-
-    @ObservationIgnored
     private var isWaitingForKeyFrame = true
-
-    @ObservationIgnored
     private var didRequestKeyFrame = false
-
-    @ObservationIgnored
     private var mediaRequestGeneration = 0
+    private var recoveryDeadline: DispatchWorkItem?
+    private var scheduledRecoveryToken: UUID?
+    private var recovery = GlassyStreamVideoRecoveryState()
+    private var lastSnapshotTime: TimeInterval = 0
+
+    deinit {
+        recoveryDeadline?.cancel()
+        sampleBufferRenderer?.stopRequestingMediaData()
+        if let decoderFailureObserver { NotificationCenter.default.removeObserver(decoderFailureObserver) }
+    }
 
     func configure(_ configuration: GlassyStreamVideoConfiguration) throws {
         try configure(
@@ -128,6 +222,15 @@ final class GlassyStreamVideoRenderer {
             try enqueue(accessUnit)
             return true
 
+        case .videoDiscontinuity:
+            recoverFromDecoderFailure(nil)
+            return true
+
+        case .hostStreamStatus(let status):
+            recovery.setPaused(status.state != .starting && status.state != .streaming)
+            synchronizeRecoveryDeadline()
+            return false
+
         case .authenticated, .cursorPosition, .pong:
             return false
         }
@@ -155,6 +258,8 @@ final class GlassyStreamVideoRenderer {
             isWaitingForKeyFrame = true
             didRequestKeyFrame = false
             state = .waitingForKeyFrame
+            recovery.begin()
+            synchronizeRecoveryDeadline()
         } catch let error as GlassyStreamVideoRendererError {
             formatDescription = nil
             self.nalUnitHeaderLength = 0
@@ -245,7 +350,13 @@ final class GlassyStreamVideoRenderer {
 
     /// Clears format, queued media, and the currently displayed image. Call
     /// this when a stream disconnects before reusing the renderer.
-    func reset() {
+    func reset(generation: UUID) {
+        self.generation = generation
+        recoveryDeadline?.cancel()
+        recoveryDeadline = nil
+        scheduledRecoveryToken = nil
+        recovery = GlassyStreamVideoRecoveryState()
+        recovery.setAttached(sampleBufferRenderer != nil)
         stopPendingMediaRequest()
         pendingAccessUnit = nil
         formatDescription = nil
@@ -253,46 +364,35 @@ final class GlassyStreamVideoRenderer {
         setVideoDimensions(nil)
         isWaitingForKeyFrame = true
         didRequestKeyFrame = false
-        renderedFrameCount = 0
+        enqueuedFrameCount = 0
         droppedFrameCount = 0
         sampleBufferRenderer?.flush(removingDisplayedImage: true, completionHandler: nil)
         state = .waitingForConfiguration
+        if let decoderFailureObserver {
+            NotificationCenter.default.removeObserver(decoderFailureObserver)
+            self.decoderFailureObserver = nil
+        }
+        if let sampleBufferRenderer { installFailureObserver(for: sampleBufferRenderer) }
     }
 
     private func setVideoDimensions(_ dimensions: CGSize?) {
         guard videoDimensions != dimensions else { return }
         videoDimensions = dimensions
-        onVideoDimensionsChanged?(dimensions)
+        publishSnapshot()
     }
 
-    func attach(to layer: AVSampleBufferDisplayLayer) {
-        guard displayLayer !== layer else { return }
-
-        detachCurrentLayer(removingImage: true)
-
-        displayLayer = layer
-        let renderer = layer.sampleBufferRenderer
+    func attach(_ renderer: AVSampleBufferVideoRenderer?) {
+        guard sampleBufferRenderer !== renderer else { return }
+        detachCurrentRenderer()
         sampleBufferRenderer = renderer
-        installFailureObserver(for: renderer)
-
-        if formatDescription != nil {
-            // A new display layer has a fresh decoder. Its first sample must be
-            // independently decodable even when the transport stayed alive.
+        recovery.setAttached(renderer != nil)
+        if let renderer { installFailureObserver(for: renderer) }
+        if formatDescription != nil, renderer != nil {
             pendingAccessUnit = nil
+            didRequestKeyFrame = false
             enterKeyFrameRecovery()
         }
-    }
-
-    func detach(from layer: AVSampleBufferDisplayLayer) {
-        guard displayLayer === layer else { return }
-        detachCurrentLayer(removingImage: false)
-
-        if formatDescription != nil {
-            pendingAccessUnit = nil
-            isWaitingForKeyFrame = true
-            didRequestKeyFrame = false
-            state = .waitingForKeyFrame
-        }
+        synchronizeRecoveryDeadline()
     }
 
     private func retainNewestSafeAccessUnit(_ accessUnit: PendingAccessUnit) {
@@ -334,8 +434,9 @@ final class GlassyStreamVideoRenderer {
         }
 
         let dimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
-        renderedFrameCount += 1
+        enqueuedFrameCount += 1
         state = .rendering(width: dimensions.width, height: dimensions.height)
+        if ProcessInfo.processInfo.systemUptime - lastSnapshotTime > 0.5 { publishSnapshot() }
     }
 
     private func requestMediaDataWhenReady() {
@@ -347,17 +448,11 @@ final class GlassyStreamVideoRenderer {
 
         isRequestingMediaData = true
         let requestGeneration = mediaRequestGeneration
-        renderer.requestMediaDataWhenReady(on: .main) { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self,
-                      self.mediaRequestGeneration == requestGeneration,
-                      let renderer = self.sampleBufferRenderer else {
-                    return
-                }
-
-                self.stopPendingMediaRequest()
-                self.drainPendingAccessUnit(using: renderer)
-            }
+        renderer.requestMediaDataWhenReady(on: queue) { [weak self] in
+            guard let self, self.mediaRequestGeneration == requestGeneration,
+                  let renderer = self.sampleBufferRenderer else { return }
+            self.stopPendingMediaRequest()
+            self.drainPendingAccessUnit(using: renderer)
         }
     }
 
@@ -369,6 +464,11 @@ final class GlassyStreamVideoRenderer {
         }
 
         pendingAccessUnit = nil
+        guard ProcessInfo.processInfo.systemUptime - accessUnit.receivedAt <= 0.15 else {
+            droppedFrameCount += 1
+            enterKeyFrameRecovery()
+            return
+        }
         do {
             try render(accessUnit, using: renderer)
         } catch {
@@ -385,21 +485,54 @@ final class GlassyStreamVideoRenderer {
     }
 
     private func enterKeyFrameRecovery() {
+        if !isWaitingForKeyFrame || !recovery.awaitsPresentation {
+            // A retained old image cannot prove this decoder recovered. A new
+            // ready-for-display transition must follow the recovery keyframe.
+            sampleBufferRenderer?.flush(removingDisplayedImage: true, completionHandler: nil)
+            didRequestKeyFrame = false
+        }
         isWaitingForKeyFrame = true
-        didRequestKeyFrame = false
         state = .waitingForKeyFrame
+        recovery.begin()
+        synchronizeRecoveryDeadline()
         requestKeyFrameIfNeeded()
     }
 
     private func requestKeyFrameIfNeeded() {
         guard !didRequestKeyFrame else { return }
         didRequestKeyFrame = true
-        onKeyFrameNeeded?()
+        notify?(generation, .keyFrameNeeded)
     }
 
     private func recoverFromDecoderFailure(_ underlyingErrorMessage: String?) {
-        let message = underlyingErrorMessage ?? "the decoder requires a reset"
-        fail(.decoder(message), resetDecoder: true)
+        guard formatDescription != nil else { return }
+        stopPendingMediaRequest()
+        pendingAccessUnit = nil
+        sampleBufferRenderer?.flush(removingDisplayedImage: true, completionHandler: nil)
+        enterKeyFrameRecovery()
+    }
+
+    func presentationReady(generation: UUID) {
+        guard self.generation == generation, !isWaitingForKeyFrame else { return }
+        recovery.presentationReady()
+        synchronizeRecoveryDeadline()
+    }
+
+    private func synchronizeRecoveryDeadline() {
+        let token = recovery.deadlineToken
+        guard token != scheduledRecoveryToken else { return }
+        recoveryDeadline?.cancel()
+        recoveryDeadline = nil
+        scheduledRecoveryToken = token
+        guard let token else { return }
+        let activeGeneration = generation
+        let item = DispatchWorkItem { [weak self] in
+            guard let self, self.generation == activeGeneration,
+                  self.recovery.deadlineToken == token else { return }
+            self.fail(.decoder("Video recovery timed out. Reconnect to request a fresh stream."), resetDecoder: false)
+        }
+        recoveryDeadline = item
+        queue.asyncAfter(deadline: .now() + .seconds(5), execute: item)
     }
 
     private func fail(
@@ -418,43 +551,85 @@ final class GlassyStreamVideoRenderer {
         }
 
         state = .failed(error.localizedDescription)
-        onError?(error)
+        notify?(generation, .error(error))
     }
 
     private func installFailureObserver(for renderer: AVSampleBufferVideoRenderer) {
+        let generation = generation
         decoderFailureObserver = NotificationCenter.default.addObserver(
             forName: AVSampleBufferVideoRenderer.didFailToDecodeNotification,
-            object: renderer,
-            queue: .main
-        ) { [weak self] notification in
-            let errorMessage = (notification.userInfo?[
+            object: renderer, queue: nil
+        ) { [weak self, weak renderer] notification in
+            let message = (notification.userInfo?[
                 AVSampleBufferVideoRenderer.didFailToDecodeNotificationErrorKey
             ] as? NSError)?.localizedDescription
-
-            Task { @MainActor [weak self] in
-                self?.recoverFromDecoderFailure(errorMessage)
+            self?.queue.async { [weak self, weak renderer] in
+                guard let self, let renderer, self.generation == generation,
+                      self.sampleBufferRenderer === renderer else { return }
+                self.recoverFromDecoderFailure(message)
             }
         }
     }
 
-    private func detachCurrentLayer(removingImage: Bool) {
+    private func detachCurrentRenderer() {
         stopPendingMediaRequest()
-
+        recoveryDeadline?.cancel()
+        recoveryDeadline = nil
+        scheduledRecoveryToken = nil
+        recovery.setAttached(false)
         if let decoderFailureObserver {
             NotificationCenter.default.removeObserver(decoderFailureObserver)
             self.decoderFailureObserver = nil
         }
-
-        sampleBufferRenderer?.flush(
-            removingDisplayedImage: removingImage,
-            completionHandler: nil
-        )
+        sampleBufferRenderer?.flush(removingDisplayedImage: true, completionHandler: nil)
         sampleBufferRenderer = nil
-        displayLayer = nil
+    }
+
+    private func publishSnapshot() {
+        lastSnapshotTime = ProcessInfo.processInfo.systemUptime
+        notify?(generation, .snapshot(state, videoDimensions, enqueuedFrameCount, droppedFrameCount))
+    }
+}
+
+/// Pure deadline identity policy shared by every decoder recovery entry. A
+/// keyframe enqueue is deliberately not completion; only presentation is.
+struct GlassyStreamVideoRecoveryState: Sendable {
+    private(set) var awaitsPresentation = false
+    private(set) var deadlineToken: UUID?
+    private var isPaused = false
+    private var isAttached = false
+
+    mutating func begin() {
+        awaitsPresentation = true
+        reconcile()
+    }
+
+    mutating func setPaused(_ paused: Bool) {
+        isPaused = paused
+        reconcile()
+    }
+
+    mutating func setAttached(_ attached: Bool) {
+        isAttached = attached
+        reconcile()
+    }
+
+    mutating func presentationReady() {
+        awaitsPresentation = false
+        deadlineToken = nil
+    }
+
+    private mutating func reconcile() {
+        guard awaitsPresentation, isAttached, !isPaused else {
+            deadlineToken = nil
+            return
+        }
+        if deadlineToken == nil { deadlineToken = UUID() }
     }
 }
 
 private struct PendingAccessUnit {
+    let receivedAt = ProcessInfo.processInfo.systemUptime
     let data: Data
     let presentationTime: TimeInterval
     let duration: TimeInterval?

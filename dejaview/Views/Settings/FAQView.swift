@@ -14,7 +14,7 @@ struct FAQView: View {
                                 ? "For VNC, use the Mac's hostname or IP address and normally port 5900. For Fast Connection, scan its QR code to choose an address automatically, or enter a LAN or VPN address and port 51515."
                                 : "Use the Mac's hostname or IP address and normally port 5900 for VNC."),
             SettingsFAQItem(question: "How do I use Wake-on-LAN?",
-                            answer: "Edit a saved Mac and enter the MAC address of its network interface. Also enable Wake for network access in macOS System Settings. If the Mac is unreachable, tapping its card sends a wake packet and waits up to a minute before connecting. Wake-on-LAN normally requires the devices to be on the same local network or a VPN that forwards broadcasts."),
+                            answer: "For Standard VNC, edit a saved Mac and enter the MAC address of its network interface. Also enable Wake for network access in macOS System Settings. If the Mac is unreachable, tapping its card sends a wake packet and waits up to a minute before connecting. Wake-on-LAN normally requires the same local network or a VPN that forwards broadcasts. Fast Connection requires the Mac to be awake."),
             SettingsFAQItem(question: "Which credentials should I enter?",
                             answer: "Use the username and password for a Mac account that is allowed to share the screen. If the server uses legacy password-only VNC authentication, leave the username blank and enter the VNC password.")
         ]

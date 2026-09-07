@@ -53,6 +53,9 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
         switch self {
         case .welcome:
             [
+                OnboardingBullet(systemImage: "timer",
+                                 title: "Try one-minute sessions",
+                                 detail: "Free sessions last one minute. Reconnect for another free session, or purchase Pro for sessions without this limit."),
                 OnboardingBullet(systemImage: "dot.radiowaves.left.and.right",
                                  title: "Find nearby Macs",
                                  detail: "Macs advertising Screen Sharing appear automatically on the Nearby Macs tab."),

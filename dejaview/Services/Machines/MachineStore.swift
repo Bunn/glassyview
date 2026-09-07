@@ -11,14 +11,17 @@ final class MachineStore: MachineStoring {
 
     @ObservationIgnored private let repository: SavedMachineRepository
     @ObservationIgnored private let widgetSnapshotPublisher: any WidgetSnapshotPublishing
+    @ObservationIgnored private let resumeCredentialRemover: any GlassyStreamResumeCredentialRemoving
     @ObservationIgnored private let recentConnectionLimit = 50
 
     init(
         repository: SavedMachineRepository = SwiftDataSavedMachineRepository.shared,
-        widgetSnapshotPublisher: any WidgetSnapshotPublishing = NoopWidgetSnapshotPublisher()
+        widgetSnapshotPublisher: any WidgetSnapshotPublishing = NoopWidgetSnapshotPublisher(),
+        resumeCredentialRemover: any GlassyStreamResumeCredentialRemoving = GlassyStreamKeychainCredentialStore()
     ) {
         self.repository = repository
         self.widgetSnapshotPublisher = widgetSnapshotPublisher
+        self.resumeCredentialRemover = resumeCredentialRemover
         reload()
     }
 
@@ -42,23 +45,44 @@ final class MachineStore: MachineStoring {
         reload()
     }
 
-    func update(_ machine: SavedMachine, password: String) {
-        guard contains(machine) else {
+    @discardableResult
+    func update(_ machine: SavedMachine, password: String) -> Bool {
+        guard let existing = machines.first(where: { $0.id == machine.id }) else {
             AppLog.storage.warning("Attempted to update missing machine id=\(machine.id.uuidString, privacy: .public)")
-            return
+            return false
         }
+
+        if existing.glassyHostIdentifier != nil,
+           existing.glassyHostIdentifier != machine.glassyHostIdentifier,
+           !removeResumeCredentials(for: machine.id) { return false }
 
         AppLog.storage.info("Updating saved machine '\(machine.displayName, privacy: .public)' at \(machine.host, privacy: .public):\(machine.port, privacy: .public)")
         repository.updateMachine(machine)
         repository.setPassword(password, for: machine.id)
         reload()
+        return true
     }
 
-    func delete(_ machine: SavedMachine) {
+    @discardableResult
+    func delete(_ machine: SavedMachine) -> Bool {
+        guard removeResumeCredentials(for: machine.id) else { return false }
         AppLog.storage.info("Deleting saved machine '\(machine.displayName, privacy: .public)'")
         repository.deleteMachine(withID: machine.id)
         repository.deletePassword(for: machine.id)
         reload()
+        return true
+    }
+
+    private func removeResumeCredentials(for savedMachineID: UUID) -> Bool {
+        do {
+            try resumeCredentialRemover.removeCredentials(savedMachineID: savedMachineID)
+            return true
+        } catch {
+            // Do not claim the pairing was forgotten while its local resume
+            // authorization still exists. The user can unlock and retry.
+            AppLog.storage.error("Could not remove Fast Connection credentials; saved Mac retained")
+            return false
+        }
     }
 
     func contains(_ machine: SavedMachine) -> Bool {

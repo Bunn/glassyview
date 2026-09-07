@@ -52,8 +52,39 @@ enum GlassyStreamEvent: Equatable, Sendable {
     case authenticated(GlassyStreamAuthentication)
     case videoConfiguration(GlassyStreamVideoConfiguration)
     case videoAccessUnit(GlassyStreamVideoAccessUnit)
+    /// A local delivery drop invalidated the H.264 reference chain.
+    case videoDiscontinuity
+    case hostStreamStatus(GlassyStreamHostStatus)
     case cursorPosition(GlassyStreamCursorPosition)
     case pong(Data)
+}
+
+struct GlassyStreamHostStatus: Equatable, Sendable {
+    enum State: UInt8, Sendable {
+        case starting = 0, streaming, stopped, screenPermissionRequired, displayUnavailable, captureFailed
+    }
+
+    let state: State
+    let accessibilityGranted: Bool
+    let ownsInput: Bool
+
+    var message: String? {
+        switch state {
+        case .starting: return nil
+        case .stopped: return String(localized: "Screen sharing is stopped. Open Glassy Desk on your Mac to resume sharing.")
+        case .screenPermissionRequired: return String(localized: "On your Mac, open Glassy Desk and allow Screen Recording and Direct Screen Access.")
+        case .displayUnavailable: return String(localized: "The selected Mac display is unavailable. Choose an available display in Glassy Desk on your Mac.")
+        case .captureFailed: return String(localized: "Your Mac could not start screen capture. Open Glassy Desk on the Mac to check its display and permissions.")
+        case .streaming:
+            if !accessibilityGranted {
+                return String(localized: "View only: enable Accessibility for Glassy Desk on your Mac to use the keyboard and pointer.")
+            }
+            if !ownsInput {
+                return String(localized: "View only: another connected device controls this Mac. Control becomes available when that device disconnects.")
+            }
+            return nil
+        }
+    }
 }
 
 /// A first-use credential supplied explicitly by the user. Once the host has

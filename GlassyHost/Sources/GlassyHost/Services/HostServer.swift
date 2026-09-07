@@ -22,6 +22,7 @@ final class HostServer: @unchecked Sendable {
     typealias StatusHandler = @Sendable (Status) -> Void
     typealias RemoteInputHandler = @Sendable (HostProtocol.RemoteInputEvent) -> Void
     typealias StreamQualityHandler = @Sendable (HostProtocol.StreamQuality) -> Void
+    typealias AdaptiveBitRateHandler = @Sendable (Int?) -> Void
     typealias AuthenticatedClientReplacementHandler = @Sendable () -> Void
     typealias PairedDevicesHandler = @Sendable ([HostPairedDevice]) -> Void
 
@@ -148,6 +149,18 @@ final class HostServer: @unchecked Sendable {
         core.setStreamQualityHandler(handler)
     }
 
+    func setAdaptiveBitRateHandler(_ handler: AdaptiveBitRateHandler?) {
+        core.setAdaptiveBitRateHandler(handler)
+    }
+
+    func setAdaptiveResolutionHandler(_ handler: AdaptiveBitRateHandler?) {
+        core.setAdaptiveResolutionHandler(handler)
+    }
+
+    func publishStreamStatus(state: HostProtocol.StreamState, accessibilityGranted: Bool) {
+        core.publishStreamStatus(state: state, accessibilityGranted: accessibilityGranted)
+    }
+
     /// Removes H.264 bootstrap data, cursor telemetry, and queued media from the
     /// capture generation that just ended. The controller calls this only after
     /// the encoder has completed its callbacks, so a late callback cannot
@@ -176,14 +189,15 @@ final class HostServer: @unchecked Sendable {
     func broadcastVideoAccessUnit(_ avccData: Data,
                                   presentationTimeSeconds: Double,
                                   durationSeconds: Double?,
-                                  isKeyFrame: Bool) {
+                                  isKeyFrame: Bool,
+                                  encodedWidth: Int? = nil) {
         do {
             let payload = try HostProtocol.encodeVideoAccessUnit(
                 avccData,
                 presentationTimeSeconds: presentationTimeSeconds,
                 durationSeconds: durationSeconds
             )
-            core.broadcastVideoAccessUnit(payload, isKeyFrame: isKeyFrame)
+            core.broadcastVideoAccessUnit(payload, isKeyFrame: isKeyFrame, encodedWidth: encodedWidth)
         } catch {
             Core.logger.error("Rejected video access unit: \(error.localizedDescription, privacy: .public)")
         }
@@ -264,7 +278,11 @@ private extension HostServer {
         private static let maximumConnections = 12
         private static let maximumUnauthenticatedConnections = 4
         private static let authenticationTimeout: TimeInterval = 15
-        private static let maximumQueuedBytesPerClient = 24 * 1024 * 1024
+        // Preserve the v1 maximum single-frame envelope. Negotiated credit
+        // normally limits delivery far below this, but an unusually large IDR
+        // must not be rejected forever at the minimum bitrate.
+        private static let maximumQueuedBytesPerClient = HostProtocol.maximumPayloadLength + HostProtocol.headerLength + HostProtocol.authenticationTagLength + 65_536
+        private static let mediaQueueAgeBudget: TimeInterval = 0.15
         private static let maximumQueuedMessagesPerClient = 10
 
         private let queue = DispatchQueue(label: "dev.bunn.glassydesk.host.server",
@@ -295,6 +313,15 @@ private extension HostServer {
             AuthenticatedClientReplacementHandler?
         private var streamQualityHandler: StreamQualityHandler = { _ in }
         private var streamQualityArbitration = HostStreamQualityArbitration()
+        private var adaptiveBitRateHandler: AdaptiveBitRateHandler = { _ in }
+        private var publishedAdaptiveBitRate: Int?
+        private var publishedAdaptiveMaximumWidth: Int?
+        private var adaptiveResolutionHandler: AdaptiveBitRateHandler = { _ in }
+        private var mediaMaintenanceWorkItem: DispatchWorkItem?
+        private var streamState: HostProtocol.StreamState = .stopped
+        private var accessibilityGranted = false
+        private var inputOwnership = HostInputOwnership()
+        private var inputOwnerID: UUID? { inputOwnership.owner }
         private var lastPublishedClientCount = 0
         private var lastStatus: Status = .stopped
         private var clientCountHandler: ClientCountHandler = { _ in }
@@ -367,9 +394,6 @@ private extension HostServer {
                     do {
                         try deviceAccessStore.revoke(identifier: id)
                         let matchingClients = clients.values.filter { $0.clientIdentifier == id }
-                        if !matchingClients.isEmpty {
-                            authenticatedClientReplacementHandler?()
-                        }
                         for client in matchingClients {
                             remove(client, publishChanges: false)
                         }
@@ -428,6 +452,84 @@ private extension HostServer {
             }
         }
 
+        func setAdaptiveBitRateHandler(_ handler: AdaptiveBitRateHandler?) {
+            queue.async { [weak self] in
+                guard let self else { return }
+                adaptiveBitRateHandler = handler ?? { _ in }
+                publishAdaptiveBitRateIfNeeded(force: true)
+            }
+        }
+
+        func setAdaptiveResolutionHandler(_ handler: AdaptiveBitRateHandler?) {
+            queue.async { [weak self] in
+                guard let self else { return }
+                adaptiveResolutionHandler = handler ?? { _ in }
+                publishAdaptiveBitRateIfNeeded(force: true)
+            }
+        }
+
+        func publishStreamStatus(state: HostProtocol.StreamState, accessibilityGranted: Bool) {
+            queue.async { [weak self] in
+                guard let self else { return }
+                guard streamState != state || self.accessibilityGranted != accessibilityGranted else { return }
+                streamState = state
+                self.accessibilityGranted = accessibilityGranted
+                for client in authenticatedClients { sendStreamStatus(to: client) }
+            }
+        }
+
+        private func sendStreamStatus(to client: Client) {
+            guard client.supportsAdaptiveStream else { return }
+            let status = HostProtocol.StreamStatus(state: streamState,
+                                                  accessibilityGranted: accessibilityGranted,
+                                                  ownsInput: inputOwnerID == client.id)
+            _ = enqueueEncrypted(HostProtocol.encodeStreamStatus(status), kind: .hostStreamStatus,
+                                 flags: [], policy: .control, for: client)
+        }
+
+        private func publishAdaptiveBitRateIfNeeded(force: Bool = false) {
+            let adaptiveClients = authenticatedClients.filter(\.supportsAdaptiveStream)
+            let width = adaptiveClients.compactMap(\.ratePolicy.maximumCaptureWidth).min()
+            if force || width != publishedAdaptiveMaximumWidth {
+                publishedAdaptiveMaximumWidth = width
+                adaptiveResolutionHandler(width)
+            }
+            let budget = adaptiveClients.map(\.ratePolicy.bitRate).min()
+            guard force || budget != publishedAdaptiveBitRate else { return }
+            publishedAdaptiveBitRate = budget
+            adaptiveBitRateHandler(budget)
+        }
+
+        private func scheduleMediaMaintenanceIfNeeded() {
+            guard mediaMaintenanceWorkItem == nil,
+                  authenticatedClients.contains(where: \.supportsAdaptiveStream) else { return }
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                mediaMaintenanceWorkItem = nil
+                let now = ProcessInfo.processInfo.systemUptime
+                for client in authenticatedClients where client.supportsAdaptiveStream {
+                    if client.deliveryWindow.oldestAge(at: now) > 0.35 {
+                        client.ratePolicy.congested(at: now)
+                    }
+                    let recoveryDeadline = max(8, min(60, Double(client.deliveryWindow.outstandingBytes * 8) / Double(client.ratePolicy.bitRate) * 3))
+                    if client.deliveryWindow.oldestAge(at: now) > recoveryDeadline {
+                        // A receiver that never drains cannot hold capture or
+                        // the only input-controller role indefinitely.
+                        remove(client)
+                        continue
+                    }
+                    sendNextPacket(for: client)
+                    if client.needsKeyFrame, client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate) {
+                        requestKeyFrameIfNeeded(for: [client])
+                    }
+                }
+                publishAdaptiveBitRateIfNeeded()
+                scheduleMediaMaintenanceIfNeeded()
+            }
+            mediaMaintenanceWorkItem = work
+            queue.asyncAfter(deadline: .now() + 0.1, execute: work)
+        }
+
         func clearVideoState() async {
             await withCheckedContinuation { continuation in
                 queue.async { [weak self] in
@@ -480,7 +582,9 @@ private extension HostServer {
                 guard let self else { return }
                 videoBootstrapCache.storeCodecConfiguration(payload)
                 for client in authenticatedClients {
+                    client.removeQueuedVideoPackets()
                     client.needsKeyFrame = true
+                    client.keyFrameRequestOutstanding = false
                     _ = enqueueEncrypted(payload,
                                          kind: .videoConfiguration,
                                          flags: [],
@@ -504,9 +608,9 @@ private extension HostServer {
             }
         }
 
-        func broadcastVideoAccessUnit(_ payload: Data, isKeyFrame: Bool) {
+        func broadcastVideoAccessUnit(_ payload: Data, isKeyFrame: Bool, encodedWidth: Int?) {
             let shouldScheduleDrain = mediaIngress.submit(
-                VideoBroadcast(payload: payload, isKeyFrame: isKeyFrame)
+                VideoBroadcast(payload: payload, isKeyFrame: isKeyFrame, encodedWidth: encodedWidth)
             )
             guard shouldScheduleDrain else { return }
             queue.async { [weak self] in
@@ -564,7 +668,7 @@ private extension HostServer {
                                                      kind: .videoAccessUnit,
                                                      flags: flags,
                                                      policy: policy,
-                                                     for: client)
+                                                     for: client, encodedWidth: item.encodedWidth)
                     if item.isKeyFrame, wasQueued {
                         client.needsKeyFrame = false
                         client.keyFrameRequestOutstanding = false
@@ -580,6 +684,8 @@ private extension HostServer {
             var shouldRequest = false
             for client in clients where client.needsKeyFrame
                 && !client.keyFrameRequestOutstanding {
+                if client.supportsAdaptiveStream,
+                   !client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate) { continue }
                 client.keyFrameRequestOutstanding = true
                 shouldRequest = true
             }
@@ -708,6 +814,9 @@ private extension HostServer {
             let hadAuthenticatedClients = authenticatedClientRegistry.activeConnectionCount > 0
             let existingClients = Array(clients.values)
             clients.removeAll(keepingCapacity: true)
+            inputOwnership.removeAll()
+            mediaMaintenanceWorkItem?.cancel()
+            mediaMaintenanceWorkItem = nil
             authenticatedClientRegistry.removeAll()
             for client in existingClients {
                 client.authenticationTimeout?.cancel()
@@ -1096,9 +1205,14 @@ private extension HostServer {
             ), replacedConnectionIdentifier != client.id,
                let replacedClient = clients[replacedConnectionIdentifier] {
                 Self.logger.info("Replacing a stale authenticated Glassy viewer connection")
-                authenticatedClientReplacementHandler?()
+                if inputOwnership.replace(replacedClient.id, with: client.id) {
+                    authenticatedClientReplacementHandler?()
+                }
                 remove(replacedClient, publishChanges: false)
             }
+
+            client.authenticatedAt = ProcessInfo.processInfo.systemUptime
+            inputOwnership.add(client.id)
 
             let accepted = HostProtocol.AuthenticationAccepted(
                 clientIdentifier: hello.clientIdentifier,
@@ -1156,10 +1270,34 @@ private extension HostServer {
                 try HostProtocol.decodeKeyFrameRequest(plaintext)
                 client.needsKeyFrame = true
                 requestKeyFrameIfNeeded(for: [client])
+            case .streamFeedback:
+                let feedback = try HostProtocol.decodeStreamFeedback(plaintext)
+                let now = ProcessInfo.processInfo.systemUptime
+                let firstFeedback = !client.supportsAdaptiveStream
+                // Media sent before opt-in was not retained in the credit ledger.
+                guard feedback.latestHandledVideoSequence <= client.latestSentVideoSequence else {
+                    throw HostProtocol.ProtocolError.malformedPayload("feedback acknowledges unsent video")
+                }
+                client.supportsAdaptiveStream = true
+                let ceiling = HostStreamQualityConfiguration(quality: client.requestedQuality).averageBitRate
+                client.ratePolicy.constrain(to: ceiling)
+                if feedback.latestHandledVideoSequence <= client.deliveryWindow.latestSentSequence,
+                   let age = try client.deliveryWindow.acknowledge(sequence: feedback.latestHandledVideoSequence, at: now) {
+                    client.ratePolicy.acknowledged(deliveryAge: age,
+                                                  queueAge: Double(feedback.callbackQueueAgeMilliseconds) / 1_000,
+                                                  ceiling: ceiling, at: now)
+                }
+                if firstFeedback { sendStreamStatus(to: client) }
+                publishAdaptiveBitRateIfNeeded()
+                sendNextPacket(for: client)
+                if client.needsKeyFrame { requestKeyFrameIfNeeded(for: [client]) }
+                scheduleMediaMaintenanceIfNeeded()
             case .streamQualityRequest:
                 let requestedQuality = try HostProtocol.decodeStreamQualityRequest(plaintext)
                 guard requestedQuality != client.requestedQuality else { return }
                 client.requestedQuality = requestedQuality
+                client.ratePolicy.constrain(to: HostStreamQualityConfiguration(quality: requestedQuality).averageBitRate)
+                publishAdaptiveBitRateIfNeeded()
                 publishEffectiveStreamQualityIfNeeded()
             case .cursorPositionSubscriptionRequest:
                 try HostProtocol.decodeCursorPositionSubscriptionRequest(plaintext)
@@ -1179,7 +1317,9 @@ private extension HostServer {
                     kind: frame.kind,
                     payload: plaintext
                 )
-                remoteInputHandler?(input)
+                // One explicit input owner prevents another viewer from
+                // releasing held buttons/modifiers or interleaving shortcuts.
+                if inputOwnerID == client.id { remoteInputHandler?(input) }
             default:
                 throw HostProtocol.ProtocolError.malformedPayload(
                     "message is not valid in the authenticated client direction"
@@ -1192,119 +1332,148 @@ private extension HostServer {
                                       flags: HostProtocol.Flags,
                                       policy: SendPolicy,
                                       for client: Client) throws {
-            let sequence = client.takeNextOutboundSequence()
-            let frame = HostProtocol.Frame(kind: kind,
-                                           flags: flags,
-                                           sequence: sequence,
-                                           payload: payload)
-            _ = try enqueuePacket(HostProtocol.encode(frame), policy: policy, for: client)
+            _ = try enqueuePacket(PendingPacket(data: payload, kind: kind, flags: flags,
+                                                encrypted: false, policy: policy), for: client)
         }
 
         private func enqueueEncrypted(_ plaintext: Data,
                                       kind: HostProtocol.MessageKind,
                                       flags: HostProtocol.Flags,
                                       policy: SendPolicy,
-                                      for client: Client) -> Bool {
-            guard case let .authenticated(material) = client.authorizationState else {
-                return false
-            }
-
+                                      for client: Client, encodedWidth: Int? = nil) -> Bool {
+            guard client.isAuthenticated else { return false }
             do {
-                let sequence = client.takeNextOutboundSequence()
-                let encryptedFlags = flags.union(.encrypted)
-                let payload = try HostProtocol.seal(plaintext,
-                                                    kind: kind,
-                                                    flags: flags,
-                                                    sequence: sequence,
-                                                    material: material,
-                                                    serverToClient: true)
-                let frame = HostProtocol.Frame(kind: kind,
-                                               flags: encryptedFlags,
-                                               sequence: sequence,
-                                               payload: payload)
-                return try enqueuePacket(HostProtocol.encode(frame),
-                                         policy: policy,
-                                         for: client)
+                return try enqueuePacket(PendingPacket(data: plaintext, kind: kind, flags: flags,
+                                                       encrypted: true, policy: policy, encodedWidth: encodedWidth), for: client)
             } catch {
-                Self.logger.error("Could not queue encrypted packet: \(error.localizedDescription, privacy: .public)")
-                if policy != .deltaFrame, policy != .cursorPosition {
-                    remove(client)
-                }
+                Self.logger.error("Could not queue packet: \(error.localizedDescription, privacy: .public)")
+                if policy == .control || policy == .codecConfiguration { remove(client) }
                 return false
             }
         }
 
-        private func enqueuePacket(_ packet: Data,
-                                   policy: SendPolicy,
-                                   for client: Client) throws -> Bool {
-            guard !client.isClosed else { return false }
-
-            if policy == .cursorPosition {
-                client.removeQueuedCursorPositions()
-                let exceedsByteLimit = client.totalQueuedBytes + packet.count
-                    > Self.maximumQueuedBytesPerClient
-                let exceedsMessageLimit = client.totalQueuedMessageCount + 1
-                    > Self.maximumQueuedMessagesPerClient
-                guard !exceedsByteLimit, !exceedsMessageLimit else {
-                    // Telemetry is opportunistic and must never displace video
-                    // or control traffic on a slow viewer.
-                    return false
-                }
-            } else if client.totalQueuedBytes + packet.count > Self.maximumQueuedBytesPerClient
-                || client.totalQueuedMessageCount + 1 > Self.maximumQueuedMessagesPerClient {
-                if client.removeQueuedDeltaFrames() {
-                    client.needsKeyFrame = true
-                    if policy != .keyFrame {
-                        requestKeyFrameIfNeeded(for: [client])
-                    }
-                }
+        private func discardQueuedMedia(for client: Client) {
+            if client.removeQueuedMediaFrames() {
+                client.needsKeyFrame = true
+                client.keyFrameRequestOutstanding = false
             }
+        }
 
-            guard client.totalQueuedBytes + packet.count <= Self.maximumQueuedBytesPerClient,
-                  client.totalQueuedMessageCount + 1 <= Self.maximumQueuedMessagesPerClient else {
-                if policy == .deltaFrame {
-                    client.needsKeyFrame = true
+        private func expireQueuedMedia(for client: Client, now: TimeInterval) {
+            if client.pendingPackets.contains(where: { $0.policy.isVideoFrame && now - $0.enqueuedAt > Self.mediaQueueAgeBudget }) {
+                discardQueuedMedia(for: client)
+            }
+        }
+
+        private func enqueuePacket(_ packet: PendingPacket, for client: Client) throws -> Bool {
+            guard !client.isClosed else { return false }
+            let now = ProcessInfo.processInfo.systemUptime
+            expireQueuedMedia(for: client, now: now)
+            if packet.policy == .cursorPosition { client.removeQueuedCursorPositions() }
+            if packet.kind == .hostStreamStatus { client.removeQueuedPackets(kind: .hostStreamStatus) }
+            if packet.policy == .keyFrame {
+                // A new independent frame replaces obsolete unsent recovery
+                // generations. Codec configuration is kept in front of it.
+                discardQueuedMedia(for: client)
+            }
+            if packet.policy.isVideoFrame {
+                let maximumFrameBytes = client.supportsAdaptiveStream
+                    ? max(65_536, client.ratePolicy.bitRate / 8 / 5)
+                    : Self.maximumQueuedBytesPerClient
+                if packet.byteCount > maximumFrameBytes {
+                    if client.supportsAdaptiveStream {
+                        if packet.policy == .keyFrame {
+                            let admit = client.ratePolicy.oversizedKeyFrame(encodedWidth: packet.encodedWidth, at: now)
+                            publishAdaptiveBitRateIfNeeded()
+                            if !admit {
+                                client.needsKeyFrame = true
+                                client.keyFrameRequestOutstanding = false
+                                return false
+                            }
+                        } else {
+                            client.ratePolicy.congested(at: now)
+                            publishAdaptiveBitRateIfNeeded()
+                        }
+                    }
+                    if packet.policy != .keyFrame {
+                        client.needsKeyFrame = true
+                        client.keyFrameRequestOutstanding = false
+                        return false
+                    }
+                    // Admit one independently decodable oversized frame. Its
+                    // bytes consume all receiver credit until acknowledged;
+                    // dropping every IDR here could permanently black-hole a
+                    // busy screen at the minimum rate. Pending IDRs coalesce.
+                }
+                if packet.policy == .keyFrame, client.supportsAdaptiveStream {
+                    client.ratePolicy.admittedKeyFrame(bytes: packet.byteCount, at: now)
+                }
+                let queuedFrames = client.pendingPackets.filter { $0.policy.isVideoFrame }.count
+                if queuedFrames >= 2 { discardQueuedMedia(for: client) }
+                if packet.policy == .deltaFrame, client.needsKeyFrame {
                     requestKeyFrameIfNeeded(for: [client])
                     return false
                 }
-                if policy == .cursorPosition {
-                    return false
-                }
-                throw HostProtocol.ProtocolError.payloadTooLarge(packet.count)
             }
-
-            // If backpressure discarded a reference frame, no later delta is
-            // independently decodable. Wait for IDR instead of showing damage.
-            if policy == .deltaFrame, client.needsKeyFrame {
-                requestKeyFrameIfNeeded(for: [client])
-                return false
+            if client.totalQueuedBytes + packet.byteCount > Self.maximumQueuedBytesPerClient
+                || client.totalQueuedMessageCount + 1 > Self.maximumQueuedMessagesPerClient {
+                discardQueuedMedia(for: client)
             }
-
-            client.pendingPackets.append(PendingPacket(data: packet, policy: policy))
-            client.pendingByteCount += packet.count
+            guard client.totalQueuedBytes + packet.byteCount <= Self.maximumQueuedBytesPerClient,
+                  client.totalQueuedMessageCount + 1 <= Self.maximumQueuedMessagesPerClient else {
+                if packet.policy == .deltaFrame || packet.policy == .keyFrame || packet.policy == .cursorPosition { return false }
+                throw HostProtocol.ProtocolError.payloadTooLarge(packet.byteCount)
+            }
+            if packet.policy == .deltaFrame, client.needsKeyFrame { return false }
+            // Sequence numbers and authenticated ciphertext do not exist yet,
+            // so small control replies can safely pass pending video.
+            if packet.policy == .control {
+                let index = client.pendingPackets.firstIndex { $0.policy != .control } ?? client.pendingPackets.endIndex
+                client.pendingPackets.insert(packet, at: index)
+            } else {
+                client.pendingPackets.append(packet)
+            }
+            client.pendingByteCount += packet.byteCount
             sendNextPacket(for: client)
             return true
         }
 
         private func sendNextPacket(for client: Client) {
-            guard !client.isClosed,
-                  client.inFlightByteCount == 0,
-                  !client.pendingPackets.isEmpty else { return }
-
-            let pending = client.pendingPackets.removeFirst()
-            client.pendingByteCount -= pending.data.count
-            client.inFlightByteCount = pending.data.count
-            client.connection.send(content: pending.data,
-                                   completion: .contentProcessed { [weak self, weak client] error in
-                guard let self, let client, !client.isClosed else { return }
-                client.inFlightByteCount = 0
-                if let error {
-                    Self.logger.debug("Client send failed: \(error.localizedDescription, privacy: .public)")
-                    remove(client)
-                } else {
-                    sendNextPacket(for: client)
+            guard !client.isClosed, client.inFlightByteCount == 0 else { return }
+            expireQueuedMedia(for: client, now: ProcessInfo.processInfo.systemUptime)
+            guard let pending = client.pendingPackets.first else { return }
+            if pending.policy.isVideoFrame, client.supportsAdaptiveStream,
+               !client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate) { return }
+            client.pendingPackets.removeFirst()
+            client.pendingByteCount -= pending.byteCount
+            do {
+                let sequence = try client.takeNextOutboundSequence()
+                let payload: Data
+                var flags = pending.flags
+                if pending.encrypted {
+                    guard case let .authenticated(material) = client.authorizationState else { return }
+                    payload = try HostProtocol.seal(pending.data, kind: pending.kind, flags: flags,
+                                                    sequence: sequence, material: material, serverToClient: true)
+                    flags.insert(.encrypted)
+                } else { payload = pending.data }
+                let data = try HostProtocol.encode(.init(kind: pending.kind, flags: flags, sequence: sequence, payload: payload))
+                client.inFlightByteCount = data.count
+                if pending.policy.isVideoFrame {
+                    client.latestSentVideoSequence = sequence
+                    if client.supportsAdaptiveStream {
+                        client.deliveryWindow.sent(sequence: sequence, bytes: data.count, at: ProcessInfo.processInfo.systemUptime)
+                    }
                 }
-            })
+                client.connection.send(content: data, completion: .contentProcessed { [weak self, weak client] error in
+                    guard let self, let client, !client.isClosed else { return }
+                    client.inFlightByteCount = 0
+                    if error != nil { remove(client) }
+                    else { sendNextPacket(for: client) }
+                })
+            } catch {
+                Self.logger.error("Could not send packet: \(error.localizedDescription, privacy: .public)")
+                remove(client)
+            }
         }
 
         private func sendErrorAndClose(code: UInt16,
@@ -1312,7 +1481,7 @@ private extension HostServer {
                                        client: Client) {
             guard !client.isClosed else { return }
             let payload = (try? HostProtocol.encodeError(code: code, message: message)) ?? Data()
-            let sequence = client.takeNextOutboundSequence()
+            guard let sequence = try? client.takeNextOutboundSequence() else { remove(client); return }
             let frame = HostProtocol.Frame(kind: .protocolError,
                                            flags: [],
                                            sequence: sequence,
@@ -1342,6 +1511,10 @@ private extension HostServer {
                     connectionIdentifier: client.id
                 )
             }
+            if inputOwnership.remove(client.id) {
+                authenticatedClientReplacementHandler?()
+                for remaining in authenticatedClients { sendStreamStatus(to: remaining) }
+            }
             client.isClosed = true
             client.authenticationTimeout?.cancel()
             client.connection.stateUpdateHandler = nil
@@ -1365,6 +1538,7 @@ private extension HostServer {
         }
 
         private func publishEffectiveStreamQualityIfNeeded(force: Bool = false) {
+            publishAdaptiveBitRateIfNeeded()
             let requestedQualities = authenticatedClients.lazy.map(\.requestedQuality)
             guard let quality = streamQualityArbitration.qualityToPublish(
                 for: requestedQualities,
@@ -1407,16 +1581,25 @@ private extension HostServer.Core {
         case keyFrame
         case deltaFrame
         case cursorPosition
+
+        var isVideoFrame: Bool { self == .keyFrame || self == .deltaFrame }
     }
 
     struct PendingPacket: Sendable {
         let data: Data
+        let kind: HostProtocol.MessageKind
+        let flags: HostProtocol.Flags
+        let encrypted: Bool
         let policy: SendPolicy
+        var encodedWidth: Int? = nil
+        let enqueuedAt = ProcessInfo.processInfo.systemUptime
+        var byteCount: Int { data.count + HostProtocol.headerLength + (encrypted ? HostProtocol.authenticationTagLength : 0) }
     }
 
     struct VideoBroadcast: Sendable {
         let payload: Data
         let isKeyFrame: Bool
+        let encodedWidth: Int?
     }
 
     /// A one-item, lock-protected ingress buffer. This bounds work *before* the
@@ -1512,6 +1695,11 @@ private extension HostServer.Core {
         var requestedQuality: HostProtocol.StreamQuality = .best
         // Cursor telemetry is opt-in so older clients receive no new messages.
         var isSubscribedToCursorPosition = false
+        var supportsAdaptiveStream = false
+        var deliveryWindow = HostMediaDeliveryWindow()
+        var ratePolicy = HostAdaptiveRatePolicy()
+        var latestSentVideoSequence: UInt64 = 0
+        var authenticatedAt: TimeInterval = 0
 
         init(connection: NWConnection) {
             self.connection = connection
@@ -1530,8 +1718,11 @@ private extension HostServer.Core {
             pendingPackets.count + (inFlightByteCount == 0 ? 0 : 1)
         }
 
-        func takeNextOutboundSequence() -> UInt64 {
-            defer { nextOutboundSequence &+= 1 }
+        func takeNextOutboundSequence() throws -> UInt64 {
+            guard nextOutboundSequence < UInt64.max else {
+                throw HostProtocol.ProtocolError.malformedPayload("session sequence exhausted")
+            }
+            defer { nextOutboundSequence += 1 }
             return nextOutboundSequence
         }
 
@@ -1540,17 +1731,35 @@ private extension HostServer.Core {
             var removedAny = false
             pendingPackets.removeAll { packet in
                 guard packet.policy == .deltaFrame else { return false }
-                pendingByteCount -= packet.data.count
+                pendingByteCount -= packet.byteCount
                 removedAny = true
                 return true
             }
             return removedAny
         }
+        @discardableResult
+        func removeQueuedMediaFrames() -> Bool {
+            var removed = false
+            pendingPackets.removeAll { packet in
+                guard packet.policy.isVideoFrame else { return false }
+                pendingByteCount -= packet.byteCount
+                removed = true
+                return true
+            }
+            return removed
+        }
+        func removeQueuedPackets(kind: HostProtocol.MessageKind) {
+            pendingPackets.removeAll { packet in
+                guard packet.kind == kind else { return false }
+                pendingByteCount -= packet.byteCount
+                return true
+            }
+        }
         func removeQueuedVideoPackets() {
             pendingPackets.removeAll { packet in
                 switch packet.policy {
                 case .codecConfiguration, .keyFrame, .deltaFrame, .cursorPosition:
-                    pendingByteCount -= packet.data.count
+                    pendingByteCount -= packet.byteCount
                     return true
                 case .control:
                     return false
@@ -1561,7 +1770,7 @@ private extension HostServer.Core {
         func removeQueuedCursorPositions() {
             pendingPackets.removeAll { packet in
                 guard packet.policy == .cursorPosition else { return false }
-                pendingByteCount -= packet.data.count
+                pendingByteCount -= packet.byteCount
                 return true
             }
         }

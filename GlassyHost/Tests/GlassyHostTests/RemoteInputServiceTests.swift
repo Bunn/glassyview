@@ -97,6 +97,45 @@ func remoteInputUnicodeText() {
     #expect(events.filter { $0.type == .keyDown }.map(keyboardText) == [text])
 }
 
+@Test("Disconnect balances ordinary held keys", arguments: [UInt32(0x61), 0x44, 0xFF51, 0xFFBE])
+func remoteInputReleasesOrdinaryKey(keysym: UInt32) throws {
+    let events = keyboardEvents(for: [.key(.init(keysym: keysym, isDown: true))])
+    #expect(events.map(\.type) == [.keyDown, .keyUp])
+    let keyCode = try #require(RemoteInputService.mappedKeyCode(forX11Keysym: keysym))
+    #expect(events.allSatisfy { $0.getIntegerValueField(.keyboardEventKeycode) == keyCode })
+}
+
+@Test("Repeated downs release once and a changed shift keysym still releases its physical key")
+func remoteInputOrdinaryKeyReleaseIsIdempotent() {
+    let repeated = keyboardEvents(for: [
+        .key(.init(keysym: 0x61, isDown: true)),
+        .key(.init(keysym: 0x61, isDown: true)),
+    ])
+    #expect(repeated.map(\.type) == [.keyDown, .keyDown, .keyUp])
+    let shifted = keyboardEvents(for: [
+        .key(.init(keysym: 0x44, isDown: true)),
+        .key(.init(keysym: 0x64, isDown: false)),
+    ])
+    #expect(shifted.map(\.type) == [.keyDown, .keyUp])
+}
+
+@Test("Disabling input releases the key before its chord modifier exactly once")
+func remoteInputDisableReleasesChord() {
+    let recorder = KeyboardEventRecorder()
+    let service = RemoteInputService(accessibilityCheck: { true },
+                                     postKeyboardEvent: { recorder.append($0) })
+    service.setEnabled(true)
+    service.handle(.key(.init(keysym: 0xFFE1, isDown: true)))
+    service.handle(.key(.init(keysym: 0xFF51, isDown: true)))
+    service.setEnabled(false)
+    service.releasePressedInput()
+    service.releasePressedInput()
+    let events = recorder.events
+    #expect(events.map(\.type) == [.flagsChanged, .keyDown, .keyUp, .flagsChanged])
+    #expect(events[2].flags.contains(.maskShift))
+    #expect(events[3].flags.isEmpty)
+}
+
 private func keyboardEvents(for inputs: [HostProtocol.RemoteInputEvent]) -> [CGEvent] {
     let recorder = KeyboardEventRecorder()
     let service = RemoteInputService(accessibilityCheck: { true },

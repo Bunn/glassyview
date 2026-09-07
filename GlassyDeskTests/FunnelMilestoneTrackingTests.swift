@@ -85,12 +85,26 @@ struct FunnelMilestoneTrackingTests {
         _ = tracker.recordFreeSessionStarted()
 
         tracker.setCollectionEnabled(false)
+        let removals = revenueCat.writes.last
+        #expect(removals?.count == FunnelMilestone.allCases.count + 1)
+        #expect(removals?.values.allSatisfy { $0.isEmpty } == true)
         _ = tracker.recordFreeSessionStarted()
         let writeCountWhileDisabled = revenueCat.writes.count
 
         tracker.setCollectionEnabled(true)
         #expect(tracker.recordFreeSessionStarted() == .first)
         #expect(revenueCat.writes.count == writeCountWhileDisabled + 2)
+    }
+
+    @Test("Disabled startup removes previous analytics attributes only once")
+    func disabledStartupClearsOldAttributes() {
+        let revenueCat = RevenueCatAttributeWriterSpy()
+        let tracker = makeTracker(revenueCat: revenueCat)
+        tracker.setCollectionEnabled(false)
+        tracker.setCollectionEnabled(false)
+        tracker.record(.purchaseStarted)
+        #expect(revenueCat.writes.count == 1)
+        #expect(revenueCat.writes[0].values.allSatisfy { $0.isEmpty })
     }
 
     @Test("Attribute schema is fixed, unique, and bounded")

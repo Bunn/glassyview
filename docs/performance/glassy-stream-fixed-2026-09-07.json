@@ -1,0 +1,166 @@
+{
+  "adaptive_source_500kbps": {
+    "consumer_stall_seconds": 0,
+    "errors": [],
+    "frames_delivered": 82,
+    "frames_offered": 90,
+    "frames_over_100ms_old": 79,
+    "frames_over_500ms_old": 2,
+    "host_adaptive_bitrate_events": [
+      2000000,
+      1300000,
+      845000,
+      549250,
+      659100,
+      790920
+    ],
+    "host_effective_quality_events": [
+      "best"
+    ],
+    "last_third_maximum_callback_age_ms": 263.5860836599022,
+    "last_third_p95_callback_age_ms": 248.96145798265934,
+    "link_bits_per_second": 500000,
+    "maximum_callback_age_ms": 608.881916385144,
+    "nominal_source_fps": 60,
+    "observation_duration_seconds": 12.957812416600063,
+    "offered_payload_mbps": 0.5056907239725499,
+    "p95_callback_age_ms": 406.1405414249748,
+    "payload_bytes_per_frame": 25000,
+    "pong_delay_ms": 103.08100003749132,
+    "producer_duration_seconds": 9.921273541636765,
+    "source_follows_adaptive_budget": true
+  },
+  "bandwidth_limited_2mbps": {
+    "consumer_stall_seconds": 0,
+    "errors": [],
+    "frames_delivered": 31,
+    "frames_offered": 180,
+    "frames_over_100ms_old": 31,
+    "frames_over_500ms_old": 0,
+    "host_adaptive_bitrate_events": [
+      2000000,
+      1300000
+    ],
+    "host_effective_quality_events": [
+      "best"
+    ],
+    "last_third_maximum_callback_age_ms": 198.58387438580394,
+    "last_third_p95_callback_age_ms": 198.58387438580394,
+    "link_bits_per_second": 2000000,
+    "maximum_callback_age_ms": 283.9632916729897,
+    "nominal_source_fps": 60,
+    "observation_duration_seconds": 6.34458849998191,
+    "offered_payload_mbps": 10.909711467533464,
+    "p95_callback_age_ms": 200.60645788908005,
+    "payload_bytes_per_frame": 25000,
+    "pong_delay_ms": 90.2619999833405,
+    "producer_duration_seconds": 3.2998122917488217,
+    "source_follows_adaptive_budget": false
+  },
+  "bandwidth_limited_with_lower_synthetic_source_budget": {
+    "consumer_stall_seconds": 0,
+    "errors": [],
+    "frames_delivered": 60,
+    "frames_offered": 60,
+    "frames_over_100ms_old": 0,
+    "frames_over_500ms_old": 0,
+    "host_adaptive_bitrate_events": [
+      2000000,
+      2400000
+    ],
+    "host_effective_quality_events": [
+      "best"
+    ],
+    "last_third_maximum_callback_age_ms": 32.51954191364348,
+    "last_third_p95_callback_age_ms": 32.51954191364348,
+    "link_bits_per_second": 2000000,
+    "maximum_callback_age_ms": 33.77624973654747,
+    "nominal_source_fps": 15,
+    "observation_duration_seconds": 7.153604041785002,
+    "offered_payload_mbps": 0.7719926046045363,
+    "p95_callback_age_ms": 33.10979204252362,
+    "payload_bytes_per_frame": 6666,
+    "pong_delay_ms": 31.012749997898936,
+    "producer_duration_seconds": 4.144702916732058,
+    "source_follows_adaptive_budget": false
+  },
+  "callback_baseline": {
+    "consumer_stall_seconds": 0,
+    "errors": [],
+    "frames_delivered": 180,
+    "frames_offered": 180,
+    "frames_over_100ms_old": 0,
+    "frames_over_500ms_old": 0,
+    "host_adaptive_bitrate_events": [
+      2000000,
+      2400000
+    ],
+    "host_effective_quality_events": [
+      "best"
+    ],
+    "last_third_maximum_callback_age_ms": 0.6035417318344116,
+    "last_third_p95_callback_age_ms": 0.5482081323862076,
+    "link_bits_per_second": null,
+    "maximum_callback_age_ms": 1.1417909990996122,
+    "nominal_source_fps": 60,
+    "observation_duration_seconds": 3.9990337083581835,
+    "offered_payload_mbps": 10.294849248774886,
+    "p95_callback_age_ms": 0.5726248491555452,
+    "payload_bytes_per_frame": 25000,
+    "pong_delay_ms": 0.3572083078324795,
+    "producer_duration_seconds": 3.4968943332787603,
+    "source_follows_adaptive_budget": false
+  },
+  "callback_stalled_consumer": {
+    "consumer_stall_seconds": 1,
+    "errors": [],
+    "frames_delivered": 128,
+    "frames_offered": 180,
+    "frames_over_100ms_old": 1,
+    "frames_over_500ms_old": 1,
+    "host_adaptive_bitrate_events": [
+      2000000,
+      1300000,
+      845000
+    ],
+    "host_effective_quality_events": [
+      "best"
+    ],
+    "last_third_maximum_callback_age_ms": 1.0200000833719969,
+    "last_third_p95_callback_age_ms": 0.5483750719577074,
+    "link_bits_per_second": null,
+    "maximum_callback_age_ms": 1000.2425003331155,
+    "nominal_source_fps": 60,
+    "observation_duration_seconds": 3.9935797499492764,
+    "offered_payload_mbps": 10.378509901416388,
+    "p95_callback_age_ms": 0.540958484634757,
+    "payload_bytes_per_frame": 25000,
+    "pong_delay_ms": 417.9910833481699,
+    "producer_duration_seconds": 3.468706041807309,
+    "source_follows_adaptive_budget": false
+  },
+  "emergency_idle_bootstrap": {
+    "emergency_widths": [
+      640,
+      320
+    ],
+    "errors": [],
+    "first_callback_seconds": 2.22928479174152,
+    "first_keyframe_bytes": 29451,
+    "new_capture_frames_after_initial": 0,
+    "passed": true,
+    "rate_changes": [
+      2000000,
+      1000000,
+      500000,
+      350000
+    ]
+  },
+  "idle_keyframe": {
+    "encoded_before_request": 3,
+    "encoder_errors": [],
+    "next_input_produced_keyframe": true,
+    "outputs_during_one_second_without_new_capture": 1
+  },
+  "scope": "Optimized macOS build of production host + iOS transport; synthetic media; no display decode"
+}

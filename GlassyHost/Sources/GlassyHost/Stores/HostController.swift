@@ -13,6 +13,8 @@ final class HostController {
         case authenticatedClientCount(Int)
         case status(HostServer.Status)
         case streamQuality(HostProtocol.StreamQuality)
+        case adaptiveBitRate(Int?)
+        case adaptiveMaximumWidth(Int?)
         case pairedDevices([HostPairedDevice])
     }
 
@@ -139,6 +141,13 @@ final class HostController {
     @ObservationIgnored
     private var activeStreamQuality: HostProtocol.StreamQuality?
 
+    @ObservationIgnored private var adaptiveBitRateBudget: Int?
+    @ObservationIgnored private var adaptiveMaximumWidth: Int?
+    @ObservationIgnored private var activeCaptureConfiguration: HostStreamQualityConfiguration?
+    @ObservationIgnored private var adaptiveUpdateTask: Task<Void, Never>?
+    @ObservationIgnored private var adaptiveUpdateGeneration = UUID()
+    @ObservationIgnored private var permissionRefreshTask: Task<Void, Never>?
+
     @ObservationIgnored
     private var pendingStreamQualityUpgrade: HostProtocol.StreamQuality?
 
@@ -241,6 +250,8 @@ final class HostController {
         pairingPasswordLoadTask?.cancel()
         serverEventContinuation?.finish()
         serverEventTask?.cancel()
+        adaptiveUpdateTask?.cancel()
+        permissionRefreshTask?.cancel()
         remoteInputService.setEnabled(false)
         hostServer.stop()
     }
@@ -398,7 +409,7 @@ final class HostController {
                 // original permissions. Restore the local presentation/gate.
                 isServerReady = previousServerReady
                 serverPort = previousServerPort
-                remoteInputService.setEnabled(previousServerReady && isStreaming)
+                remoteInputService.setEnabled(previousServerReady && isStreaming && permissions.canCaptureScreen && accessibilityAuthorization == .granted)
             }
         }
         refreshPairingCode()
@@ -426,7 +437,7 @@ final class HostController {
             return .terminalFailure
         }
 
-        let streamConfiguration = HostStreamQualityConfiguration(quality: quality)
+        let streamConfiguration = HostStreamQualityConfiguration(quality: quality, availableBitRate: adaptiveBitRateBudget, maximumCaptureWidth: adaptiveMaximumWidth)
 
         let requestedOwnership = streamingDemand.ownership
         await refreshAuthorizationStatuses()
@@ -440,6 +451,7 @@ final class HostController {
                 lastError = requestedOwnership == .onDemand
                     ? "Screen Recording permission is required for on-demand streaming. Allow it locally, then reconnect."
                     : "Allow Screen Recording in System Settings, then start streaming again."
+                publishRuntimeStreamStatus(.screenPermissionRequired)
                 return .terminalFailure
             }
         }
@@ -449,13 +461,22 @@ final class HostController {
                 requestDirectScreenAccessPermission()
             }
             lastError = "Confirm Direct Screen Access in Permissions on this Mac, then reconnect or start sharing again."
+            publishRuntimeStreamStatus(.screenPermissionRequired)
             return .terminalFailure
         }
 
         runState = .starting
+        publishRuntimeStreamStatus(.starting)
         lastError = nil
         await refreshDisplays()
-        guard permissions.canCaptureScreen else { return .terminalFailure }
+        guard permissions.canCaptureScreen else {
+            publishRuntimeStreamStatus(.screenPermissionRequired)
+            return .terminalFailure
+        }
+        guard !displays.isEmpty else {
+            publishRuntimeStreamStatus(.displayUnavailable)
+            return .retryableFailure
+        }
         guard allowsConnections, isServerReady, streamingDemand.wantsCapture else {
             return .superseded
         }
@@ -476,7 +497,8 @@ final class HostController {
                         accessUnit.data,
                         presentationTimeSeconds: accessUnit.presentationTimeSeconds,
                         durationSeconds: accessUnit.durationSeconds,
-                        isKeyFrame: accessUnit.isKeyFrame
+                        isKeyFrame: accessUnit.isKeyFrame,
+                        encodedWidth: accessUnit.encodedWidth
                     )
                 }
             },
@@ -509,7 +531,7 @@ final class HostController {
                 return .superseded
             }
 
-            frameTask = Task { [weak self, encoder, pipelineGeneration] in
+            frameTask = Task.detached(priority: .userInitiated) { [weak self, encoder, pipelineGeneration] in
                 var cursorPositionTracker = HostCursorPositionTracker()
                 do {
                     for await frame in frames {
@@ -542,7 +564,10 @@ final class HostController {
 
             isStreaming = true
             activeStreamQuality = quality
-            remoteInputService.setEnabled(allowsConnections && isServerReady)
+            activeCaptureConfiguration = streamConfiguration
+            handleAdaptiveBitRateChange(adaptiveBitRateBudget)
+            publishRuntimeStreamStatus(.streaming)
+            remoteInputService.setEnabled(allowsConnections && isServerReady && accessibilityAuthorization == .granted)
             if isServerReady {
                 runState = .ready
             }
@@ -563,9 +588,11 @@ final class HostController {
                 permissions.invalidateDirectScreenAccess()
                 await refreshAuthorizationStatuses()
                 lastError = "Screen access was declined. Confirm Direct Screen Access in Permissions on this Mac, then reconnect."
+                publishRuntimeStreamStatus(.screenPermissionRequired)
                 return .terminalFailure
             }
             fail(with: error)
+            publishRuntimeStreamStatus(.captureFailed)
             return .retryableFailure
         }
     }
@@ -574,6 +601,9 @@ final class HostController {
         retiring generation: HostPipelineGeneration? = nil
     ) async {
         pipelineGenerations.invalidate(generation)
+        adaptiveUpdateGeneration = UUID()
+        adaptiveUpdateTask?.cancel()
+        adaptiveUpdateTask = nil
         cancelPipelineRetry(resetAttempt: generation == nil)
         streamQualityUpgradeTask?.cancel()
         streamQualityUpgradeTask = nil
@@ -598,6 +628,8 @@ final class HostController {
         await hostServer.clearVideoState()
         isStreaming = false
         activeStreamQuality = nil
+        activeCaptureConfiguration = nil
+        publishRuntimeStreamStatus()
         if !streamingDemand.wantsCapture,
            let pendingStreamQualityUpgrade {
             desiredStreamQuality = pendingStreamQualityUpgrade
@@ -632,6 +664,74 @@ final class HostController {
         }
     }
 
+    private func publishRuntimeStreamStatus(_ state: HostProtocol.StreamState? = nil) {
+        let current = state ?? (!permissions.canCaptureScreen ? .screenPermissionRequired : (isStreaming ? .streaming : .stopped))
+        hostServer.publishStreamStatus(state: current, accessibilityGranted: accessibilityAuthorization == .granted)
+    }
+
+    private func handleAdaptiveBitRateChange(_ budget: Int?) {
+        adaptiveBitRateBudget = budget
+        // One owner applies changes to completion. Canceling after an encoder
+        // mutation but before committing state would make an A→B→A change
+        // incorrectly look like no work was needed for the final A.
+        guard adaptiveUpdateTask == nil else { return }
+        let updateGeneration = UUID()
+        adaptiveUpdateGeneration = updateGeneration
+        adaptiveUpdateTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
+            guard let self else { return }
+            defer {
+                if adaptiveUpdateGeneration == updateGeneration { adaptiveUpdateTask = nil }
+            }
+            while !Task.isCancelled, adaptiveUpdateGeneration == updateGeneration {
+                guard let encoder, let generation = pipelineGenerations.current,
+                      let activeStreamQuality, isStreaming else { return }
+                let configuration = HostStreamQualityConfiguration(quality: activeStreamQuality,
+                                                                    availableBitRate: adaptiveBitRateBudget,
+                                                                    maximumCaptureWidth: adaptiveMaximumWidth)
+                guard configuration != activeCaptureConfiguration else { return }
+                do {
+                    try await encoder.updateConfiguration(configuration.encoderConfiguration)
+                    guard !Task.isCancelled, adaptiveUpdateGeneration == updateGeneration,
+                          pipelineGenerations.isCurrent(generation) else { return }
+                    if activeCaptureConfiguration?.maximumWidth != configuration.maximumWidth
+                        || activeCaptureConfiguration?.maximumHeight != configuration.maximumHeight
+                        || activeCaptureConfiguration?.framesPerSecond != configuration.framesPerSecond {
+                        try await captureService.updateConfiguration(configuration.screenCaptureConfiguration,
+                                                                     pipelineGeneration: generation)
+                    }
+                    guard !Task.isCancelled, adaptiveUpdateGeneration == updateGeneration,
+                          pipelineGenerations.isCurrent(generation) else { return }
+                    activeCaptureConfiguration = configuration
+                    encoder.requestKeyFrame()
+                    // Any budget received across an await is reconciled by the
+                    // next pass, against the configuration actually applied.
+                } catch {
+                    guard !Task.isCancelled, adaptiveUpdateGeneration == updateGeneration,
+                          pipelineGenerations.isCurrent(generation) else { return }
+                    await handlePipelineFailure(error, generation: generation)
+                    return
+                }
+            }
+        }
+    }
+
+    private func updatePermissionRefreshTask() {
+        guard clientCount > 0 else {
+            permissionRefreshTask?.cancel()
+            permissionRefreshTask = nil
+            return
+        }
+        guard permissionRefreshTask == nil else { return }
+        permissionRefreshTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                guard let self, clientCount > 0 else { return }
+                await refreshAuthorizationStatuses()
+            }
+        }
+    }
+
     func refreshAuthorizationStatuses() async {
         let previouslyCouldCapture = permissions.canCaptureScreen
         let changed = await permissions.refresh()
@@ -642,6 +742,8 @@ final class HostController {
             selectedDisplayID = nil
         }
 
+        remoteInputService.setEnabled(isStreaming && allowsConnections && isServerReady && permissions.canCaptureScreen && accessibilityAuthorization == .granted)
+        publishRuntimeStreamStatus()
         if let pane = permissionFlowController?.currentPane,
            (pane == .screenRecording && screenRecordingAuthorization == .granted)
             || (pane == .accessibility && accessibilityAuthorization == .granted) {
@@ -828,12 +930,9 @@ final class HostController {
 
     private func handleAuthenticatedClientCountChange(_ count: Int) async {
         guard allowsConnections || count == 0 else { return }
-        let previousCount = clientCount
         let effects = streamingDemand.authenticatedClientCountChanged(to: count)
         clientCount = streamingDemand.authenticatedClientCount
-        if clientCount < previousCount {
-            remoteInputService.releasePressedInput()
-        }
+        updatePermissionRefreshTask()
         applyStreamingDemandEffects(effects)
         updateInitialOnDemandStartCoalescing()
         if clientCount > 0 {
@@ -1179,12 +1278,23 @@ final class HostController {
                     handleServerStatus(status)
                 case .streamQuality(let quality):
                     await handleStreamQualityChange(quality)
+                case .adaptiveBitRate(let budget):
+                    handleAdaptiveBitRateChange(budget)
+                case .adaptiveMaximumWidth(let width):
+                    adaptiveMaximumWidth = width
+                    handleAdaptiveBitRateChange(adaptiveBitRateBudget)
                 case .pairedDevices(let devices):
                     pairedDevices = devices
                 }
             }
         }
 
+        hostServer.setAdaptiveResolutionHandler { width in
+            continuation.yield(.adaptiveMaximumWidth(width))
+        }
+        hostServer.setAdaptiveBitRateHandler { budget in
+            continuation.yield(.adaptiveBitRate(budget))
+        }
         hostServer.setStreamQualityHandler { quality in
             continuation.yield(.streamQuality(quality))
         }
@@ -1227,7 +1337,7 @@ final class HostController {
             serverPort = nil
             runState = .starting
         case .listening(let port):
-            remoteInputService.setEnabled(isStreaming)
+            remoteInputService.setEnabled(isStreaming && permissions.canCaptureScreen && accessibilityAuthorization == .granted)
             isServerReady = true
             serverPort = port
             runState = .ready
@@ -1308,6 +1418,7 @@ final class HostController {
         // intentionally retained: explicit manual stop still clears it, while
         // authenticated viewers cause reconciliation to replace this pipeline.
         pipelineGenerations.invalidate(generation)
+        publishRuntimeStreamStatus(.captureFailed)
         pendingPipelineFailure = HostPendingPipelineFailure(
             generation: generation,
             error: HostPipelineError(message: error.localizedDescription)

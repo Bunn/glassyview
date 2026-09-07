@@ -76,7 +76,8 @@ private struct GlassyStreamStatusOverlay: View {
                     .font(.system(size: 36))
                     .foregroundStyle(.orange)
 
-                Text("Connection Stopped")
+                Text(controller.error == nil && controller.hostStatus?.message != nil
+                     ? String(localized: "Check Your Mac") : String(localized: "Connection Stopped"))
                     .font(.headline)
 
                 Text(failureMessage)
@@ -98,10 +99,24 @@ private struct GlassyStreamStatusOverlay: View {
             }
             .padding(18)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        } else if let message = controller.hostStatus?.message {
+            VStack {
+                Text(message)
+                    .font(.footnote)
+                    .multilineTextAlignment(.center)
+                    .padding(14)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                    .padding()
+                Spacer()
+            }
         }
     }
 
     private var failureMessage: String? {
+        if let status = controller.hostStatus,
+           status.state != .streaming, status.state != .starting {
+            return status.message
+        }
         guard controller.state == .failed else { return nil }
         return controller.error?.localizedDescription
             ?? "The fast video connection ended. Close this session and reconnect."

@@ -87,6 +87,7 @@ final class GlassyStreamSessionController {
     private(set) var error: GlassyStreamSessionError?
     private(set) var authentication: GlassyStreamAuthentication?
     private(set) var videoDimensions: CGSize?
+    private(set) var hostStatus: GlassyStreamHostStatus?
 
     var isConnected: Bool {
         state == .connected
@@ -148,6 +149,7 @@ final class GlassyStreamSessionController {
         let generation = UUID()
         activeGeneration = generation
         authentication = nil
+        hostStatus = nil
         videoDimensions = nil
         error = nil
         state = .connecting
@@ -176,17 +178,19 @@ final class GlassyStreamSessionController {
                     continuation: continuation
                 )
 
+                let consumeMedia = renderer.makeMediaConsumer()
                 client.connect(
                     configuration: configuration,
-                    callbackQueue: .main,
+                    callbackQueue: renderer.mediaQueue,
                     callbacks: GlassyStreamClientCallbacks(
                         onEvent: { [weak self] event in
-                            MainActor.assumeIsolated {
+                            if consumeMedia(event) { return }
+                            Task { @MainActor [weak self] in
                                 self?.receive(event, generation: generation)
                             }
                         },
                         onCompletion: { [weak self] result in
-                            MainActor.assumeIsolated {
+                            Task { @MainActor [weak self] in
                                 self?.complete(result, generation: generation)
                             }
                         }
@@ -229,38 +233,17 @@ final class GlassyStreamSessionController {
             takeAuthenticationWaiter(generation: generation)?
                 .resume(returning: authentication)
 
-        case let .videoConfiguration(configuration):
-            guard state == .connected else { return }
-            do {
-                try renderer.configure(
-                    parameterSets: configuration.parameterSets,
-                    nalUnitHeaderLength: configuration.nalUnitHeaderLength
-                )
-            } catch let rendererError as GlassyStreamVideoRendererError {
-                fail(.video(rendererError), generation: generation)
-            } catch {
-                fail(
-                    .video(.decoder(error.localizedDescription)),
-                    generation: generation
-                )
-            }
+        case .videoConfiguration, .videoAccessUnit, .videoDiscontinuity:
+            break // Consumed synchronously on the bounded media worker.
 
-        case let .videoAccessUnit(accessUnit):
-            guard state == .connected else { return }
-            do {
-                try renderer.enqueue(
-                    avccData: accessUnit.data,
-                    presentationTime: accessUnit.presentationTime,
-                    duration: accessUnit.duration,
-                    isKeyFrame: accessUnit.isKeyFrame
-                )
-            } catch let rendererError as GlassyStreamVideoRendererError {
-                fail(.video(rendererError), generation: generation)
-            } catch {
-                fail(
-                    .video(.decoder(error.localizedDescription)),
-                    generation: generation
-                )
+        case .hostStreamStatus(let status):
+            hostStatus = status
+            if status.state != .starting && status.state != .streaming {
+                // Keep the authenticated connection alive so local permission
+                // recovery can resume it and the actionable host status remains.
+                cancelVideoReadinessTimeout()
+            } else if !renderer.isDisplayingVideo, videoReadinessTask == nil {
+                scheduleVideoReadinessTimeout(generation: generation)
             }
 
         case let .cursorPosition(position):
@@ -309,9 +292,20 @@ final class GlassyStreamSessionController {
         }
         renderer.onStateChanged = { [weak self] rendererState in
             guard let self, self.activeGeneration == generation else { return }
-            if case .rendering = rendererState {
+            // Enqueueing is not proof of visible video. The layer's readiness
+            // observation below owns initial presentation success.
+            if case .failed = rendererState {
                 self.cancelVideoReadinessTimeout()
+            } else if rendererState == .waitingForConfiguration || rendererState == .waitingForKeyFrame {
+                self.resumeVideoReadinessTimeoutIfNeeded(generation: generation)
             }
+        }
+        renderer.onPresentationReady = { [weak self] in
+            guard let self, self.activeGeneration == generation else { return }
+            self.cancelVideoReadinessTimeout()
+        }
+        renderer.onPresentationLost = { [weak self] in
+            self?.resumeVideoReadinessTimeoutIfNeeded(generation: generation)
         }
         renderer.onVideoDimensionsChanged = { [weak self] dimensions in
             guard let self, self.activeGeneration == generation else { return }
@@ -330,9 +324,12 @@ final class GlassyStreamSessionController {
         renderer.onKeyFrameNeeded = nil
         renderer.onStateChanged = nil
         renderer.onVideoDimensionsChanged = nil
+        renderer.onPresentationReady = nil
+        renderer.onPresentationLost = nil
         client.disconnect()
         renderer.reset()
         authentication = nil
+        hostStatus = nil
         videoDimensions = nil
         error = sessionError
         state = .failed
@@ -360,9 +357,12 @@ final class GlassyStreamSessionController {
         renderer.onKeyFrameNeeded = nil
         renderer.onStateChanged = nil
         renderer.onVideoDimensionsChanged = nil
+        renderer.onPresentationReady = nil
+        renderer.onPresentationLost = nil
         client.disconnect()
         renderer.reset()
         authentication = nil
+        hostStatus = nil
         videoDimensions = nil
         state = .idle
         if clearError {
@@ -376,7 +376,7 @@ final class GlassyStreamSessionController {
         y: UInt16,
         buttons: GlassyStreamPointerButtons
     ) {
-        guard state == .connected else { return }
+        guard canSendInput else { return }
         client.sendPointerInput(x: x, y: y, buttons: buttons)
     }
 
@@ -384,12 +384,12 @@ final class GlassyStreamSessionController {
         direction: GlassyStreamScrollDirection,
         steps: UInt16
     ) {
-        guard state == .connected else { return }
+        guard canSendInput else { return }
         client.sendScrollInput(direction: direction, steps: steps)
     }
 
     func sendKeyInput(keysym: UInt32, isDown: Bool) {
-        guard state == .connected else { return }
+        guard canSendInput else { return }
         client.sendKeyInput(keysym: keysym, isDown: isDown)
     }
 
@@ -397,18 +397,33 @@ final class GlassyStreamSessionController {
         _ text: String,
         modifiers: GlassyStreamTextModifiers = []
     ) {
-        guard state == .connected else { return }
+        guard canSendInput else { return }
         client.sendTextInput(text, modifiers: modifiers)
     }
 
     func pasteClipboardText(_ text: String) {
-        guard state == .connected,
+        guard canSendInput,
               authentication?.supportsClipboardPaste == true else { return }
         client.pasteClipboardText(text)
     }
 
+    private var canSendInput: Bool {
+        guard state == .connected else { return false }
+        guard let hostStatus else { return true } // Older hosts have no status extension.
+        return hostStatus.state == .streaming && hostStatus.accessibilityGranted && hostStatus.ownsInput
+    }
+
+    private func resumeVideoReadinessTimeoutIfNeeded(generation: UUID) {
+        guard activeGeneration == generation, state == .connected,
+              videoReadinessTask == nil, !renderer.isDisplayingVideo else { return }
+        if let hostStatus, hostStatus.state != .starting && hostStatus.state != .streaming { return }
+        scheduleVideoReadinessTimeout(generation: generation)
+    }
+
     private func scheduleVideoReadinessTimeout(generation: UUID) {
         cancelVideoReadinessTimeout()
+        guard !renderer.isDisplayingVideo else { return }
+        if let hostStatus, hostStatus.state != .starting && hostStatus.state != .streaming { return }
         guard videoReadinessTimeout.isFinite, videoReadinessTimeout > 0 else {
             fail(.videoReadinessTimedOut, generation: generation)
             return
@@ -420,7 +435,8 @@ final class GlassyStreamSessionController {
                   let self,
                   self.activeGeneration == generation,
                   self.state == .connected else { return }
-            guard case .rendering = self.renderer.state else {
+            self.videoReadinessTask = nil
+            guard self.renderer.isDisplayingVideo else {
                 self.fail(.videoReadinessTimedOut, generation: generation)
                 return
             }

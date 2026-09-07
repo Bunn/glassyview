@@ -56,6 +56,8 @@ struct DejaViewApp: App {
                     }
 
                     await subscriptionStore.refresh()
+                }
+                .task {
                     await subscriptionStore.observeCustomerInfoUpdates()
                 }
         }
@@ -80,12 +82,6 @@ struct DejaViewApp: App {
     private func updateAnalyticsCollection(_ enabled: Bool) {
         funnelMilestones.setCollectionEnabled(enabled)
 
-        if enabled {
-            analytics.setCollectionEnabled(true)
-        } else {
-            Task {
-                await analytics.disableCollectionAfterTrackingOptOut()
-            }
-        }
+        analytics.setCollectionEnabled(enabled)
     }
 }

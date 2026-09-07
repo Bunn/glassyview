@@ -40,6 +40,13 @@ struct AboutView: View {
             }
 
             Section {
+                Link("Privacy Policy", destination: GlassyDeskLinks.privacyPolicy)
+                Link("Terms of Use", destination: GlassyDeskLinks.termsOfUse)
+
+                NavigationLink("Open Source Licenses") {
+                    LicenseNoticesView()
+                }
+
                 if let developerURL {
                     Link(destination: developerURL) {
                         Label("Developer", systemImage: "person")

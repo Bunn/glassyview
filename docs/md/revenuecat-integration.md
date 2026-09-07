@@ -39,7 +39,8 @@ Release -> App Store production public SDK key
 
 ## SwiftUI Entry Points
 
-`DejaViewApp` configures RevenueCat once at launch, owns a `SubscriptionStore`, injects it into the SwiftUI environment, refreshes customer info, and listens for customer info updates:
+`DejaViewApp` configures RevenueCat once at launch, owns a `SubscriptionStore`, injects it into the SwiftUI environment, hydrates cached customer info, refreshes entitlement information independently
+of product offerings, and listens for customer info updates in a separate task:
 
 ```swift
 @State private var subscriptionStore = SubscriptionStore()
@@ -53,6 +54,8 @@ WindowGroup {
         .environment(subscriptionStore)
         .task {
             await subscriptionStore.refresh()
+        }
+        .task {
             await subscriptionStore.observeCustomerInfoUpdates()
         }
 }

@@ -79,9 +79,10 @@ struct AnalyticsTests {
         osMajor: 26
     )
 
-    @Test("Collection is enabled by default")
-    func collectionIsEnabledByDefault() {
-        #expect(AnalyticsPreference.defaultCollectionEnabled)
+    @Test("Optional collection requires new explicit consent")
+    func collectionRequiresExplicitConsent() {
+        #expect(!AnalyticsPreference.defaultCollectionEnabled)
+        #expect(AnalyticsPreference.collectionEnabledKey != "privacyPreservingAnalyticsEnabled")
     }
 
     @Test("Payload contains only allowlisted aggregate fields")
@@ -213,9 +214,9 @@ struct AnalyticsTests {
         ])
     }
 
-    @Test("Opting out delivers a final event before disabling collection")
-    func optOutDeliversFinalEventBeforeDisablingCollection() async throws {
-        let transport = AnalyticsTransportSpy()
+    @Test("Opt-out drops queued events without sending a final analytics event")
+    func optOutDropsQueuedEvents() async {
+        let transport = SuspendedAnalyticsTransport()
         let tracker = CloudflareAnalyticsTracker(
             transport: transport,
             metadata: metadata,
@@ -223,20 +224,35 @@ struct AnalyticsTests {
         )
         tracker.setCollectionEnabled(true)
         tracker.track(.appOpened)
-
-        await tracker.disableCollectionAfterTrackingOptOut()
-
+        await transport.waitForSendCount(1)
         tracker.track(.purchaseStarted)
+
+        tracker.setCollectionEnabled(false)
+        tracker.track(.purchaseStarted)
+        #expect(tracker.pendingEventCount == 0)
+        await transport.resumeSend(at: 0, with: .accepted)
         await tracker.waitForPendingDelivery()
 
         let events = await transport.batches().flatMap { $0 }
-        #expect(events.map(\.event) == [.appOpened, .analyticsDisabled])
+        #expect(events.map(\.event) == [.appOpened])
+        #expect(tracker.pendingEventCount == 0)
+    }
 
-        let optOut = try #require(events.last)
-        #expect(optOut.context == AnalyticsEventContext(
-            source: .settings,
-            outcome: .success
-        ))
+    @Test("Finishing an old upload cannot disable or drain newly opted-in events")
+    func reenableSurvivesOldUploadCompletion() async {
+        let transport = SuspendedAnalyticsTransport()
+        let tracker = CloudflareAnalyticsTracker(transport: transport, metadata: metadata, retryDelays: [])
+        tracker.setCollectionEnabled(true)
+        tracker.track(.appOpened)
+        await transport.waitForSendCount(1)
+        tracker.setCollectionEnabled(false)
+        tracker.setCollectionEnabled(true)
+        tracker.track(.freeSessionStarted)
+        await transport.waitForSendCount(2)
+        await transport.resumeSend(at: 0, with: .accepted)
+        await transport.resumeSend(at: 1, with: .accepted)
+        await tracker.waitForPendingDelivery()
+        #expect(await transport.batches().flatMap { $0 }.map(\.event) == [.appOpened, .freeSessionStarted])
         #expect(tracker.pendingEventCount == 0)
     }
 
@@ -354,12 +370,11 @@ struct AnalyticsTests {
         #expect(log.entries.first?.0 == .paywallDismissed)
         #expect(log.entries.first?.1 == context)
 
-        await tracker.disableCollectionAfterTrackingOptOut()
+        tracker.setCollectionEnabled(false)
         tracker.track(.purchaseStarted)
 
         #expect(log.entries.map(\.0) == [
             .paywallDismissed,
-            .analyticsDisabled,
         ])
     }
     #endif

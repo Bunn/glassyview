@@ -51,6 +51,7 @@ enum HostProtocol {
         static let cursorPositionTelemetry = Capabilities(rawValue: 1 << 4)
         static let pairingPassword = Capabilities(rawValue: 1 << 5)
         static let clipboardPaste = Capabilities(rawValue: 1 << 6)
+        static let adaptiveStream = Capabilities(rawValue: 1 << 7)
     }
 
     static let advertisedCapabilities: Capabilities = [
@@ -59,7 +60,8 @@ enum HostProtocol {
         .directInput,
         .streamQualityControl,
         .cursorPositionTelemetry,
-        .clipboardPaste
+        .clipboardPaste,
+        .adaptiveStream
     ]
 
     static func advertisedCapabilities(pairingPasswordEnabled: Bool) -> Capabilities {
@@ -82,6 +84,8 @@ enum HostProtocol {
         case streamQualityRequest = 0x13
         case cursorPositionSubscriptionRequest = 0x14
         case cursorPosition = 0x15
+        case streamFeedback = 0x16
+        case hostStreamStatus = 0x17
 
         case pointerInput = 0x20
         case scrollInput = 0x21
@@ -128,6 +132,67 @@ enum HostProtocol {
         case dataSaver = 0
         case balanced = 1
         case best = 2
+    }
+
+    /// Opt-in progress for adaptiveStream. Sequence zero subscribes before video.
+    struct StreamFeedback: Equatable, Sendable {
+        let latestHandledVideoSequence: UInt64
+        let callbackQueueAgeMilliseconds: UInt32
+    }
+
+    enum StreamState: UInt8, CaseIterable, Sendable {
+        case starting = 0
+        case streaming = 1
+        case stopped = 2
+        case screenPermissionRequired = 3
+        case displayUnavailable = 4
+        case captureFailed = 5
+    }
+
+    struct StreamStatus: Equatable, Sendable {
+        let state: StreamState
+        let accessibilityGranted: Bool
+        let ownsInput: Bool
+    }
+
+    static func encodeStreamFeedback(_ feedback: StreamFeedback) -> Data {
+        var writer = ByteWriter(capacity: 16)
+        writer.write(feedback.latestHandledVideoSequence)
+        writer.write(feedback.callbackQueueAgeMilliseconds)
+        writer.write(UInt32(0))
+        return writer.data
+    }
+
+    static func decodeStreamFeedback(_ data: Data) throws -> StreamFeedback {
+        var reader = ByteReader(data: data)
+        let sequence = try reader.readUInt64()
+        let age = try reader.readUInt32()
+        guard try reader.readUInt32() == 0, age <= 60_000 else {
+            throw ProtocolError.malformedPayload("invalid stream feedback")
+        }
+        try reader.requireEnd()
+        return StreamFeedback(latestHandledVideoSequence: sequence, callbackQueueAgeMilliseconds: age)
+    }
+
+    static func encodeStreamStatus(_ status: StreamStatus) -> Data {
+        var writer = ByteWriter(capacity: 16)
+        writer.write(status.state.rawValue)
+        writer.write(UInt8((status.accessibilityGranted ? 1 : 0) | (status.ownsInput ? 2 : 0)))
+        writer.write(UInt16(0))
+        return writer.data
+    }
+
+    static func decodeStreamStatus(_ data: Data) throws -> StreamStatus {
+        var reader = ByteReader(data: data)
+        guard let state = StreamState(rawValue: try reader.readUInt8()) else {
+            throw ProtocolError.malformedPayload("invalid stream status")
+        }
+        let flags = try reader.readUInt8()
+        guard flags & ~3 == 0, try reader.readUInt16() == 0 else {
+            throw ProtocolError.malformedPayload("invalid stream status flags")
+        }
+        try reader.requireEnd()
+        return StreamStatus(state: state, accessibilityGranted: flags & 1 != 0, ownsInput: flags & 2 != 0)
     }
 
     struct Frame: Sendable {
@@ -770,6 +835,7 @@ enum HostProtocol {
                      sequence: UInt64,
                      material: SessionMaterial,
                      serverToClient: Bool) throws -> Data {
+        try validateNonceDirections(material)
         let encryptedFlags = flags.union(.encrypted)
         let prefix = serverToClient
             ? material.serverToClientNoncePrefix
@@ -794,6 +860,7 @@ enum HostProtocol {
                      sequence: UInt64,
                      material: SessionMaterial,
                      serverToClient: Bool) throws -> Data {
+        try validateNonceDirections(material)
         guard flags.contains(.encrypted),
               ciphertextAndTag.count >= authenticationTagLength else {
             throw ProtocolError.invalidCiphertext
@@ -818,6 +885,15 @@ enum HostProtocol {
                                     using: material.encryptionKey,
                                     authenticating: aad)
         } catch {
+            throw ProtocolError.invalidCiphertext
+        }
+    }
+
+    private static func validateNonceDirections(_ material: SessionMaterial) throws {
+        // Both directions use one key. Reject the rare truncated-HMAC
+        // collision before encrypting or accepting anything with that key.
+        // This preserves v1 interoperability without risking nonce reuse.
+        guard material.serverToClientNoncePrefix != material.clientToServerNoncePrefix else {
             throw ProtocolError.invalidCiphertext
         }
     }

@@ -240,6 +240,7 @@ actor ScreenCaptureService {
             generation: generation,
             pipelineGeneration: pipelineGeneration,
             displayID: display.displayID,
+            display: display,
             stream: stream,
             output: frameOutput,
             delegate: streamDelegate,
@@ -254,6 +255,25 @@ actor ScreenCaptureService {
             )
         )
         return frameRelay.stream
+    }
+
+    /// Change capture dimensions/cadence in the existing stream. Encoder rate
+    /// changes alone do not call this; only a debounced format tier change does.
+    func updateConfiguration(_ configuration: ScreenCaptureConfiguration,
+                             pipelineGeneration: HostPipelineGeneration) async throws {
+        guard let activeCapture, activeCapture.pipelineGeneration == pipelineGeneration else { return }
+        let size = Self.outputSize(for: activeCapture.display,
+                                   maximumWidth: configuration.maximumWidth,
+                                   maximumHeight: configuration.maximumHeight)
+        let updated = SCStreamConfiguration()
+        updated.width = size.width
+        updated.height = size.height
+        updated.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(configuration.framesPerSecond))
+        updated.queueDepth = 3
+        updated.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        updated.showsCursor = configuration.showsCursor
+        updated.capturesAudio = false
+        try await activeCapture.stream.updateConfiguration(updated)
     }
 
     func stop() async {
@@ -344,6 +364,7 @@ private extension ScreenCaptureService {
         let generation: UInt64
         let pipelineGeneration: HostPipelineGeneration
         let displayID: CGDirectDisplayID
+        let display: SCDisplay
         let stream: SCStream
         let output: CaptureOutput
         // SCStream's delegate is weak, so the service must retain it explicitly.

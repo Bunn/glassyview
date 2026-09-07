@@ -3,6 +3,8 @@ import SwiftUI
 struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedPage: OnboardingPage = .welcome
+    @AppStorage(AnalyticsPreference.collectionEnabledKey)
+    private var analyticsEnabled = AnalyticsPreference.defaultCollectionEnabled
 
     let onComplete: (() -> Void)?
 
@@ -14,11 +16,24 @@ struct OnboardingView: View {
         TabView(selection: $selectedPage) {
             ForEach(OnboardingPage.allCases) { page in
                 ScrollView {
-                    OnboardingPageView(page: page)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 22)
-                        .padding(.bottom, 120)
-                        .frame(maxWidth: .infinity)
+                    VStack(spacing: 24) {
+                        OnboardingPageView(page: page)
+                        if page.isLast {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Toggle("Share Optional Analytics", isOn: $analyticsEnabled)
+                                Text("Help improve Glassy Desk by sharing aggregate app events and limited usage milestones linked to your anonymous purchase profile. Screen content, input, Mac addresses, and credentials are never included. You can change this in Settings.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                Link("Privacy Policy", destination: GlassyDeskLinks.privacyPolicy)
+                            }
+                            .padding()
+                            .background(.quaternary, in: .rect(cornerRadius: 16))
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 22)
+                    .padding(.bottom, 120)
+                    .frame(maxWidth: .infinity)
                 }
                 .tag(page)
             }

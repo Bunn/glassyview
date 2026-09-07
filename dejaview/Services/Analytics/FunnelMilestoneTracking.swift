@@ -157,6 +157,7 @@ final class RevenueCatFunnelMilestoneTracker: FunnelMilestoneTracking {
         static let freeSessionBand = "analytics.freeSessionBand"
         static let previousSessionReachedLimit = "analytics.previousFreeSessionReachedLimit"
         static let revenueCatBand = "gv_free_session_band"
+        static let attributesCleared = "analytics.revenueCatAttributesClearedV2"
     }
 
     private let revenueCat: any RevenueCatAttributeWriting
@@ -179,7 +180,23 @@ final class RevenueCatFunnelMilestoneTracker: FunnelMilestoneTracking {
     func setCollectionEnabled(_ enabled: Bool) {
         isCollectionEnabled = enabled
 
-        guard !enabled else { return }
+        if enabled {
+            defaults.set(false, forKey: StorageKey.attributesCleared)
+            return
+        }
+
+        // Empty values replace queued writes and request removal of existing
+        // optional attributes when RevenueCat next synchronizes. Purchase data
+        // and the customer identity used to restore access remain unchanged.
+        if productionAnalyticsEnabled(), revenueCat.isConfigured,
+           !defaults.bool(forKey: StorageKey.attributesCleared) {
+            var removals = Dictionary(uniqueKeysWithValues: FunnelMilestone.allCases.map {
+                ($0.revenueCatAttributeKey, "")
+            })
+            removals[StorageKey.revenueCatBand] = ""
+            revenueCat.setAttributes(removals)
+            defaults.set(true, forKey: StorageKey.attributesCleared)
+        }
         FunnelMilestone.allCases.forEach {
             defaults.removeObject(forKey: persistenceKey(for: $0))
         }

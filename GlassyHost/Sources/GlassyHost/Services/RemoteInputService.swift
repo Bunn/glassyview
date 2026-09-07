@@ -15,6 +15,7 @@ final class RemoteInputService: @unchecked Sendable {
     private var isEnabled = false
     private var pressedButtons: HostProtocol.PointerButtonMask = []
     private var pressedModifierKeysyms: Set<UInt32> = []
+    private var pressedOrdinaryKeys: [CGKeyCode: CGEventFlags] = [:]
     private var lastPointerLocation: CGPoint?
     private var mouseEventBuilder = RemoteMouseEventBuilder()
 
@@ -82,7 +83,7 @@ final class RemoteInputService: @unchecked Sendable {
     }
 
     /// Prevents a disconnected client from leaving a synthetic button or
-    /// modifier logically pressed on the Mac. Returning is a barrier: all
+    /// key logically pressed on the Mac. Returning is a barrier: all
     /// earlier input and its reset have completed before revocation can report
     /// success or a replacement transport can submit input.
     func releasePressedInput() {
@@ -197,6 +198,12 @@ final class RemoteInputService: @unchecked Sendable {
             } else {
                 pressedModifierKeysyms.remove(input.keysym)
             }
+        } else if input.isDown {
+            // Track physical keys so a Shift change between down/up, or
+            // repeated down packets, cannot leave duplicate held entries.
+            pressedOrdinaryKeys[mapping.keyCode] = mapping.requiredFlags
+        } else {
+            pressedOrdinaryKeys.removeValue(forKey: mapping.keyCode)
         }
 
         postKeyboard(
@@ -260,6 +267,7 @@ final class RemoteInputService: @unchecked Sendable {
         guard accessibilityCheck() else {
             pressedButtons = []
             pressedModifierKeysyms.removeAll()
+            pressedOrdinaryKeys.removeAll()
             return
         }
 
@@ -274,6 +282,15 @@ final class RemoteInputService: @unchecked Sendable {
             postMouse(type: .rightMouseUp, location: location, button: .right)
         }
         pressedButtons = []
+
+        // Release ordinary keys before their modifiers, preserving the chord
+        // flags for each balancing key-up. Each physical key is released once.
+        for keyCode in pressedOrdinaryKeys.keys.sorted() {
+            postKeyboard(keyCode: keyCode,
+                         isDown: false,
+                         flags: currentModifierFlags.union(pressedOrdinaryKeys[keyCode] ?? []))
+        }
+        pressedOrdinaryKeys.removeAll()
 
         let pressed = pressedModifierKeysyms
         for keysym in pressed {
