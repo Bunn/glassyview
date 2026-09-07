@@ -23,6 +23,7 @@ continue independently of this optional setting.
 | --- | --- |
 | Do activation and conversion differ between iPhone and iPad? | Every Cloudflare event grouped by `deviceClass` |
 | Do people reach the product's value? | `remote_session_connected` compared with `app_opened` and `onboarding_completed` |
+| Are sessions using Standard VNC or Fast Connection? | `remote_session_connected` grouped by `context.sessionType`: `vnc` or `glassy_stream` |
 | Do free users return for another timed session? | `free_session_restarted` and RevenueCat attribute `gv_free_session_band` |
 | Are people deliberately resetting the one-minute allowance? | `free_session_restarted_after_limit` and milestone `gv_ms_refresh_after_limit` |
 | Which upgrade prompt works best? | `paywall_presented` grouped by `settings`, `free_session_timer`, or `session_limit` |
@@ -128,11 +129,22 @@ source:  app, onboarding, settings, free_session_timer, session_limit, unknown
 outcome: success, failure, cancelled, unavailable
 reason:  network, store_unavailable, purchase_not_allowed, payment_pending,
          configuration, unknown
+sessionType: vnc, glassy_stream
 ```
+
+`sessionType` is supplied on successful connections and the free-session start,
+restart, timer-open, and limit events. It describes the actual connection method:
+`vnc` means Standard VNC and `glassy_stream` means Fast Connection with Glassy Desk
+for Mac. It contains no session or machine identifier. The field is optional so
+older releases remain compatible; missing values must be reported separately as
+unreported, never inferred as VNC. These are session counts, not unique users.
+The Worker accepts this field only for Glassy Desk and stores it in that app's
+Analytics Engine `blob11`. Deploy the updated Worker before distributing an app
+release that sends this field, because the older strict validator rejects it.
 
 The production health endpoint currently reports
 `{"status":"ok","service":"app-analytics","version":1}`. The Worker source is
-in `/Users/bunn/Developer/worker-apps-analytics`. Deploy its strict
+in the sibling `../worker-apps-analytics` project. Deploy its strict
 app/event/context allowlists and register `glassydesk` in the production D1
 `apps` table before enabling this in a production release.
 

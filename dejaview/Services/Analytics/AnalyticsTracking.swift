@@ -53,6 +53,20 @@ enum AnalyticsEventReason: String, Codable, Sendable {
     case unknown
 }
 
+enum AnalyticsSessionType: String, CaseIterable, Codable, Sendable {
+    case vnc
+    case glassyStream = "glassy_stream"
+
+    init(connectionMode: RemoteConnectionMode) {
+        switch connectionMode {
+        case .vnc:
+            self = .vnc
+        case .glassyStream:
+            self = .glassyStream
+        }
+    }
+}
+
 enum AnalyticsDeviceClass: String, Codable, Sendable {
     case iPhone = "iphone"
     case iPad = "ipad"
@@ -91,15 +105,18 @@ struct AnalyticsEventContext: Codable, Equatable, Sendable {
     let source: AnalyticsEventSource?
     let outcome: AnalyticsEventOutcome?
     let reason: AnalyticsEventReason?
+    let sessionType: AnalyticsSessionType?
 
     init(
         source: AnalyticsEventSource? = nil,
         outcome: AnalyticsEventOutcome? = nil,
-        reason: AnalyticsEventReason? = nil
+        reason: AnalyticsEventReason? = nil,
+        sessionType: AnalyticsSessionType? = nil
     ) {
         self.source = source
         self.outcome = outcome
         self.reason = reason
+        self.sessionType = sessionType
     }
 }
 
@@ -226,8 +243,9 @@ final class DebugConsoleAnalyticsTracker: AnalyticsTracking {
         let source = context?.source?.rawValue ?? "none"
         let outcome = context?.outcome?.rawValue ?? "none"
         let reason = context?.reason?.rawValue ?? "none"
+        let sessionType = context?.sessionType?.rawValue ?? "none"
         AppLog.analytics.info(
-            "Debug analytics event; name=\(event.rawValue, privacy: .public) source=\(source, privacy: .public) outcome=\(outcome, privacy: .public) reason=\(reason, privacy: .public) sent=false"
+            "Debug analytics event; name=\(event.rawValue, privacy: .public) source=\(source, privacy: .public) outcome=\(outcome, privacy: .public) reason=\(reason, privacy: .public) sessionType=\(sessionType, privacy: .public) sent=false"
         )
     }
 }

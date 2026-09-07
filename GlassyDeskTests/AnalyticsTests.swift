@@ -147,6 +147,36 @@ struct AnalyticsTests {
         #expect(AnalyticsDeviceClass(interfaceIdiom: .unspecified) == .other)
     }
 
+    @Test("Session types encode the configured connection method", arguments: RemoteConnectionMode.allCases)
+    func sessionTypePayload(connectionMode: RemoteConnectionMode) throws {
+        let sessionType = AnalyticsSessionType(connectionMode: connectionMode)
+        let expectedValue = connectionMode == .vnc ? "vnc" : "glassy_stream"
+        let event = AnalyticsEvent(
+            name: .remoteSessionConnected,
+            context: AnalyticsEventContext(source: .app, outcome: .success, sessionType: sessionType),
+            metadata: metadata
+        )
+        let request = try AnalyticsRequestBuilder().makeRequest(events: [event], token: "temporary-rate-limit-token")
+        let body = try #require(request.httpBody)
+        let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let events = try #require(json["events"] as? [[String: Any]])
+        let context = try #require(events.first?["context"] as? [String: Any])
+
+        #expect(Set(context.keys) == Set(["source", "outcome", "sessionType"]))
+        #expect(context["sessionType"] as? String == expectedValue)
+        #expect(try JSONDecoder().decode(AnalyticsBatch.self, from: body).events == [event])
+    }
+
+    @Test("Legacy contexts have no inferred session type")
+    func legacyContextOmitsSessionType() throws {
+        let data = Data(#"{"source":"app","outcome":"success"}"#.utf8)
+        let context = try JSONDecoder().decode(AnalyticsEventContext.self, from: data)
+        #expect(context.sessionType == nil)
+        let encoded = try JSONEncoder().encode(context)
+        let fields = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        #expect(fields["sessionType"] == nil)
+    }
+
     @Test("Rate-limit token stays in the header")
     func rateLimitTokenIsHeaderOnly() throws {
         let token = "temporary-rate-limit-token"

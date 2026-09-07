@@ -10,7 +10,6 @@ struct ScreenSharingSetupView<Store: MachineStoring>: View {
     @State private var username = ""
     @State private var password = ""
     @State private var portText: String
-    @State private var showsOptions = false
 
     init(store: Store, machine: SavedMachine,
          connect: @escaping (SavedMachine, String) -> Void) {
@@ -42,15 +41,6 @@ struct ScreenSharingSetupView<Store: MachineStoring>: View {
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
             }
 
-            Section {
-                NavigationLink {
-                    RemoteConnectionInfoView(usesVNC: true)
-                } label: {
-                    Label("Connect away from home", systemImage: "globe")
-                }
-                .accessibilityIdentifier("connection.vnc.remote-guide")
-            }
-
             Section("Mac Address") {
                 TextField("Host name or IP address", text: $host)
                     .textInputAutocapitalization(.never)
@@ -71,21 +61,28 @@ struct ScreenSharingSetupView<Store: MachineStoring>: View {
                 Text("Use an account allowed to share this Mac’s screen. A VNC password may not need a username.")
             }
 
-            Section {
-                DisclosureGroup("Options", isExpanded: $showsOptions) {
-                    TextField("Name (optional)", text: $name)
-                    LabeledContent("Port") {
-                        TextField("5900", text: $portText)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .accessibilityLabel("Screen Sharing port")
-                    }
-                    if port == nil {
-                        Text("Enter a port from 1 to 65535.")
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
+            Section("Options") {
+                TextField("Name (optional)", text: $name)
+                LabeledContent("Port") {
+                    TextField("5900", text: $portText)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .accessibilityLabel("Screen Sharing port")
                 }
+                if port == nil {
+                    Text("Enter a port from 1 to 65535.")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+            }
+
+            Section {
+                NavigationLink {
+                    RemoteConnectionInfoView(usesVNC: true)
+                } label: {
+                    Label("Connect away from home", systemImage: "globe")
+                }
+                .accessibilityIdentifier("connection.vnc.remote-guide")
             }
         }
         .scrollDismissesKeyboard(.interactively)

@@ -35,13 +35,14 @@ struct EditMachineView<Store: MachineStoring>: View {
         self.glassyHostBrowser = glassyHostBrowser
         self.discoveredService = discoveredService
         self.connectAfterDismiss = connectAfterDismiss
-        isNew = !store.contains(machine)
+        let isNew = !store.contains(machine)
+        self.isNew = isNew
         _machine = State(initialValue: machine)
         _name = State(initialValue: machine.name)
         _host = State(initialValue: machine.host)
         _username = State(initialValue: machine.username)
         _password = State(initialValue: password)
-        let initialConnectionMode = machine.connectionMode.isEnabled
+        let initialConnectionMode = !isNew || machine.connectionMode.isEnabled
             ? machine.connectionMode
             : RemoteConnectionMode.default
         _connectionMode = State(initialValue: initialConnectionMode)
@@ -128,7 +129,7 @@ struct EditMachineView<Store: MachineStoring>: View {
         NavigationStack {
             Form {
                 Section {
-                    if FeatureFlags.isGlassyStreamEnabled {
+                    if isNew && FeatureFlags.isGlassyStreamEnabled {
                         Picker("Connection Method", selection: $connectionMode) {
                             ForEach(RemoteConnectionMode.availableCases) { mode in
                                 Label(mode.title, systemImage: mode.systemImage)
@@ -137,9 +138,12 @@ struct EditMachineView<Store: MachineStoring>: View {
                         }
                         .pickerStyle(.segmented)
                         .accessibilityHint("Choose Fast Connection with Glassy Desk for Mac, or Standard VNC.")
+                    } else {
+                        Label(connectionMode.title, systemImage: connectionMode.systemImage)
+                            .accessibilityIdentifier("connection.configured-method")
                     }
 
-                    if isGlassyHostDetected {
+                    if isNew && isGlassyHostDetected {
                         VStack(alignment: .leading, spacing: 4) {
                             GlassyStreamDetectionBadge(
                                 title: "Fast Connection available on this Mac"

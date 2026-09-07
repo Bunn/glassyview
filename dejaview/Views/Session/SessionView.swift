@@ -38,6 +38,10 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
     private let freeSessionDurationInterval: TimeInterval = 60
 
+    private var analyticsSessionType: AnalyticsSessionType {
+        glassyStream == nil ? .vnc : .glassyStream
+    }
+
     init(session: Session,
          preferences: Binding<SessionPreferences>,
          sessionTitle: String,
@@ -548,7 +552,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         AppLog.subscriptions.info("Free session timer tapped")
         analytics.track(
             .freeSessionTimerOpened,
-            context: AnalyticsEventContext(source: .freeSessionTimer)
+            context: AnalyticsEventContext(source: .freeSessionTimer, sessionType: analyticsSessionType)
         )
         isFreeSessionTimerInfoPresented = true
     }
@@ -604,17 +608,17 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         let startKind = funnelMilestones.recordFreeSessionStarted()
         analytics.track(
             .freeSessionStarted,
-            context: AnalyticsEventContext(source: .app, outcome: .success)
+            context: AnalyticsEventContext(source: .app, outcome: .success, sessionType: analyticsSessionType)
         )
 
         switch startKind {
         case .first:
             break
         case .returning:
-            analytics.track(.freeSessionRestarted)
+            analytics.track(.freeSessionRestarted, context: AnalyticsEventContext(sessionType: analyticsSessionType))
         case .restartedAfterLimit:
-            analytics.track(.freeSessionRestarted)
-            analytics.track(.freeSessionRestartedAfterLimit)
+            analytics.track(.freeSessionRestarted, context: AnalyticsEventContext(sessionType: analyticsSessionType))
+            analytics.track(.freeSessionRestartedAfterLimit, context: AnalyticsEventContext(sessionType: analyticsSessionType))
         }
     }
 
@@ -625,7 +629,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         funnelMilestones.recordFreeSessionLimitReached()
         analytics.track(
             .freeSessionLimitReached,
-            context: AnalyticsEventContext(source: .sessionLimit)
+            context: AnalyticsEventContext(source: .sessionLimit, sessionType: analyticsSessionType)
         )
     }
 

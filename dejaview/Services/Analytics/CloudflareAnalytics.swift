@@ -239,8 +239,9 @@ final class CloudflareAnalyticsTracker: AnalyticsTracking {
         let source = context?.source?.rawValue ?? "none"
         let outcome = context?.outcome?.rawValue ?? "none"
         let reason = context?.reason?.rawValue ?? "none"
+        let sessionType = context?.sessionType?.rawValue ?? "none"
         AppLog.analytics.debug(
-            "Queued event; name=\(event.rawValue, privacy: .public) source=\(source, privacy: .public) outcome=\(outcome, privacy: .public) reason=\(reason, privacy: .public) deviceClass=\(self.metadata.deviceClass.rawValue, privacy: .public) queueDepth=\(self.queue.count, privacy: .public) evicted=\(overflowCount, privacy: .public)"
+            "Queued event; name=\(event.rawValue, privacy: .public) source=\(source, privacy: .public) outcome=\(outcome, privacy: .public) reason=\(reason, privacy: .public) sessionType=\(sessionType, privacy: .public) deviceClass=\(self.metadata.deviceClass.rawValue, privacy: .public) queueDepth=\(self.queue.count, privacy: .public) evicted=\(overflowCount, privacy: .public)"
         )
         #endif
 

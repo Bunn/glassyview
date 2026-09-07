@@ -847,7 +847,11 @@ struct ContentView<Session: RemoteSessionControlling,
             funnelMilestones.record(.firstRemoteSessionConnected)
             analytics.track(
                 .remoteSessionConnected,
-                context: AnalyticsEventContext(source: .app, outcome: .success)
+                context: AnalyticsEventContext(
+                    source: .app,
+                    outcome: .success,
+                    sessionType: AnalyticsSessionType(connectionMode: sessionMachine.connectionMode)
+                )
             )
             AppLog.storage.info("Session history tracking started for '\(sessionMachine.displayName, privacy: .public)'; id=\(historyID.uuidString, privacy: .public) recentCount=\(self.store.recentConnections.count, privacy: .public)")
 
