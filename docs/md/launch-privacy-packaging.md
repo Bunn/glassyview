@@ -20,12 +20,12 @@ changes are part of these privacy fixes.
 - Unassigned legacy icon renditions are retained in `docs/assets/legacy-app-icons`
   instead of the compiled AppIcon set.
 
-The matching policy has been prepared in the website repository at
+The matching policy has been published from the website repository at
 `glassydesk/privacy.html`, dated September 7, 2026. It describes the Mac
 companion, pairing camera, permissions, optional analytics, ordinary network
 request metadata, and opt-out behavior. Existing iCloud and saved-password
-paragraphs are unchanged. Publishing this file and updating App Store Connect
-privacy answers are separate release actions; an app manifest does not update
+paragraphs are unchanged. The policy distinguishes version 1.3 controls from earlier iOS behavior.
+Updating App Store Connect privacy answers remains a separate release action; an app manifest does not update
 the App Store listing.
 
 Sources checked September 7, 2026:

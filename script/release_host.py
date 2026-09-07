@@ -41,6 +41,10 @@ SECRET_ENV = {
 }
 XCODE_NOTARY_POLL_ATTEMPTS = 41
 XCODE_NOTARY_POLL_INTERVAL = 30
+CLOUDFLARE_ENV_AUTH = {
+    "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_API_KEY", "CLOUDFLARE_EMAIL",
+    "CF_API_TOKEN", "CF_API_KEY", "CF_EMAIL",
+}
 
 
 class ReleaseError(Exception):
@@ -563,7 +567,29 @@ def publish_asset(state, archive, github, save):
     save()
 
 
+def cloudflare_deployment_environment(state, token, account_id):
+    mode = state.get("cloudflare_auth_mode", "api-token")
+    if mode not in ("api-token", "oauth"):
+        raise ReleaseError("The release receipt has an unsupported Cloudflare authentication mode.")
+    if mode == "oauth" and is_ci_environment():
+        raise ReleaseError("--cloudflare-oauth is local-only and cannot run in CI.")
+    env = clean_environment()
+    env["CLOUDFLARE_ACCOUNT_ID"] = account_id
+    if mode == "oauth":
+        # These override Wrangler's saved session, including deprecated aliases.
+        # Keep CI=true in the child so missing/expired session credentials fail
+        # without opening a browser or starting an interactive login flow.
+        for name in CLOUDFLARE_ENV_AUTH:
+            env.pop(name, None)
+    else:
+        if not token:
+            raise ReleaseError("A Cloudflare API token is required for deployment.")
+        env["CLOUDFLARE_API_TOKEN"] = token
+    return env
+
+
 def publish_feed(state, work, config, github, run, cloudflare_token, account_id, save):
+    env = cloudflare_deployment_environment(state, cloudflare_token, account_id)
     current, blob = github.content(config["feed_path"])
     feed = updated_feed(current, state)
     if feed != current:
@@ -586,8 +612,6 @@ def publish_feed(state, work, config, github, run, cloudflare_token, account_id,
         (site / "_headers").write_text(
             f"/{config['feed_path']}\n  Content-Type: application/rss+xml; charset=utf-8\n"
             "  Cache-Control: no-cache, max-age=0, must-revalidate, no-transform\n")
-        env = clean_environment()
-        env.update(CLOUDFLARE_API_TOKEN=cloudflare_token, CLOUDFLARE_ACCOUNT_ID=account_id)
         latest, _ = github.content(config["feed_path"])
         if latest != feed:
             raise ReleaseError("Another release changed the feed before deployment. Resume to reconcile it.")
@@ -636,8 +660,11 @@ def read_config(path):
 
 def execute(args):
     config = read_config(args.config)
+    cloudflare_oauth = getattr(args, "cloudflare_oauth", False)
+    if cloudflare_oauth and is_ci_environment():
+        raise ReleaseError("--cloudflare-oauth is local-only and cannot run in CI.")
     if getattr(args, "add_dmg", None):
-        if args.resume or args.notes or args.identity or args.work_dir or args.xcode_notarization:
+        if args.resume or args.notes or args.identity or args.work_dir or args.xcode_notarization or cloudflare_oauth:
             raise ReleaseError("--add-dmg uses the existing receipt; do not combine it with new-release options.")
         from host_release_dmg import add_installer
         add_installer(args.add_dmg, config, dry_run=args.dry_run)
@@ -650,10 +677,7 @@ def execute(args):
         if args.notes or args.identity or args.work_dir or getattr(args, "xcode_notarization", False):
             raise ReleaseError("--resume cannot be combined with --notes, --identity, --work-dir, or --xcode-notarization.")
         state.setdefault("notarization_mode", "notarytool")
-        if state.get("complete"):
-            print(f"Already released: {state['release_url']}")
-            return
-        if not state.get("packaged") and not (work / "package.json").is_file() and not args.dry_run:
+        if not state.get("complete") and not state.get("packaged") and not (work / "package.json").is_file() and not args.dry_run:
             raise ReleaseError("Compilation did not finish for this run. Start a new release; --resume never rebuilds source.")
     else:
         metadata = app_metadata(ROOT / "GlassyHost/Support/Info.plist", config)
@@ -668,15 +692,41 @@ def execute(args):
         state["release_url"] = f"https://github.com/{config['repository']}/releases/tag/{state['tag']}"
         state["download_url"] = f"https://github.com/{config['repository']}/releases/download/{state['tag']}/GlassyHost-{state['version']}.zip"
         work = args.work_dir.resolve() if args.work_dir else ROOT / "dist" / f"publish-{state['version']}-{state['id'][:8]}"
+    state.setdefault("cloudflare_auth_mode", "api-token")
+    if cloudflare_oauth:
+        # Explicitly allow recovery from an expired token without rebuilding or
+        # changing the signed artifacts. The choice is saved under the run lock.
+        state["cloudflare_auth_mode"] = "oauth"
+    if state["cloudflare_auth_mode"] not in ("api-token", "oauth"):
+        raise ReleaseError("The release receipt has an unsupported Cloudflare authentication mode.")
+    if state["cloudflare_auth_mode"] == "oauth" and is_ci_environment():
+        raise ReleaseError("--cloudflare-oauth is local-only and cannot run in CI.")
     if state.get("notarization_mode") not in ("notarytool", "xcode"):
         raise ReleaseError("The release receipt has an unsupported notarization mode.")
     if state["notarization_mode"] == "xcode" and is_ci_environment():
         raise ReleaseError("--xcode-notarization is local-only and cannot run in CI.")
+    if state.get("complete"):
+        if cloudflare_oauth and not args.dry_run:
+            # Record an explicitly selected local auth mode even when a prior
+            # recovery already completed publication. Never redeploy artifacts.
+            with (work / ".lock").open("a") as lock:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    raise ReleaseError("Another process is already using this release workspace.") from None
+                current = json.loads((work / "state.json").read_text())
+                if current.get("id") != state["id"] or not current.get("complete"):
+                    raise ReleaseError("The release receipt changed. Resume again to reconcile it.")
+                current["cloudflare_auth_mode"] = "oauth"
+                write_private(work / "state.json", (json.dumps(current, indent=2) + "\n").encode())
+        print(f"Already released: {state['release_url']}")
+        return
     if args.dry_run:
         print(f"Glassy Desk {state['version']} ({state['build']}) → {config['repository']}")
         notary_label = "signed-in Xcode account" if state["notarization_mode"] == "xcode" else "notarytool API key"
         print(f"Compile arm64 + x86_64 → Developer ID sign → notarize ({notary_label}) → staple → Sparkle ZIP + notarized DMG → GitHub → Pages")
         print(f"Workspace: {work}\nFeed: {config['feed_url']}")
+        print(f"Cloudflare authentication: {state['cloudflare_auth_mode']}")
         print("Dry run: local configuration only; no credentials, compilation, uploads, or remote checks.")
         return
     if sys.platform != "darwin":
@@ -701,7 +751,8 @@ def execute(args):
         print(f"After compilation, retry with: ./script/release_host.sh --resume {work}", flush=True)
         credentials = Secrets()
         github = GitHub(credentials.get("github-token", ["GH_TOKEN", "GITHUB_TOKEN"]), config)
-        cloudflare = credentials.get("cloudflare-token", ["CLOUDFLARE_API_TOKEN"])
+        cloudflare = (None if state["cloudflare_auth_mode"] == "oauth"
+                      else credentials.get("cloudflare-token", ["CLOUDFLARE_API_TOKEN"]))
         account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID") or config.get("cloudflare_account_id", "")
         if not re.fullmatch(r"[a-fA-F0-9]{32}", account_id):
             raise ReleaseError("Set CLOUDFLARE_ACCOUNT_ID (public metadata) or cloudflare_account_id in the config.")
@@ -783,6 +834,8 @@ def main(argv=None):
     parser.add_argument("--dry-run", action="store_true", help="Inspect the local release plan without side effects")
     parser.add_argument("--xcode-notarization", action="store_true",
                         help="Local only: notarize through the developer account signed into Xcode")
+    parser.add_argument("--cloudflare-oauth", action="store_true",
+                        help="Local only: deploy using an existing Wrangler OAuth session; allowed with --resume")
     parser.add_argument("--config", type=Path, default=ROOT / "script/host-release.json")
     args = parser.parse_args(argv)
     try:

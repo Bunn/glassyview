@@ -572,6 +572,46 @@ class AssetPublicationTests(SyntheticCase):
 
 
 class FeedDeploymentTests(SyntheticCase):
+    def test_oauth_deployment_uses_saved_session_without_inherited_auth_overrides(self):
+        self.state["cloudflare_auth_mode"] = "oauth"
+        github = FakeGitHub(self.state)
+        inherited = {name: "synthetic-expired-credential" for name in release.CLOUDFLARE_ENV_AUTH}
+        inherited.update(PATH="/synthetic/bin", CI="false")
+        with patch.dict(os.environ, inherited), self.allow_live_feed(github):
+            release.publish_feed(self.state, self.work, CONFIG, github, self.runner,
+                                 None, "a" * 32, self.save)
+        environment = self.runner.deployments[0]["env"]
+        self.assertTrue(release.CLOUDFLARE_ENV_AUTH.isdisjoint(environment))
+        self.assertEqual(environment["CLOUDFLARE_ACCOUNT_ID"], "a" * 32)
+        self.assertEqual(environment["CI"], "true")
+        self.assertEqual(environment["GH_PROMPT_DISABLED"], "1")
+        self.assertEqual(len(self.runner.calls), 1)
+        self.assertIn("deploy", self.runner.calls[0][0])
+        self.assertNotIn("login", self.runner.calls[0][0])
+        self.assertTrue(self.state["complete"])
+
+    def test_oauth_ci_is_rejected_before_feed_mutation_or_commands(self):
+        self.state["cloudflare_auth_mode"] = "oauth"
+        github = FakeGitHub(self.state)
+        with patch.dict(os.environ, {"CI": "true"}):
+            with self.assertRaisesRegex(release.ReleaseError, "local-only"):
+                release.publish_feed(self.state, self.work, CONFIG, github, self.runner,
+                                     None, "a" * 32, self.save)
+        self.assertEqual(github.calls, [])
+        self.assertEqual(self.runner.calls, [])
+
+    def test_unavailable_oauth_session_stops_without_login_or_marking_complete(self):
+        self.state["cloudflare_auth_mode"] = "oauth"
+        github = FakeGitHub(self.state)
+        runner = FakeRunner(fail_label="Deploy the Sparkle feed to Cloudflare Pages")
+        with self.assertRaisesRegex(release.ReleaseError, "Synthetic command failure"):
+            release.publish_feed(self.state, self.work, CONFIG, github, runner,
+                                 None, "a" * 32, self.save)
+        self.assertEqual(len(runner.calls), 1)
+        self.assertNotIn("login", runner.calls[0][0])
+        self.assertEqual(runner.calls[0][2]["env"]["CI"], "true")
+        self.assertNotIn("complete", self.state)
+
     def test_deployment_contains_only_feed_and_headers_and_scoped_token(self):
         (self.work / "private-secret.p8").write_text("SYNTHETIC-PRIVATE-MATERIAL")
         github = FakeGitHub(self.state)
@@ -626,6 +666,94 @@ class FeedDeploymentTests(SyntheticCase):
         self.assertEqual(self.state["feed_commit"], "d" * 40)
         self.assertEqual(github.feed, current)
         self.assertTrue(self.state["complete"])
+
+
+class CloudflareAuthModeTests(SyntheticCase):
+    def resume_args(self, *, oauth=False, dry_run=False):
+        return argparse.Namespace(config=Path("synthetic-config"), resume=self.work, notes=None,
+                                  identity=None, work_dir=None, dry_run=dry_run,
+                                  xcode_notarization=False, cloudflare_oauth=oauth)
+
+    def test_resume_can_switch_to_oauth_and_later_resumes_remember_it(self):
+        self.state.update(packaged=True, notary_status="Accepted")
+        (self.work / "state.json").write_text(json.dumps(self.state))
+        github = FakeGitHub(self.state)
+        credentials = Mock()
+        def get_credential(account, *args, **kwargs):
+            self.assertEqual(account, "github-token")
+            return "synthetic-github-token"
+        credentials.get.side_effect = get_credential
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(release, "read_config", return_value=CONFIG))
+            stack.enter_context(patch.object(release.sys, "platform", "darwin"))
+            stack.enter_context(patch.object(release.shutil, "which", return_value="/synthetic/tool"))
+            stack.enter_context(patch.object(release, "Secrets", return_value=credentials))
+            stack.enter_context(patch.object(release, "GitHub", return_value=github))
+            stack.enter_context(patch.object(release, "Runner", return_value=self.runner))
+            finalize = stack.enter_context(patch.object(release, "finalize", return_value=self.archive))
+            stack.enter_context(patch.object(release, "publish_asset"))
+            publish = stack.enter_context(patch.object(release, "publish_feed",
+                side_effect=[release.ReleaseError("Synthetic deployment failure"), None]))
+            stack.enter_context(redirect_stdout(io.StringIO()))
+            with self.assertRaisesRegex(release.ReleaseError, "Synthetic deployment failure"):
+                release.execute(self.resume_args(oauth=True))
+            saved = json.loads((self.work / "state.json").read_text())
+            self.assertEqual(saved["cloudflare_auth_mode"], "oauth")
+            self.assertEqual(saved["sha256"], self.state["sha256"])
+            self.assertEqual(saved["signature"], self.state["signature"])
+            release.execute(self.resume_args())
+        self.assertEqual(finalize.call_count, 2)
+        self.assertEqual(publish.call_count, 2)
+        self.assertTrue(all(call.args[5] is None for call in publish.call_args_list))
+        self.assertTrue(all(call.args[0] == "github-token" for call in credentials.get.call_args_list))
+        self.assertEqual(self.archive.read_bytes(), PAYLOAD)
+        self.assertEqual(self.runner.calls, [])
+
+    def test_ci_rejects_explicit_and_saved_oauth_before_credentials(self):
+        for variable in ("CI", "GITHUB_ACTIONS"):
+            for explicit in (False, True):
+                with self.subTest(variable=variable, explicit=explicit):
+                    self.state.update(packaged=True, cloudflare_auth_mode="api-token" if explicit else "oauth")
+                    (self.work / "state.json").write_text(json.dumps(self.state))
+                    with patch.dict(os.environ, {variable: "true"}), \
+                         patch.object(release, "read_config", return_value=CONFIG), \
+                         patch.object(release, "Secrets", side_effect=AssertionError("credentials accessed")):
+                        with self.assertRaisesRegex(release.ReleaseError, "local-only"):
+                            release.execute(self.resume_args(oauth=explicit))
+        self.process.assert_not_called()
+
+    def test_unsupported_saved_auth_mode_is_rejected(self):
+        self.state.update(packaged=True, cloudflare_auth_mode="unknown")
+        (self.work / "state.json").write_text(json.dumps(self.state))
+        with patch.object(release, "read_config", return_value=CONFIG):
+            with self.assertRaisesRegex(release.ReleaseError, "unsupported Cloudflare"):
+                release.execute(self.resume_args(dry_run=True))
+
+    def test_oauth_dry_run_never_saves_choice_or_accesses_credentials(self):
+        self.state.update(packaged=True)
+        receipt = self.work / "state.json"
+        original = json.dumps(self.state)
+        receipt.write_text(original)
+        output = io.StringIO()
+        with patch.object(release, "read_config", return_value=CONFIG), \
+             patch.object(release, "Secrets", side_effect=AssertionError("credentials accessed")), \
+             redirect_stdout(output):
+            self.assertEqual(release.main(["--resume", str(self.work), "--cloudflare-oauth", "--dry-run"]), 0)
+        self.assertIn("Cloudflare authentication: oauth", output.getvalue())
+        self.assertEqual(receipt.read_text(), original)
+        self.process.assert_not_called()
+
+    def test_completed_resume_records_only_explicit_auth_choice_without_remote_work(self):
+        self.state.update(complete=True)
+        receipt = self.work / "state.json"
+        receipt.write_text(json.dumps(self.state))
+        with patch.object(release, "read_config", return_value=CONFIG), \
+             patch.object(release, "Secrets", side_effect=AssertionError("credentials accessed")), \
+             redirect_stdout(io.StringIO()):
+            release.execute(self.resume_args(oauth=True))
+        saved = json.loads(receipt.read_text())
+        self.assertEqual(saved, dict(self.state, cloudflare_auth_mode="oauth"))
+        self.process.assert_not_called()
 
 
 class EnvironmentAndDryRunTests(SyntheticCase):

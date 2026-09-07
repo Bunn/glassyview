@@ -49,6 +49,14 @@ Use a fine-grained GitHub PAT or GitHub App token with **Contents: write** on `B
 
 The Cloudflare token needs **Account → Cloudflare Pages → Edit**, scoped to the account hosting `glassydesk-host`. Supply `CLOUDFLARE_ACCOUNT_ID` through local configuration or a CI variable. See [Cloudflare's CI direct-upload guide](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/).
 
+On a development Mac with an existing authenticated Wrangler OAuth session, choose it explicitly for a local release:
+
+```sh
+./script/release_host.sh --notes /path/to/release-notes.md --cloudflare-oauth
+```
+
+This uses the same configured Cloudflare account and Pages project, skips the saved API token, and removes token/key/email environment overrides from the deployment command, including Wrangler's deprecated aliases. Wrangler runs noninteractively: the release tool never opens a browser or starts a login flow. If the existing session is missing or cannot refresh, deployment stops and remains resumable. The receipt saves only the authentication mode, never OAuth credentials. API-token authentication remains the default and is required in CI; explicit or saved OAuth mode is rejected when `CI` or `GITHUB_ACTIONS` is enabled.
+
 For notarization, provide the `.p8` private key plus `NOTARY_KEY_ID`. Team API keys also require `NOTARY_ISSUER_ID`; omit the issuer for individual API keys. Locally, `NOTARY_KEY_PATH` can point to the private PEM file instead of supplying its contents. An existing `NOTARY_KEYCHAIN_PROFILE`, with optional `NOTARY_KEYCHAIN`, is another local option if it is already accessible without an authentication dialog. This `notarytool` path is the default and is required in CI. Apple documents the submission process in [Notarization with notarytool](https://developer.apple.com/documentation/technotes/tn3147-migrating-to-the-latest-notarization-tool).
 
 On a development Mac that is already signed into the correct Apple developer account in Xcode, a local fallback can use that account without a `.p8` key:
@@ -134,6 +142,14 @@ If a run stops after packaging completed, correct the reported problem and resum
 ```
 
 Resume uses the saved release state and the same artifact; it never recompiles. Keep the workspace contents, the packaged `.xcarchive`, and the release configuration intact, and make the credentials needed for the remaining stages available again. The receipt remembers whether the run uses `notarytool` or the signed-in Xcode account, so resume without repeating `--xcode-notarization`. Do not combine `--resume` with `--notes`, `--identity`, `--work-dir`, or `--xcode-notarization`.
+
+To recover locally from an expired Cloudflare API token using an existing Wrangler OAuth session:
+
+```sh
+./script/release_host.sh --resume /path/to/existing-release-workspace --cloudflare-oauth
+```
+
+The choice is saved for subsequent resumes, so the flag need not be repeated. It does not change the release version, signed artifacts, GitHub destination, or Cloudflare account/project. On an already completed release, the explicit flag records the mode under the workspace lock and returns without republishing. `--dry-run` never writes the choice.
 
 Receipts also contain absolute archive/tool paths; copying a workspace to a new checkout path does not automatically relocate an unfinished run. Prefer completing the release before a computer migration. See [migration and recovery](macos-release-migration.md#first-release-and-recovery-commands).
 

@@ -1,6 +1,6 @@
 # Launch hardening — 7 September 2026
 
-This follow-up implements the non-iCloud code defects from the [launch audit](launch-readiness-2026-09-07.md). The original report is retained as the before-change evidence. The Mac release is **0.2.10 (14)**; the accompanying iOS changes remain in the upcoming **1.3** source.
+This follow-up implements the non-iCloud code defects from the [launch audit](launch-readiness-2026-09-07.md). The original report is retained as the before-change evidence. The Mac release **0.2.10 (14)** is [published and verified](../releases/macos-0.2.10-verification.md); the accompanying iOS changes remain in the upcoming **1.3** source.
 
 ## Changes
 
@@ -31,7 +31,7 @@ A full physical matrix across macOS 14/current, Intel/Apple silicon, real iPhone
 ## Completed automated checks
 
 - Full iOS simulator suite: **147 tests in 23 suites passed**, including mailbox overflow/expiry/configuration/cancellation, recovery deadlines and generation isolation, nonce separation, real isolated Keychain credential deletion, input/session logic, subscription resilience and analytics cancellation. Result: `/tmp/glassydesk-final-fixes-20260907.xcresult`.
-- Mac release orchestration: **79 tests passed**, including interrupted notarization/publication recovery and immutable artifact handling. Log: `/tmp/glassydesk-fixes-release-tests.log`.
+- Mac release orchestration: **87 tests passed**, including interrupted notarization/publication recovery, immutable artifact handling and explicit local Cloudflare OAuth recovery. Log: `/tmp/glassy-release-oauth-tests.log`.
 - App and widget manifests pass plist validation; both manifests and `ThirdPartyNotices.txt` are present in the simulator app bundle. No unassigned AppIcon-child warning in the integration build.
 - Release dry run resolves Mac **0.2.10 (14)** to the existing `Bunn/GlassyDesk-Host` repository and `glassydesk-host.pages.dev/glassy-host/appcast.xml` without changing signing/update identity.
 - Generic iOS device **Release build passed** with signing disabled (70 seconds), without compiler warnings. The final Release bundle contains the first-party app manifest, widget-extension manifest and dependency notice. Version remains 1.3 (3), minimum iOS 26.0. Log: `/tmp/glassydesk-final-release-build.log`.
