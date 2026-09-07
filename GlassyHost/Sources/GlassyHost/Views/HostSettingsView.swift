@@ -4,6 +4,7 @@ import SwiftUI
 struct HostSettingsView: View {
     @Bindable var controller: HostController
     let updater: HostUpdateController
+    @AppStorage(HostDockIconPreference.defaultsKey) private var isDockIconHidden = false
     @State private var isPasswordEditorPresented = false
     @State private var isRemovePasswordPresented = false
     @State private var isResetPresented = false
@@ -14,6 +15,9 @@ struct HostSettingsView: View {
             security.tabItem { Label("Security", systemImage: "lock.shield") }
         }
         .frame(width: 540, height: 460)
+        .onChange(of: isDockIconHidden) { _, isHidden in
+            HostDockIconPreference.apply(isHidden: isHidden)
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             controller.refreshLoginItemStatus()
         }
@@ -54,6 +58,13 @@ struct HostSettingsView: View {
                 Text("Startup")
             } footer: {
                 Text("Glassy Desk stays available in the menu bar when you close its window.")
+            }
+            Section {
+                Toggle("Hide Dock icon", isOn: $isDockIconHidden)
+            } header: {
+                Text("Appearance")
+            } footer: {
+                Text("Use the Glassy Desk menu bar icon to open the app or Settings. Changes take effect immediately.")
             }
             Section("Software updates") {
                 LabeledContent("Glassy Desk", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development")

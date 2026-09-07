@@ -16,6 +16,8 @@ The script builds and signs `dist/Glassy Desk.app`, installs a verified copy at 
 
 Grant Screen Recording and Accessibility access locally, then leave Glassy Desk for Mac running. Its lightweight `_glassydesk._tcp` listener remains available without recording the screen. Capture starts automatically after a Glassy Desk device completes the authenticated pairing or resume handshake, then stops five seconds after the final device disconnects. **Share Continuously** in Display & Control is available as an explicit always-on override.
 
+To keep Glassy Desk out of the Dock while it runs, enable **Hide Dock icon** in **Settings → General → Appearance**. The change takes effect immediately and is remembered across launches. Use the Glassy Desk menu bar icon to open the app, return to Settings, or quit.
+
 ### Guided permission setup
 
 Setup has three steps in Connections and Display & Control: **Screen Recording**, **Accessibility**, and **Direct Screen Access**. Choose **Enable…** beside Screen Recording or Accessibility. [PermissionFlow](https://github.com/jaywcjlove/PermissionFlow) opens the matching System Settings page with a floating Glassy Desk app card. Turn on Glassy Desk in the list, or drag the card into the list if the app is missing.

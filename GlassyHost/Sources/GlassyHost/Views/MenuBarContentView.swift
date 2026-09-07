@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MenuBarContentView: View {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     let controller: HostController
     let updater: HostUpdateController
 
@@ -39,6 +40,12 @@ struct MenuBarContentView: View {
         }
 
         Divider()
+
+        Button("Settings…") {
+            openSettings()
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        .keyboardShortcut(",")
 
         CheckForUpdatesView(updater: updater)
         if updater.isInstallationDeferred {
