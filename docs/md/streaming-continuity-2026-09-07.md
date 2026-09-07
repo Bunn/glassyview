@@ -41,3 +41,5 @@ The generic iOS device Release build also passed without compiler diagnostics. I
 ## Scope
 
 The repair addresses image retention during recovery, unnecessary client dependency drops, duplicate configuration handling and host configuration/frame ordering. iCloud and persistence remain excluded. No physical iPad was connected for installation or direct verification; installing the corrected client remains necessary. Sparkle only distributes the Mac companion.
+
+Mac **0.2.12 (16)** is published and was installed on this Mac through the normal Sparkle Check for Updates → Install Update → Install and Relaunch flow. The updated host reports Ready to connect and retains its existing iPad approvals. See [release verification](../releases/macos-0.2.12-verification.md) for publication evidence and artifact checksums.
