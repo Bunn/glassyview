@@ -31,6 +31,24 @@ private struct CallbackStats {
 private enum StreamAuditProbe {
     static func main() async throws {
         let directory = URL(fileURLWithPath: CommandLine.arguments[1])
+        if CommandLine.arguments.dropFirst(2).first == "healthy-best" {
+            let direct = try await emergencyIdleBootstrapProbe(directory: directory, linkBitsPerSecond: nil)
+            let latency = try await emergencyIdleBootstrapProbe(directory: directory, linkBitsPerSecond: 100_000_000, roundTripDelay: 0.1)
+            let cached = try await emergencyIdleBootstrapProbe(directory: directory, linkBitsPerSecond: 100_000_000, roundTripDelay: 0.1, prewarm: true)
+            let sustained = try await callbackProbe(stall: 0, directory: directory, linkBitsPerSecond: 100_000_000,
+                                                    roundTripDelay: 0.1, frameCount: 600)
+            let result: [String: Any] = ["unrestricted_best": direct, "best_100ms_rtt": latency, "cached_best_new_viewer_100ms_rtt": cached, "sixty_fps_100ms_rtt": sustained]
+            print(String(decoding: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), as: UTF8.self))
+            return
+        }
+        if CommandLine.arguments.dropFirst(2).first == "slow-bootstrap" {
+            let noise = try await emergencyIdleBootstrapProbe(directory: directory)
+            let native = try await emergencyIdleBootstrapProbe(directory: directory, inputWidth: 640)
+            let desktop = try await emergencyIdleBootstrapProbe(directory: directory, noise: false)
+            let result: [String: Any] = ["noise_3840_source": noise, "noise_native_640_source": native, "desktop_pattern_3840_source": desktop]
+            print(String(decoding: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), as: UTF8.self))
+            return
+        }
         let baseline = try await callbackProbe(stall: 0, directory: directory)
         let stalled = try await callbackProbe(stall: 1, directory: directory)
         let constrained = try await callbackProbe(stall: 0, directory: directory, linkBitsPerSecond: 2_000_000)
@@ -57,7 +75,7 @@ private enum StreamAuditProbe {
     // The main-queue callback is the same dispatch target used by the iOS
     // session controller. Only the consumer delay and media producer are fake.
     private static func callbackProbe(stall: Double, directory: URL,
-                                      linkBitsPerSecond: Int? = nil, frameCount: Int = 180,
+                                      linkBitsPerSecond: Int? = nil, roundTripDelay: Double = 0, frameCount: Int = 180,
                                       frameBytes: Int = 25_000, framesPerSecond: Int = 60,
                                       followsAdaptiveBudget: Bool = false) async throws -> [String: Any] {
         let statusStream = AsyncStream<HostServer.Status>.makeStream()
@@ -90,7 +108,7 @@ private enum StreamAuditProbe {
         let proxy: RateLimitedProxy?
         let connectionPort: UInt16
         if let linkBitsPerSecond {
-            let newProxy = try RateLimitedProxy(hostPort: port, bitsPerSecond: linkBitsPerSecond)
+            let newProxy = try RateLimitedProxy(hostPort: port, bitsPerSecond: linkBitsPerSecond, roundTripDelay: roundTripDelay)
             connectionPort = try await newProxy.start()
             proxy = newProxy
         } else {
@@ -168,6 +186,7 @@ private enum StreamAuditProbe {
                 "frames_offered": frameCount,
                 "payload_bytes_per_frame": frameBytes,
                 "nominal_source_fps": framesPerSecond,
+                "round_trip_delay_ms": roundTripDelay * 1_000,
                 "link_bits_per_second": linkBitsPerSecond as Any? ?? NSNull(),
                 "producer_duration_seconds": producerDuration,
                 "observation_duration_seconds": observationDuration,
@@ -188,22 +207,26 @@ private enum StreamAuditProbe {
 
     /// Real encoded high-entropy media from one retained capture, with no
     /// later capture frames. This tests emergency resize/IDR delivery end-to-end.
-    private static func emergencyIdleBootstrapProbe(directory: URL) async throws -> [String: Any] {
+    private static func emergencyIdleBootstrapProbe(directory: URL, linkBitsPerSecond: Int? = 500_000, roundTripDelay: Double = 0, inputWidth: Int = 3840, prewarm: Bool = false, noise: Bool = true) async throws -> [String: Any] {
         let hostStatus = AsyncStream<HostServer.Status>.makeStream()
         let host = HostServer(serviceName: "Glassy Emergency Probe", port: 0,
                               deviceAccessStore: HostDeviceAccessStore(fileURL: directory.appendingPathComponent(UUID().uuidString)))
         let configurations = AsyncStream<HostStreamQualityConfiguration>.makeStream(bufferingPolicy: .bufferingNewest(1))
-        let limits = Locked<(Int, Int?)>((2_000_000, nil))
+        let limits = Locked<(Int, Int?)>((12_000_000, nil))
         let rates = Locked<[Int]>([]), widths = Locked<[Int]>([])
+        let encodedWidths = Locked<[Int]>([])
         let errors = Locked<[String]>([])
-        let frameStats = Locked<(Double?, Int)>((nil, 0))
-        let encoder = H264Encoder(configuration: HostStreamQualityConfiguration(quality: .best, availableBitRate: 2_000_000).encoderConfiguration,
+        let frameStats = Locked<(Double?, Int, Double?)>((nil, 0, nil))
+        let outputWidths = Locked<[Data: Int]>([:])
+        let deliveredFullFrames = Locked<Int>(0)
+        let encoder = H264Encoder(configuration: HostStreamQualityConfiguration(quality: .best).encoderConfiguration,
                                   outputHandler: { output in
             switch output {
             case .codecConfiguration(let configuration):
                 host.broadcastCodecConfiguration(parameterSets: configuration.parameterSets,
                                                    nalUnitHeaderLength: configuration.nalUnitHeaderLength)
             case .accessUnit(let unit):
+                if let width = unit.encodedWidth { encodedWidths.update { $0.append(width) }; outputWidths.update { $0[unit.data] = width } }
                 host.broadcastVideoAccessUnit(unit.data, presentationTimeSeconds: unit.presentationTimeSeconds,
                                               durationSeconds: unit.durationSeconds, isKeyFrame: unit.isKeyFrame,
                                               encodedWidth: unit.encodedWidth)
@@ -241,19 +264,36 @@ private enum StreamAuditProbe {
             if case .listening(let value) = status { port = value; break }
         }
         guard let port, let code = host.currentPairingCode()?.value else { throw ProbeError(message: "Emergency host unavailable") }
-        let proxy = try RateLimitedProxy(hostPort: port, bitsPerSecond: 500_000)
-        let proxyPort = try await proxy.start()
-        defer { proxy.stop() }
+        let proxy = try linkBitsPerSecond.map { try RateLimitedProxy(hostPort: port, bitsPerSecond: $0, roundTripDelay: roundTripDelay) }
+        let proxyPort = try await proxy?.start() ?? port
+        defer { proxy?.stop() }
+        let buffer = try noisePixelBuffer(width: inputWidth, height: inputWidth * 9 / 16, noise: noise)
+        if prewarm {
+            try await encoder.encode(.init(pixelBuffer: buffer, presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()),
+                                           duration: CMTime(value: 1, timescale: 60)))
+            for _ in 0..<100 {
+                if encodedWidths.update({ $0.contains(inputWidth) }) { break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+        }
         let authenticated = AsyncStream<Bool>.makeStream()
         let client = GlassyStreamClient(credentialStore: ProbeCredentialStore())
         defer { client.disconnect(); authenticated.continuation.finish() }
+        let started = ProcessInfo.processInfo.systemUptime
         client.connect(configuration: .init(endpoint: .hostPort(host: "127.0.0.1", port: .init(rawValue: proxyPort)!),
                                             savedMachineID: UUID(), bootstrapCredential: .oneTimeCode(code),
                                             expectedHostIdentifier: HostServer.makeHostIdentifier(from: secret)),
                        callbackQueue: .main, callbacks: .init(onEvent: { event in
             switch event {
             case .authenticated: authenticated.continuation.yield(true)
-            case .videoAccessUnit(let unit): frameStats.update { if $0.0 == nil { $0 = (ProcessInfo.processInfo.systemUptime, unit.data.count) } }
+            case .videoAccessUnit(let unit):
+                frameStats.update {
+                    if $0.0 == nil { $0.0 = ProcessInfo.processInfo.systemUptime; $0.1 = unit.data.count }
+                    if outputWidths.update({ $0[unit.data] }) == inputWidth {
+                        deliveredFullFrames.update { $0 += 1 }
+                        if $0.2 == nil { $0.2 = ProcessInfo.processInfo.systemUptime }
+                    }
+                }
             default: break
             }
         }, onCompletion: { result in
@@ -261,27 +301,44 @@ private enum StreamAuditProbe {
         }))
         var iterator = authenticated.stream.makeAsyncIterator()
         guard await iterator.next() == true else { throw ProbeError(message: "Emergency authentication failed") }
-        let buffer = try noisePixelBuffer(width: 1280, height: 720)
-        let started = ProcessInfo.processInfo.systemUptime
         try await encoder.encode(.init(pixelBuffer: buffer, presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()),
                                        duration: CMTime(value: 1, timescale: 15)))
         for _ in 0..<200 {
-            if frameStats.update({ $0.0 != nil }) { break }
+            if frameStats.update({ linkBitsPerSecond == 500_000 ? $0.0 != nil : $0.2 != nil }) { break }
             try await Task.sleep(for: .milliseconds(25))
         }
+        if linkBitsPerSecond != 500_000 {
+            // Keep the real encoder alive across several periodic large IDRs,
+            // so good first-frame timing cannot hide later quality collapse.
+            for _ in 0..<5 {
+                try await Task.sleep(for: .seconds(2))
+                encoder.requestKeyFrame()
+            }
+            try await Task.sleep(for: .seconds(1))
+        } else { try await Task.sleep(for: .milliseconds(200)) }
         let captured = frameStats.update { $0 }
         await encoder.finish()
         let latency = captured.0.map { $0 - started }
+        let fullLatency = captured.2.map { $0 - started }
+        let healthy = linkBitsPerSecond != 500_000
         let passed = latency.map { $0 < 5 } == true && errors.update { $0.isEmpty }
+            && (!healthy || (fullLatency.map { $0 < 1.5 } == true && rates.update { $0.allSatisfy { $0 == 12_000_000 } }))
         let report: [String: Any] = ["first_callback_seconds": latency as Any? ?? NSNull(),
                                      "first_keyframe_bytes": captured.1, "rate_changes": rates.update { $0 },
+                                     "link_bits_per_second": linkBitsPerSecond as Any? ?? NSNull(), "encoded_widths": encodedWidths.update { $0 },
+                                     "round_trip_delay_ms": roundTripDelay * 1_000, "input_width": inputWidth, "cached_full_size_encoder": prewarm, "noise_input": noise,
+                                     "full_resolution_callback_seconds": fullLatency as Any? ?? NSNull(),
+                                     "observation_duration_seconds": ProcessInfo.processInfo.systemUptime - started,
+                                     "full_resolution_frames_delivered": deliveredFullFrames.update { $0 },
+                                     "periodic_real_keyframe_requests": healthy ? 5 : 0,
+                                     "minimum_periodic_observation_seconds": healthy ? 11 : 0,
                                      "emergency_widths": widths.update { $0 }, "errors": errors.update { $0 },
                                      "passed": passed, "new_capture_frames_after_initial": 0]
         guard passed else { throw ProbeError(message: "Emergency idle bootstrap missed five-second target: \(report)") }
         return report
     }
 
-    private static func noisePixelBuffer(width: Int, height: Int) throws -> CVPixelBuffer {
+    private static func noisePixelBuffer(width: Int, height: Int, noise: Bool = true) throws -> CVPixelBuffer {
         var buffer: CVPixelBuffer?
         let status = CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
                                         [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &buffer)
@@ -294,7 +351,10 @@ private enum StreamAuditProbe {
             let bytes = raw.assumingMemoryBound(to: UInt8.self)
             for index in 0..<(CVPixelBufferGetBytesPerRowOfPlane(buffer, plane) * CVPixelBufferGetHeightOfPlane(buffer, plane)) {
                 random = random &* 1_664_525 &+ 1_013_904_223
-                bytes[index] = UInt8(truncatingIfNeeded: random >> 24)
+                let row = index / CVPixelBufferGetBytesPerRowOfPlane(buffer, plane)
+                let column = index % CVPixelBufferGetBytesPerRowOfPlane(buffer, plane)
+                let textStroke = plane == 0 && row % 28 < 3 && column % 320 > 24 && column % 320 < 260
+                bytes[index] = noise ? UInt8(truncatingIfNeeded: random >> 24) : (plane == 0 ? (textStroke ? 32 : 230) : 128)
             }
         }
         return buffer
@@ -356,11 +416,14 @@ private final class RateLimitedProxy: @unchecked Sendable {
     private let listener: NWListener
     private let hostPort: UInt16
     private let bitsPerSecond: Int
+    private let oneWayDelay: Double
+    private var nextForwardSerializationTime: Double = 0
     private var connections: [NWConnection] = []
 
-    init(hostPort: UInt16, bitsPerSecond: Int) throws {
+    init(hostPort: UInt16, bitsPerSecond: Int, roundTripDelay: Double = 0) throws {
         self.hostPort = hostPort
         self.bitsPerSecond = bitsPerSecond
+        oneWayDelay = roundTripDelay / 2
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
         listener = try NWListener(using: parameters)
@@ -413,13 +476,18 @@ private final class RateLimitedProxy: @unchecked Sendable {
     private func pump(source: NWConnection, destination: NWConnection, paced: Bool) {
         source.receive(minimumIncompleteLength: 1, maximumLength: 4_096) { [weak self] data, _, done, error in
             guard let self, error == nil, !done, let data, !data.isEmpty else { return }
-            let delay = paced ? Double(data.count * 8) / Double(bitsPerSecond) : 0
-            queue.asyncAfter(deadline: .now() + delay) { [weak self] in
-                destination.send(content: data, completion: .contentProcessed { [weak self] error in
-                    guard error == nil else { return }
-                    self?.pump(source: source, destination: destination, paced: paced)
-                })
+            let now = ProcessInfo.processInfo.systemUptime
+            let sendAt: Double
+            if paced {
+                nextForwardSerializationTime = max(now, nextForwardSerializationTime) + Double(data.count * 8) / Double(bitsPerSecond)
+                sendAt = nextForwardSerializationTime + oneWayDelay
+            } else { sendAt = now + oneWayDelay }
+            queue.asyncAfter(deadline: .now() + max(0, sendAt - now)) {
+                destination.send(content: data, completion: .contentProcessed { _ in })
             }
+            // Propagation latency is per stream byte, not a stop-and-wait
+            // penalty on every 4 KiB chunk. Keep receiving in wire order.
+            pump(source: source, destination: destination, paced: paced)
         }
     }
 }

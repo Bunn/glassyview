@@ -703,7 +703,7 @@ final class HostController {
                     guard !Task.isCancelled, adaptiveUpdateGeneration == updateGeneration,
                           pipelineGenerations.isCurrent(generation) else { return }
                     activeCaptureConfiguration = configuration
-                    encoder.requestKeyFrame()
+                    HostLog.capture.info("Applied stream configuration \(configuration.maximumWidth)×\(configuration.maximumHeight) fps=\(configuration.framesPerSecond) bitrate=\(configuration.averageBitRate)")
                     // Any budget received across an await is reconciled by the
                     // next pass, against the configuration actually applied.
                 } catch {

@@ -186,8 +186,12 @@ final class H264Encoder: @unchecked Sendable {
                                         value: NSNumber(value: Int(Double(updated.expectedFrameRate) * updated.keyFrameIntervalSeconds)),
                                         on: session)
                     }
+                    let dimensionsChanged = configuration.maximumWidth != updated.maximumWidth
+                        || configuration.maximumHeight != updated.maximumHeight
                     configuration = updated
-                    requestKeyFrame()
+                    // Rate/cadence updates preserve the existing dependency
+                    // chain. Only dimensions require idle-buffer recovery.
+                    if dimensionsChanged { requestKeyFrame() }
                     continuation.resume()
                 } catch { continuation.resume(throwing: error) }
             }
@@ -381,6 +385,7 @@ final class H264Encoder: @unchecked Sendable {
         compressionSession = newSession
         sessionWidth = width
         sessionHeight = height
+        HostLog.encoding.info("Encoder ready actual=\(width)×\(height) fps=\(self.configuration.expectedFrameRate) bitrate=\(self.configuration.averageBitRate)")
         forceNextKeyFrame = true
         callbackContext.resetCodecConfiguration()
     }

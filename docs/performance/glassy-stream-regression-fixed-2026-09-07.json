@@ -1,0 +1,218 @@
+{
+  "healthy-best": {
+    "best_100ms_rtt": {
+      "cached_full_size_encoder": false,
+      "emergency_widths": [
+        640,
+        320
+      ],
+      "encoded_widths": [
+        3840,
+        640,
+        320,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840
+      ],
+      "errors": [],
+      "first_callback_seconds": 0.6181792083662003,
+      "first_keyframe_bytes": 63135,
+      "full_resolution_callback_seconds": 1.2273804999422282,
+      "input_width": 3840,
+      "link_bits_per_second": 100000000,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": true,
+      "passed": true,
+      "rate_changes": [
+        12000000
+      ],
+      "round_trip_delay_ms": 100,
+      "periodic_real_keyframe_requests": 5,
+      "minimum_periodic_observation_seconds": 11,
+      "full_resolution_encoded_frames": 7
+    },
+    "cached_best_new_viewer_100ms_rtt": {
+      "cached_full_size_encoder": true,
+      "emergency_widths": [
+        640,
+        320
+      ],
+      "encoded_widths": [
+        3840,
+        3840,
+        3840,
+        640,
+        320,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840
+      ],
+      "errors": [],
+      "first_callback_seconds": 0.8410910833626986,
+      "first_keyframe_bytes": 63135,
+      "full_resolution_callback_seconds": 1.4692700000014156,
+      "input_width": 3840,
+      "link_bits_per_second": 100000000,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": true,
+      "passed": true,
+      "rate_changes": [
+        12000000
+      ],
+      "round_trip_delay_ms": 100,
+      "periodic_real_keyframe_requests": 5,
+      "minimum_periodic_observation_seconds": 11,
+      "full_resolution_encoded_frames": 9
+    },
+    "sixty_fps_100ms_rtt": {
+      "consumer_stall_seconds": 0,
+      "errors": [],
+      "frames_delivered": 591,
+      "frames_offered": 600,
+      "frames_over_100ms_old": 0,
+      "frames_over_500ms_old": 0,
+      "host_adaptive_bitrate_events": [
+        12000000
+      ],
+      "host_effective_quality_events": [
+        "best"
+      ],
+      "last_third_maximum_callback_age_ms": 61.109124682843685,
+      "last_third_p95_callback_age_ms": 59.429417131468654,
+      "link_bits_per_second": 100000000,
+      "maximum_callback_age_ms": 61.66654103435576,
+      "nominal_source_fps": 60,
+      "observation_duration_seconds": 15.335214625112712,
+      "offered_payload_mbps": 9.758916539061559,
+      "p95_callback_age_ms": 59.274583123624325,
+      "payload_bytes_per_frame": 25000,
+      "pong_delay_ms": 106.81533324532211,
+      "producer_duration_seconds": 12.296447000000626,
+      "round_trip_delay_ms": 100,
+      "source_follows_adaptive_budget": false
+    },
+    "unrestricted_best": {
+      "cached_full_size_encoder": false,
+      "emergency_widths": [
+        640,
+        320
+      ],
+      "encoded_widths": [
+        640,
+        320,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840,
+        3840
+      ],
+      "errors": [],
+      "first_callback_seconds": 0.23364737490192056,
+      "first_keyframe_bytes": 63135,
+      "full_resolution_callback_seconds": 0.5602061247918755,
+      "input_width": 3840,
+      "link_bits_per_second": null,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": true,
+      "passed": true,
+      "rate_changes": [
+        12000000
+      ],
+      "round_trip_delay_ms": 0,
+      "periodic_real_keyframe_requests": 5,
+      "minimum_periodic_observation_seconds": 11,
+      "full_resolution_encoded_frames": 6
+    }
+  },
+  "slow-bootstrap": {
+    "desktop_pattern_3840_source": {
+      "cached_full_size_encoder": false,
+      "emergency_widths": [
+        640
+      ],
+      "encoded_widths": [
+        3840,
+        640,
+        640,
+        640
+      ],
+      "errors": [],
+      "first_callback_seconds": 0.6216827917378396,
+      "first_keyframe_bytes": 33803,
+      "full_resolution_callback_seconds": null,
+      "input_width": 3840,
+      "link_bits_per_second": 500000,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": false,
+      "passed": true,
+      "rate_changes": [
+        12000000,
+        398540
+      ],
+      "round_trip_delay_ms": 0
+    },
+    "noise_3840_source": {
+      "cached_full_size_encoder": false,
+      "emergency_widths": [
+        640,
+        320,
+        640
+      ],
+      "encoded_widths": [
+        3840,
+        640,
+        320,
+        640
+      ],
+      "errors": [],
+      "first_callback_seconds": 1.4955065832473338,
+      "first_keyframe_bytes": 63135,
+      "full_resolution_callback_seconds": null,
+      "input_width": 3840,
+      "link_bits_per_second": 500000,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": true,
+      "passed": true,
+      "rate_changes": [
+        12000000,
+        396623
+      ],
+      "round_trip_delay_ms": 0
+    },
+    "noise_native_640_source": {
+      "cached_full_size_encoder": false,
+      "emergency_widths": [
+        640,
+        320,
+        640
+      ],
+      "encoded_widths": [
+        640,
+        640,
+        320,
+        640
+      ],
+      "errors": [],
+      "first_callback_seconds": 3.3986407085321844,
+      "first_keyframe_bytes": 190137,
+      "full_resolution_callback_seconds": null,
+      "input_width": 640,
+      "link_bits_per_second": 500000,
+      "new_capture_frames_after_initial": 0,
+      "noise_input": true,
+      "passed": true,
+      "rate_changes": [
+        12000000,
+        396229
+      ],
+      "round_trip_delay_ms": 0
+    }
+  }
+}

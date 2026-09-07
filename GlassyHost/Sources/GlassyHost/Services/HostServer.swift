@@ -283,7 +283,7 @@ private extension HostServer {
         // must not be rejected forever at the minimum bitrate.
         private static let maximumQueuedBytesPerClient = HostProtocol.maximumPayloadLength + HostProtocol.headerLength + HostProtocol.authenticationTagLength + 65_536
         private static let mediaQueueAgeBudget: TimeInterval = 0.15
-        private static let maximumQueuedMessagesPerClient = 10
+        private static let maximumQueuedMessagesPerClient = 24
 
         private let queue = DispatchQueue(label: "dev.bunn.glassydesk.host.server",
                                           qos: .userInteractive)
@@ -487,16 +487,18 @@ private extension HostServer {
                                  flags: [], policy: .control, for: client)
         }
 
-        private func publishAdaptiveBitRateIfNeeded(force: Bool = false) {
+        private func publishAdaptiveBitRateIfNeeded(force: Bool = false, reason: String = "receiver progress") {
             let adaptiveClients = authenticatedClients.filter(\.supportsAdaptiveStream)
             let width = adaptiveClients.compactMap(\.ratePolicy.maximumCaptureWidth).min()
             if force || width != publishedAdaptiveMaximumWidth {
                 publishedAdaptiveMaximumWidth = width
+                Self.logger.info("Adaptive capture width limit=\(width ?? 0) reason=\(reason, privacy: .public)")
                 adaptiveResolutionHandler(width)
             }
             let budget = adaptiveClients.map(\.ratePolicy.bitRate).min()
             guard force || budget != publishedAdaptiveBitRate else { return }
             publishedAdaptiveBitRate = budget
+            Self.logger.info("Adaptive bitrate=\(budget ?? 0) reason=\(reason, privacy: .public)")
             adaptiveBitRateHandler(budget)
         }
 
@@ -508,7 +510,7 @@ private extension HostServer {
                 mediaMaintenanceWorkItem = nil
                 let now = ProcessInfo.processInfo.systemUptime
                 for client in authenticatedClients where client.supportsAdaptiveStream {
-                    if client.deliveryWindow.oldestAge(at: now) > 0.35 {
+                    if client.deliveryWindow.oldestAge(at: now) > client.ratePolicy.congestionAgeBudget(bytes: client.deliveryWindow.frames.first?.bytes ?? 0) {
                         client.ratePolicy.congested(at: now)
                     }
                     let recoveryDeadline = max(8, min(60, Double(client.deliveryWindow.outstandingBytes * 8) / Double(client.ratePolicy.bitRate) * 3))
@@ -519,11 +521,11 @@ private extension HostServer {
                         continue
                     }
                     sendNextPacket(for: client)
-                    if client.needsKeyFrame, client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate) {
+                    if client.needsKeyFrame, client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate, allowsMultipleFrames: !client.ratePolicy.awaitingFirstDelivery) {
                         requestKeyFrameIfNeeded(for: [client])
                     }
                 }
-                publishAdaptiveBitRateIfNeeded()
+                publishAdaptiveBitRateIfNeeded(reason: "receiver stalled")
                 scheduleMediaMaintenanceIfNeeded()
             }
             mediaMaintenanceWorkItem = work
@@ -581,7 +583,7 @@ private extension HostServer {
             queue.async { [weak self] in
                 guard let self else { return }
                 videoBootstrapCache.storeCodecConfiguration(payload)
-                for client in authenticatedClients {
+                for client in authenticatedClients where client.isMediaReady {
                     client.removeQueuedVideoPackets()
                     client.needsKeyFrame = true
                     client.keyFrameRequestOutstanding = false
@@ -591,7 +593,9 @@ private extension HostServer {
                                          policy: .codecConfiguration,
                                          for: client)
                 }
-                requestKeyFrameIfNeeded(for: authenticatedClients)
+                // The encoder emits configuration immediately before its
+                // already-encoded IDR. Requesting another here duplicates that
+                // large image; maintenance recovers if the IDR is lost.
             }
         }
 
@@ -658,7 +662,7 @@ private extension HostServer {
                 guard let item = drain.item else { continue }
                 let flags: HostProtocol.Flags = item.isKeyFrame ? [.keyFrame] : []
                 let policy: SendPolicy = item.isKeyFrame ? .keyFrame : .deltaFrame
-                for client in authenticatedClients {
+                for client in authenticatedClients where client.isMediaReady {
                     if !item.isKeyFrame, client.needsKeyFrame {
                         requestKeyFrameIfNeeded(for: [client])
                         continue
@@ -682,10 +686,10 @@ private extension HostServer {
 
         private func requestKeyFrameIfNeeded(for clients: [Client]) {
             var shouldRequest = false
-            for client in clients where client.needsKeyFrame
+            for client in clients where client.isMediaReady && client.needsKeyFrame
                 && !client.keyFrameRequestOutstanding {
                 if client.supportsAdaptiveStream,
-                   !client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate) { continue }
+                   !client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate, allowsMultipleFrames: !client.ratePolicy.awaitingFirstDelivery) { continue }
                 client.keyFrameRequestOutstanding = true
                 shouldRequest = true
             }
@@ -1227,18 +1231,33 @@ private extension HostServer {
                                  policy: .control,
                                  for: client)
 
-            if let cachedCodecConfiguration = videoBootstrapCache.codecConfiguration {
-                _ = enqueueEncrypted(cachedCodecConfiguration,
-                                     kind: .videoConfiguration,
-                                     flags: [],
-                                     policy: .codecConfiguration,
-                                     for: client)
+            // Modern clients immediately negotiate with feedback; historical
+            // clients send quality first. Hold media until that first message
+            // so already-sharing capture cannot send a full-size IDR before
+            // the bounded preview is negotiated. Passive legacy clients still
+            // start after one second, without requiring any new wire message.
+            let mediaTimeout = DispatchWorkItem { [weak self, weak client] in
+                guard let self, let client, !client.isClosed else { return }
+                activateMedia(for: client)
             }
+            client.mediaNegotiationTimeout = mediaTimeout
+            queue.asyncAfter(deadline: .now() + 1, execute: mediaTimeout)
 
             Self.logger.info("Authenticated a Glassy viewer")
             publishAuthenticatedClientCountIfNeeded()
             publishEffectiveStreamQualityIfNeeded()
             publishPairedDevices()
+            requestKeyFrameIfNeeded(for: [client])
+        }
+
+        private func activateMedia(for client: Client) {
+            guard !client.isMediaReady, !client.isClosed else { return }
+            client.isMediaReady = true
+            client.mediaNegotiationTimeout?.cancel()
+            client.mediaNegotiationTimeout = nil
+            if let payload = videoBootstrapCache.codecConfiguration {
+                _ = enqueueEncrypted(payload, kind: .videoConfiguration, flags: [], policy: .codecConfiguration, for: client)
+            }
             requestKeyFrameIfNeeded(for: [client])
         }
 
@@ -1256,6 +1275,7 @@ private extension HostServer {
                                                   sequence: frame.sequence,
                                                   material: material,
                                                   serverToClient: false)
+            if frame.kind != .streamFeedback { activateMedia(for: client) }
             switch frame.kind {
             case .ping:
                 guard plaintext.count <= 64 else {
@@ -1279,16 +1299,30 @@ private extension HostServer {
                     throw HostProtocol.ProtocolError.malformedPayload("feedback acknowledges unsent video")
                 }
                 client.supportsAdaptiveStream = true
+                if firstFeedback { client.ratePolicy.observeInitialRoundTrip(now - client.authenticatedAt) }
                 let ceiling = HostStreamQualityConfiguration(quality: client.requestedQuality).averageBitRate
                 client.ratePolicy.constrain(to: ceiling)
+                let acknowledgedBytes = client.deliveryWindow.frames
+                    .filter { $0.sequence <= feedback.latestHandledVideoSequence }.reduce(0) { $0 + $1.bytes }
+                let wasAwaitingFirstDelivery = client.ratePolicy.awaitingFirstDelivery
                 if feedback.latestHandledVideoSequence <= client.deliveryWindow.latestSentSequence,
                    let age = try client.deliveryWindow.acknowledge(sequence: feedback.latestHandledVideoSequence, at: now) {
                     client.ratePolicy.acknowledged(deliveryAge: age,
                                                   queueAge: Double(feedback.callbackQueueAgeMilliseconds) / 1_000,
-                                                  ceiling: ceiling, at: now)
+                                                  ceiling: ceiling, at: now, deliveredBytes: acknowledgedBytes)
                 }
-                if firstFeedback { sendStreamStatus(to: client) }
+                if wasAwaitingFirstDelivery, !client.ratePolicy.awaitingFirstDelivery {
+                    // Preview frames are obsolete after their one capacity
+                    // sample. Do not let queued copies serialize ahead of the
+                    // newly selected configuration.
+                    discardQueuedMedia(for: client)
+                }
+                if firstFeedback {
+                    Self.logger.info("Adaptive stream negotiated quality=\(String(describing: client.requestedQuality), privacy: .public)")
+                    sendStreamStatus(to: client)
+                }
                 publishAdaptiveBitRateIfNeeded()
+                activateMedia(for: client)
                 sendNextPacket(for: client)
                 if client.needsKeyFrame { requestKeyFrameIfNeeded(for: [client]) }
                 scheduleMediaMaintenanceIfNeeded()
@@ -1296,8 +1330,9 @@ private extension HostServer {
                 let requestedQuality = try HostProtocol.decodeStreamQualityRequest(plaintext)
                 guard requestedQuality != client.requestedQuality else { return }
                 client.requestedQuality = requestedQuality
-                client.ratePolicy.constrain(to: HostStreamQualityConfiguration(quality: requestedQuality).averageBitRate)
-                publishAdaptiveBitRateIfNeeded()
+                Self.logger.info("Stream quality selected=\(String(describing: requestedQuality), privacy: .public)")
+                client.ratePolicy.selectQuality(ceiling: HostStreamQualityConfiguration(quality: requestedQuality).averageBitRate)
+                publishAdaptiveBitRateIfNeeded(reason: "viewer selected quality")
                 publishEffectiveStreamQualityIfNeeded()
             case .cursorPositionSubscriptionRequest:
                 try HostProtocol.decodeCursorPositionSubscriptionRequest(plaintext)
@@ -1377,39 +1412,37 @@ private extension HostServer {
                 discardQueuedMedia(for: client)
             }
             if packet.policy.isVideoFrame {
-                let maximumFrameBytes = client.supportsAdaptiveStream
-                    ? max(65_536, client.ratePolicy.bitRate / 8 / 5)
-                    : Self.maximumQueuedBytesPerClient
-                if packet.byteCount > maximumFrameBytes {
-                    if client.supportsAdaptiveStream {
-                        if packet.policy == .keyFrame {
-                            let admit = client.ratePolicy.oversizedKeyFrame(encodedWidth: packet.encodedWidth, at: now)
-                            publishAdaptiveBitRateIfNeeded()
-                            if !admit {
-                                client.needsKeyFrame = true
-                                client.keyFrameRequestOutstanding = false
-                                return false
-                            }
-                        } else {
-                            client.ratePolicy.congested(at: now)
-                            publishAdaptiveBitRateIfNeeded()
-                        }
-                    }
-                    if packet.policy != .keyFrame {
+                // The first preview must be genuinely small even when an
+                // existing full-resolution encoder is already sharing.
+                if client.supportsAdaptiveStream, client.ratePolicy.awaitingFirstDelivery {
+                    let admit = client.ratePolicy.admitPreview(bytes: packet.byteCount, encodedWidth: packet.encodedWidth)
+                    publishAdaptiveBitRateIfNeeded(reason: "bounded initial preview")
+                    if !admit {
                         client.needsKeyFrame = true
                         client.keyFrameRequestOutstanding = false
                         return false
                     }
-                    // Admit one independently decodable oversized frame. Its
-                    // bytes consume all receiver credit until acknowledged;
-                    // dropping every IDR here could permanently black-hole a
-                    // busy screen at the minimum rate. Pending IDRs coalesce.
+                }
+                let maximumFrameBytes = client.supportsAdaptiveStream
+                    ? max(65_536, client.ratePolicy.bitRate / 8 / 5)
+                    : Self.maximumQueuedBytesPerClient
+                if packet.byteCount > maximumFrameBytes, packet.policy == .keyFrame,
+                   client.supportsAdaptiveStream {
+                    let admit = client.ratePolicy.oversizedKeyFrame(encodedWidth: packet.encodedWidth, at: now)
+                    publishAdaptiveBitRateIfNeeded(reason: "large keyframe after receiver congestion")
+                    if !admit {
+                        client.needsKeyFrame = true
+                        client.keyFrameRequestOutstanding = false
+                        return false
+                    }
+                    // A large independent image consumes receiver credit until
+                    // acknowledged. Its size is not evidence of a slow link.
                 }
                 if packet.policy == .keyFrame, client.supportsAdaptiveStream {
                     client.ratePolicy.admittedKeyFrame(bytes: packet.byteCount, at: now)
                 }
                 let queuedFrames = client.pendingPackets.filter { $0.policy.isVideoFrame }.count
-                if queuedFrames >= 2 { discardQueuedMedia(for: client) }
+                if queuedFrames >= 12 { discardQueuedMedia(for: client) }
                 if packet.policy == .deltaFrame, client.needsKeyFrame {
                     requestKeyFrameIfNeeded(for: [client])
                     return false
@@ -1443,7 +1476,7 @@ private extension HostServer {
             expireQueuedMedia(for: client, now: ProcessInfo.processInfo.systemUptime)
             guard let pending = client.pendingPackets.first else { return }
             if pending.policy.isVideoFrame, client.supportsAdaptiveStream,
-               !client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate) { return }
+               !client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate, allowsMultipleFrames: !client.ratePolicy.awaitingFirstDelivery) { return }
             client.pendingPackets.removeFirst()
             client.pendingByteCount -= pending.byteCount
             do {
@@ -1517,6 +1550,7 @@ private extension HostServer {
             }
             client.isClosed = true
             client.authenticationTimeout?.cancel()
+            client.mediaNegotiationTimeout?.cancel()
             client.connection.stateUpdateHandler = nil
             client.connection.cancel()
             guard publishChanges else { return }
@@ -1688,6 +1722,8 @@ private extension HostServer.Core {
         var pendingByteCount = 0
         var inFlightByteCount = 0
         var authenticationTimeout: DispatchWorkItem?
+        var mediaNegotiationTimeout: DispatchWorkItem?
+        var isMediaReady = false
         var isClosed = false
         var needsKeyFrame = true
         var keyFrameRequestOutstanding = false

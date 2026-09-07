@@ -106,3 +106,27 @@ private func makeEncoderProbeBuffer(width: Int, height: Int, noise: Bool) throws
     }
     return pixelBuffer
 }
+
+@Test("Bitrate and cadence updates do not force idle IDRs or reset the dependency chain")
+func encoderRateChangesDoNotForceRecovery() async throws {
+    let output = EncoderProbeOutput()
+    let encoder = H264Encoder(configuration: .init(expectedFrameRate: 30, averageBitRate: 5_000_000,
+                                                  maximumWidth: 1280, maximumHeight: 720),
+                              outputHandler: { output.accept($0) }, errorHandler: { output.fail($0) })
+    let buffer = try makeEncoderProbeBuffer(width: 640, height: 360, noise: false)
+    try await encoder.encode(.init(pixelBuffer: buffer, presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()),
+                                   duration: CMTime(value: 1, timescale: 30)))
+    for _ in 0..<40 {
+        if !output.frames.isEmpty { break }
+        try await Task.sleep(for: .milliseconds(25))
+    }
+    #expect(output.frames.count == 1)
+    for rate in [6_000_000, 7_000_000, 8_000_000] {
+        try await encoder.updateConfiguration(.init(expectedFrameRate: 60, averageBitRate: rate,
+                                                    maximumWidth: 1280, maximumHeight: 720))
+    }
+    try await Task.sleep(for: .milliseconds(400))
+    #expect(output.frames.count == 1)
+    #expect(output.errors.isEmpty)
+    await encoder.finish()
+}

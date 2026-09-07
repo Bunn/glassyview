@@ -66,26 +66,45 @@ remove obsolete queued video. Pending media has a 150 ms age budget and a small
 frame limit. Dropping a dependent frame discards the unsent dependency chain;
 recovery resumes at a fresh IDR. New pending IDRs replace obsolete pending IDRs.
 
-The user-selected quality remains a ceiling. Subscribed viewers initially use a
-2 Mbps budget, downshift promptly under delayed progress, and increase only
-after sustained timely feedback. The shared encoder uses the most constrained
-viewer's budget. Bitrate updates happen in place. Capture dimensions and cadence
-move through 960×540/8 fps, 1280×720/12–15 fps, 1920×1080/30 fps and
-3840×2160/60 fps tiers, bounded by the selected preset. The minimum bitrate is
-350 kbps. Capture tier changes update the existing ScreenCaptureKit stream;
-a single reconciler applies changes to completion before rechecking the latest
-budget, including A→B→A changes while framework calls are suspended.
+The user-selected quality remains the target and ceiling: Best starts with a
+12 Mbps budget. Each newly negotiated viewer receives one 640-pixel preview
+before full-resolution media; only one preview can be outstanding. If that
+preview exceeds 200 kB, a 320-pixel preview bounds initial serialization time.
+This size rule applies only to bootstrap and never cuts the selected bitrate. The first
+receiver acknowledgement ends this bootstrap permanently. Delivery bytes and
+the initial authentication/feedback round trip distinguish transmission time
+from propagation and the client's 30 ms feedback batching. Healthy delivery
+restores the selected resolution immediately; measured slow delivery seeds a
+lower bitrate. Sub-20 ms serialization samples cannot reliably establish a
+lower throughput limit. Normal quality and bitrate changes do not restart
+bootstrap.
 
-A per-rate byte budget detects unusually large independent frames. During
-bootstrap, oversized IDRs halve the budget at most every 250 ms and are withheld
-while the encoder moves to a deliverable tier. Repeated oversized IDRs at the
-350 kbps floor enable emergency 640×360 and then 320×180 capture (8/6 fps).
-Ordinary low-bandwidth desktops retain their normal detail unless actual encoded
-frame size requires this fallback. Only an actual final-tier encoded image can
-use the final one-IDR admission escape; a retained large image cannot slip
-through merely because a smaller capture was requested. One final-tier
-protocol-valid IDR may consume all receiver credit until acknowledged, preventing
-an endless rejection/recovery loop even if an encoder overshoots its rate target.
+The host holds media until the first encrypted post-authentication message.
+Modern clients send adaptive feedback first; historical clients send quality
+first. A one-second fallback starts passive legacy clients without requiring
+new messages. Actual encoded dimensions gate preview admission, including when
+another viewer is already sharing and a full-size codec configuration is cached.
+The shared encoder uses the most constrained viewer's budget and dimensions, so
+another viewer joining can briefly reduce an existing viewer's resolution.
+
+The receiver ledger permits up to sixteen outstanding frames within a 200 ms
+byte budget (32 KiB minimum); pending media permits twelve frames within its
+150 ms age limit. This covers 60 fps through 100 ms RTT and feedback batching.
+An independently decodable IDR can exceed the byte window once, consuming
+receiver credit until acknowledged. Frame size alone never reduces bitrate.
+Large-IDR delivery is judged against its byte serialization budget rather than
+an absolute delta-frame age threshold.
+
+Bitrate and cadence properties update in place without forcing extra IDRs.
+Dimensions move through 960×540/8 fps, 1280×720/12–15 fps, 1920×1080/30 fps and
+3840×2160/60 fps tiers, bounded by the selected preset. The minimum bitrate is
+350 kbps. Only actual receiver congestion at this floor plus oversized IDRs can
+enable emergency 640×360 and then 320×180 capture. A small final-tier IDR remains
+admissible to avoid an endless rejection loop. Capture tier changes update the
+existing ScreenCaptureKit stream; a single reconciler applies changes to
+completion before rechecking the latest budget, including A→B→A changes while
+framework calls are suspended. Codec configuration emitted alongside an already
+encoded IDR does not request another duplicate IDR.
 
 Restoring emergency detail requires fifteen seconds of hysteresis and measured
 keyframe size with at least six-fold headroom against the byte budget. This
@@ -133,10 +152,16 @@ Run host tests with `swift test --package-path GlassyHost`.
 `script/performance/run_stream_audit.py` compiles current host/client transport
 in a temporary loopback-only fixture, exercises bounded delivery and an adaptive
 500 kbps synthetic source, and checks real VideoToolbox idle recovery. A separate
-high-entropy bootstrap uses one synthetic 1280×720 pixel buffer, no later capture
-input, real encoding, a 500 kbps proxy, emergency rescaling and receiver feedback;
-it asserts the first video callback arrives within five seconds. The September 7
-run delivered a 29,451-byte keyframe after 2.229 seconds. The last
+high-entropy bootstrap uses synthetic 3840×2160 and native 640×360 pixel buffers,
+no later capture input, real encoding, a 500 kbps proxy and receiver feedback;
+it asserts the first video callback arrives within five seconds. Run
+`--scenario healthy-best` for unrestricted and 100 ms RTT links, including an
+already-running full-size encoder and ten seconds of periodic real encoded
+IDRs, plus sustained 60 fps transport. It requires
+full 3840-pixel delivery within 1.5 seconds and retention of the 12 Mbps Best
+budget. Run `--scenario slow-bootstrap` for 500 kbps noise and desktop-pattern
+fixtures. These checks supersede the earlier 320-pixel bootstrap result, which
+mistook image complexity for proof of network congestion. The last
 third of each run reports steady-state callback age separately from startup.
 Synthetic media is not a physical-device FPS, image-quality or input-to-display
 benchmark.

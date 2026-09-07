@@ -2,6 +2,8 @@
 
 This follow-up implements the non-iCloud code defects from the [launch audit](launch-readiness-2026-09-07.md). The original report is retained as the before-change evidence. The Mac release **0.2.10 (14)** is [published and verified](../releases/macos-0.2.10-verification.md); the accompanying iOS changes remain in the upcoming **1.3** source.
 
+The subsequent [streaming regression follow-up](streaming-regression-2026-09-07.md) records two failures missed by this initial validation and their fixes in Mac 0.2.11 and the current iOS source.
+
 ## Changes
 
 - Host video admission is bounded by count, bytes, receiver progress and age. Control messages are prioritized before final sequencing/encryption. Compatible clients report consumed/discarded video progress and queue age, enabling conservative bitrate, capture size and frame-rate adaptation below 1 Mbps. Selected quality remains a ceiling; a slow viewer constrains the shared capture stream.

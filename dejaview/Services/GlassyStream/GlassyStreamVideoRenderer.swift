@@ -54,7 +54,7 @@ final class GlassyStreamVideoRenderer {
     @ObservationIgnored private let worker: GlassyStreamVideoWorker
     @ObservationIgnored private var generation = UUID()
     @ObservationIgnored private weak var displayLayer: AVSampleBufferDisplayLayer?
-    @ObservationIgnored private var readyObserver: NSKeyValueObservation?
+    @ObservationIgnored private var readyObserver: GlassyStreamPresentationObservation?
 
     var mediaQueue: DispatchQueue { worker.queue }
 
@@ -123,20 +123,35 @@ final class GlassyStreamVideoRenderer {
     }
 
     private func observePresentation(on layer: AVSampleBufferDisplayLayer) {
+        readyObserver = nil
         let identity = ObjectIdentifier(layer)
         let generation = generation
-        readyObserver = layer.observe(\.isReadyForDisplay, options: [.new]) { [weak self] _, change in
-            guard let ready = change.newValue else { return }
+        let epoch = worker.presentationEpoch
+        // This property is explicitly not KVO-observable. AVFoundation posts
+        // this notification after real decoded output becomes displayable.
+        let token = NotificationCenter.default.addObserver(
+            forName: .AVSampleBufferDisplayLayerReadyForDisplayDidChange,
+            object: layer, queue: nil
+        ) { [weak self] _ in
+            let observedEpoch = epoch.current
             Task { @MainActor [weak self] in
-                guard let self, self.generation == generation,
-                      let layer = self.displayLayer, ObjectIdentifier(layer) == identity,
-                      layer.isReadyForDisplay == ready else { return }
-                self.setPresentationReady(ready)
-                if ready {
-                    self.worker.queue.async { [worker = self.worker] in
-                        worker.presentationReady(generation: generation)
-                    }
-                }
+                self?.refreshPresentation(identity: identity, generation: generation, epoch: observedEpoch)
+            }
+        }
+        readyObserver = GlassyStreamPresentationObservation(token)
+        refreshPresentation(identity: identity, generation: generation, epoch: epoch.current)
+    }
+
+    private func refreshPresentation(identity: ObjectIdentifier, generation: UUID, epoch: UUID) {
+        guard self.generation == generation, worker.presentationEpoch.current == epoch,
+              let layer = displayLayer, ObjectIdentifier(layer) == identity else { return }
+        // Read the current property; a delayed notification may describe an
+        // earlier transition, or an earlier decoder recovery may have flushed.
+        let ready = layer.isReadyForDisplay
+        setPresentationReady(ready)
+        if ready {
+            worker.queue.async { [worker] in
+                worker.presentationReady(generation: generation, epoch: epoch)
             }
         }
     }
@@ -186,6 +201,7 @@ final class GlassyStreamVideoWorker: @unchecked Sendable {
     private var scheduledRecoveryToken: UUID?
     private var recovery = GlassyStreamVideoRecoveryState()
     private var lastSnapshotTime: TimeInterval = 0
+    fileprivate let presentationEpoch = GlassyStreamPresentationEpoch()
 
     deinit {
         recoveryDeadline?.cancel()
@@ -247,7 +263,7 @@ final class GlassyStreamVideoWorker: @unchecked Sendable {
             )
 
             stopPendingMediaRequest()
-            sampleBufferRenderer?.flush(removingDisplayedImage: true, completionHandler: nil)
+            flushDisplayedImage()
             formatDescription = description
             self.nalUnitHeaderLength = nalUnitHeaderLength
             let dimensions = CMVideoFormatDescriptionGetDimensions(description)
@@ -366,7 +382,7 @@ final class GlassyStreamVideoWorker: @unchecked Sendable {
         didRequestKeyFrame = false
         enqueuedFrameCount = 0
         droppedFrameCount = 0
-        sampleBufferRenderer?.flush(removingDisplayedImage: true, completionHandler: nil)
+        flushDisplayedImage()
         state = .waitingForConfiguration
         if let decoderFailureObserver {
             NotificationCenter.default.removeObserver(decoderFailureObserver)
@@ -488,7 +504,7 @@ final class GlassyStreamVideoWorker: @unchecked Sendable {
         if !isWaitingForKeyFrame || !recovery.awaitsPresentation {
             // A retained old image cannot prove this decoder recovered. A new
             // ready-for-display transition must follow the recovery keyframe.
-            sampleBufferRenderer?.flush(removingDisplayedImage: true, completionHandler: nil)
+            flushDisplayedImage()
             didRequestKeyFrame = false
         }
         isWaitingForKeyFrame = true
@@ -508,12 +524,13 @@ final class GlassyStreamVideoWorker: @unchecked Sendable {
         guard formatDescription != nil else { return }
         stopPendingMediaRequest()
         pendingAccessUnit = nil
-        sampleBufferRenderer?.flush(removingDisplayedImage: true, completionHandler: nil)
+        flushDisplayedImage()
         enterKeyFrameRecovery()
     }
 
-    func presentationReady(generation: UUID) {
-        guard self.generation == generation, !isWaitingForKeyFrame else { return }
+    func presentationReady(generation: UUID, epoch: UUID) {
+        guard self.generation == generation, presentationEpoch.current == epoch,
+              !isWaitingForKeyFrame else { return }
         recovery.presentationReady()
         synchronizeRecoveryDeadline()
     }
@@ -544,7 +561,7 @@ final class GlassyStreamVideoWorker: @unchecked Sendable {
         pendingAccessUnit = nil
 
         if resetDecoder {
-            sampleBufferRenderer?.flush(removingDisplayedImage: true, completionHandler: nil)
+            flushDisplayedImage()
             isWaitingForKeyFrame = true
             didRequestKeyFrame = false
             requestKeyFrameIfNeeded()
@@ -581,14 +598,34 @@ final class GlassyStreamVideoWorker: @unchecked Sendable {
             NotificationCenter.default.removeObserver(decoderFailureObserver)
             self.decoderFailureObserver = nil
         }
-        sampleBufferRenderer?.flush(removingDisplayedImage: true, completionHandler: nil)
+        flushDisplayedImage()
         sampleBufferRenderer = nil
+    }
+
+    private func flushDisplayedImage() {
+        presentationEpoch.invalidate()
+        sampleBufferRenderer?.flush(removingDisplayedImage: true, completionHandler: nil)
     }
 
     private func publishSnapshot() {
         lastSnapshotTime = ProcessInfo.processInfo.systemUptime
         notify?(generation, .snapshot(state, videoDimensions, enqueuedFrameCount, droppedFrameCount))
     }
+}
+
+/// Notification delivery can cross the media queue and MainActor. A flush
+/// retires callbacks captured before it, even within the same connection.
+fileprivate final class GlassyStreamPresentationEpoch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = UUID()
+    var current: UUID { lock.withLock { value } }
+    func invalidate() { lock.withLock { value = UUID() } }
+}
+
+private final class GlassyStreamPresentationObservation: @unchecked Sendable {
+    private let token: NSObjectProtocol
+    init(_ token: NSObjectProtocol) { self.token = token }
+    deinit { NotificationCenter.default.removeObserver(token) }
 }
 
 /// Pure deadline identity policy shared by every decoder recovery entry. A

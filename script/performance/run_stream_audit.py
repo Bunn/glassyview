@@ -11,6 +11,7 @@ import argparse
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 
@@ -32,6 +33,7 @@ def declaration(path, start):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--scenario", choices=["healthy-best", "slow-bootstrap", "regression"])
     parser.add_argument("--compatibility", choices=["legacy-client", "legacy-host"],
                         help="Compile the selected peer's pre-adaptive committed source against the current other peer")
     parser.add_argument("--legacy-revision", default="485335bc393c173d5f6e39cd5ef73932036ee6fa",
@@ -103,10 +105,17 @@ enum GlassyStreamEndpoint {
              str(work / "Support.swift"), str(work / "HostServer.swift"),
              "-o", str(binary)], check=True, cwd=ROOT, timeout=180,
         )
-        probe_args = [str(binary), str(work)] + ([args.compatibility] if args.compatibility else [])
-        result = subprocess.run(probe_args, check=True, text=True,
-                                capture_output=True, timeout=120)
-        print(json.dumps(json.loads(result.stdout), indent=2))
+        scenarios = ["healthy-best", "slow-bootstrap"] if args.scenario == "regression" else [args.compatibility or args.scenario]
+        reports = {}
+        for scenario in scenarios:
+            probe_args = [str(binary), str(work)] + ([scenario] if scenario else [])
+            result = subprocess.run(probe_args, text=True, capture_output=True, timeout=120)
+            if result.returncode:
+                print(result.stdout, file=sys.stderr)
+                print(result.stderr, file=sys.stderr)
+                result.check_returncode()
+            reports[scenario or "audit"] = json.loads(result.stdout)
+        print(json.dumps(reports if len(reports) > 1 else next(iter(reports.values())), indent=2))
 
 
 if __name__ == "__main__":
