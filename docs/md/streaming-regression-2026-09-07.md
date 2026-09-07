@@ -63,4 +63,6 @@ A normal UI pairing from the iPhone simulator exercised the installed Mac's real
 
 The app displayed the real desktop and reached its normal one-minute free-session limit with no five-second reconnection loop. Mac logs showed one authentication and no bitrate reduction during this session. The simulator was then stopped and its temporary Mac approval revoked; existing iPad approvals remained intact. Runtime evidence: `/tmp/glassy-host-0.2.11-live-all.log`. This is actual Mac capture through the normal encrypted transport into the simulator, not physical iPad validation.
 
-Publication results will be recorded after completion. iCloud and persistence changes remain outside this repair.
+Mac **0.2.11 (15)** was published through Sparkle from commit `7892edfb5acf128c972179f7fe66440c2075ed97`. The final notarized app is installed on this Mac and reports Ready to connect. The live Mac download page points to the new installer. See [release verification](../releases/macos-0.2.11-verification.md) for artifact checksums and deployment evidence.
+
+The reconnect correction also requires the updated iPhone/iPad app. Its source is committed and validated, but no physical device was connected for installation and this repair did not publish an iOS build. iCloud and persistence changes remain outside this repair.
