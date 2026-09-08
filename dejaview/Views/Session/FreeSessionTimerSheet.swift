@@ -17,7 +17,7 @@ struct FreeSessionTimerSheet: View {
                 Text("Free Session Timer")
                     .font(.title2.bold())
 
-                Text("Free sessions are timed. Upgrade to Pro to keep this session active.")
+                Text("Enjoy one-minute free sessions with a 30-second break between them. Upgrade to Pro for sessions without time limits.")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

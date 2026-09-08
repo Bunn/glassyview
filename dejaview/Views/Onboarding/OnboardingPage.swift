@@ -55,7 +55,7 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
             [
                 OnboardingBullet(systemImage: "timer",
                                  title: "Try one-minute sessions",
-                                 detail: "Free sessions last one minute. Reconnect for another free session, or purchase Pro for sessions without this limit."),
+                                 detail: "Free sessions last one minute, with a 30-second break before the next. Purchase Pro for sessions without time limits."),
                 OnboardingBullet(systemImage: "dot.radiowaves.left.and.right",
                                  title: "Find nearby Macs",
                                  detail: "Macs advertising Screen Sharing appear automatically on the Nearby Macs tab."),

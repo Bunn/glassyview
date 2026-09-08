@@ -6,6 +6,7 @@ struct RevenueCatPaywallSheet: View {
     @Environment(SubscriptionStore.self) private var subscriptionStore
     @Environment(\.analyticsTracker) private var analytics
     @Environment(\.funnelMilestoneTracker) private var funnelMilestones
+    @Environment(\.dismiss) private var dismiss
 
     @State private var didRecordPresentation = false
     @State private var didRecordDismissal = false
@@ -65,6 +66,16 @@ struct RevenueCatPaywallSheet: View {
             } else {
                 RevenueCatUnavailableView()
             }
+        }
+        .overlay(alignment: .topTrailing) {
+            Button("Close", systemImage: "xmark", action: dismiss.callAsFunction)
+                .labelStyle(.iconOnly)
+                .font(.body.weight(.semibold))
+                .frame(minWidth: 44, minHeight: 44)
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .padding(12)
+                .accessibilityIdentifier("subscription.paywall.close")
         }
         // The default iPad form sheet is too short for this full-height paywall.
         .presentationSizing(.page)

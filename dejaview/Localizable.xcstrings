@@ -746,6 +746,46 @@
         }
       }
     },
+    "A short break, then you’re back. Start another free session when the timer finishes." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine kurze Pause, dann geht’s weiter. Starte eine neue kostenlose Sitzung, sobald der Timer abgelaufen ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una pequeña pausa y vuelves. Inicia otra sesión gratuita cuando termine el temporizador."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "少し休んだら、また続けましょう。タイマーが終了すると、新しい無料セッションを開始できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een korte pauze, en je kunt weer verder. Start een nieuwe gratis sessie zodra de timer afloopt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma breve pausa e você já volta. Inicie outra sessão gratuita quando o tempo acabar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稍作休息，即可继续。倒计时结束后，就能开始新的免费会话。"
+          }
+        }
+      }
+    },
     "About" : {
       "localizations" : {
         "de" : {
@@ -1598,6 +1638,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "身份验证"
+          }
+        }
+      }
+    },
+    "Available when the countdown finishes." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verfügbar, sobald der Countdown abgelaufen ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponible cuando termine la cuenta atrás."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カウントダウン終了後に利用できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beschikbaar zodra het aftellen klaar is."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponível quando a contagem regressiva terminar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "倒计时结束后可用。"
+          }
+        }
+      }
+    },
+    "Back to My Macs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zurück zu meinen Macs"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a Mis Macs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分のMacに戻る"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terug naar Mijn Macs"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar aos Meus Macs"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回我的 Mac"
           }
         }
       }
@@ -5198,6 +5318,46 @@
         }
       }
     },
+    "Enjoy one-minute free sessions with a 30-second break between them. Upgrade to Pro for sessions without time limits." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nutze einminütige kostenlose Sitzungen mit jeweils 30 Sekunden Pause. Hol dir Pro für Sitzungen ohne Zeitlimit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disfruta de sesiones gratuitas de un minuto con una pausa de 30 segundos entre ellas. Pásate a Pro para tener sesiones sin límite de tiempo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1分間の無料セッションを、30秒の休憩を挟んで利用できます。Proにアップグレードすると、時間制限なしで使えます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geniet van gratis sessies van één minuut met een pauze van 30 seconden ertussen. Upgrade naar Pro voor sessies zonder tijdslimiet."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aproveite sessões gratuitas de um minuto com uma pausa de 30 segundos entre elas. Assine o Pro para ter sessões sem limite de tempo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费会话每次一分钟，两次之间休息30秒。升级到 Pro 即可享受无时间限制的会话。"
+          }
+        }
+      }
+    },
     "Enter a TCP port from 1 through 65535." : {
       "localizations" : {
         "de" : {
@@ -5882,6 +6042,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "解释如何安全地连接到本地网络之外的 Mac。"
+          }
+        }
+      }
+    },
+    "Explore Pro" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro entdecken"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descubrir Pro"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proをチェック"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ontdek Pro"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conhecer o Pro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "了解 Pro"
           }
         }
       }
@@ -7102,6 +7302,86 @@
         }
       }
     },
+    "Free session complete" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kostenlose Sitzung beendet"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sesión gratuita finalizada"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無料セッションが終了しました"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gratis sessie afgelopen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessão gratuita encerrada"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费会话已结束"
+          }
+        }
+      }
+    },
+    "Free session ready" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kostenlose Sitzung bereit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sesión gratuita lista"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無料セッションを開始できます"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gratis sessie klaar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessão gratuita pronta"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费会话已就绪"
+          }
+        }
+      }
+    },
     "Free session timer" : {
       "localizations" : {
         "de" : {
@@ -7178,6 +7458,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "免费课程是有时间限制的。升级到专业版以保持此会话活跃。"
+          }
+        }
+      }
+    },
+    "Free sessions last one minute, with a 30-second break before the next. Purchase Pro for sessions without time limits." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kostenlose Sitzungen dauern eine Minute, mit 30 Sekunden Pause bis zur nächsten. Kaufe Pro für Sitzungen ohne Zeitlimit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las sesiones gratuitas duran un minuto, con una pausa de 30 segundos antes de la siguiente. Compra Pro para tener sesiones sin límite de tiempo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無料セッションは1分間で、次のセッションまで30秒の休憩があります。Proを購入すると、時間制限なしで使えます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gratis sessies duren één minuut, met een pauze van 30 seconden voor de volgende. Koop Pro voor sessies zonder tijdslimiet."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As sessões gratuitas duram um minuto, com uma pausa de 30 segundos antes da próxima. Compre o Pro para ter sessões sem limite de tempo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费会话每次一分钟，下一次开始前需休息30秒。购买 Pro 即可享受无时间限制的会话。"
           }
         }
       }
@@ -9172,6 +9492,46 @@
         }
       }
     },
+    "Let’s get back to your Mac." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zurück zu deinem Mac."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volvamos a tu Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macに戻りましょう。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terug naar je Mac."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vamos voltar ao seu Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回到你的 Mac 吧。"
+          }
+        }
+      }
+    },
     "Lifetime" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10219,6 +10579,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建计算机"
+          }
+        }
+      }
+    },
+    "New Session Available Soon" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Sitzung bald verfügbar"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nueva sesión disponible pronto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まもなく新しいセッションを開始できます"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nieuwe sessie binnenkort beschikbaar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova sessão disponível em breve"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新会话即将可用"
+          }
+        }
+      }
+    },
+    "Next free session in" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nächste kostenlose Sitzung in"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima sesión gratuita en"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次の無料セッションまで"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volgende gratis sessie over"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima sessão gratuita em"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "距离下次免费会话还有"
           }
         }
       }
@@ -12248,6 +12688,86 @@
         }
       }
     },
+    "Ready" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bereit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備完了"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pronto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已就绪"
+          }
+        }
+      }
+    },
+    "Ready when you are" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bereit, wenn du es bist"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuando quieras"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いつでもどうぞ"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaar wanneer jij dat bent"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando você quiser"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随时可以开始"
+          }
+        }
+      }
+    },
     "Recent Session Options" : {
       "localizations" : {
         "de" : {
@@ -12526,6 +13046,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新连接到此计算机。"
+          }
+        }
+      }
+    },
+    "Reconnects to your Mac for one minute." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbindet dich erneut für eine Minute mit deinem Mac."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuelve a conectarte a tu Mac durante un minuto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macに再接続して1分間利用できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maakt opnieuw verbinding met je Mac voor één minuut."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconecta ao seu Mac por um minuto."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新连接到你的 Mac，使用一分钟。"
           }
         }
       }
@@ -14788,6 +15348,46 @@
         }
       }
     },
+    "Shows Pro plans for sessions without time limits." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt Pro-Angebote für Sitzungen ohne Zeitlimit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra los planes Pro para sesiones sin límite de tiempo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間制限のないセッションを利用できるProプランを表示します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toont Pro-abonnementen voor sessies zonder tijdslimiet."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra os planos Pro para sessões sem limite de tempo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看会话无时间限制的 Pro 方案。"
+          }
+        }
+      }
+    },
     "Shows available session controls." : {
       "localizations" : {
         "de" : {
@@ -15030,6 +15630,46 @@
         }
       }
     },
+    "Skip the wait. Stay as long as you like." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ohne Wartezeit. Bleib so lange du möchtest."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin esperas. Quédate todo el tiempo que quieras."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待ち時間なしで、好きなだけ使えます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sla het wachten over. Blijf zo lang je wilt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem espera. Fique o tempo que quiser."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无需等待，想用多久就用多久。"
+          }
+        }
+      }
+    },
     "Standard VNC" : {
       "localizations" : {
         "de" : {
@@ -15148,6 +15788,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "标准 VNC/RFB 服务器可能会工作，但该应用程序是围绕 macOS 屏幕共享行为进行调整和测试的。"
+          }
+        }
+      }
+    },
+    "Start New Free Session" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue kostenlose Sitzung starten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciar nueva sesión gratuita"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい無料セッションを開始"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nieuwe gratis sessie starten"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciar nova sessão gratuita"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始新的免费会话"
           }
         }
       }
@@ -16818,6 +17498,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法访问"
+          }
+        }
+      }
+    },
+    "Until your next free session" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bis zur nächsten kostenlosen Sitzung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hasta tu próxima sesión gratuita"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次の無料セッションまで"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tot je volgende gratis sessie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Até sua próxima sessão gratuita"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "距离下次免费会话"
           }
         }
       }
@@ -18695,6 +19415,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "您的 iPhone 或 iPad 和 Mac 需要位于同一本地网络上，或者通过可以访问 Mac 的 VPN 进行连接。"
+          }
+        }
+      }
+    },
+    "Your next free session is ready." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine nächste kostenlose Sitzung ist bereit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu próxima sesión gratuita está lista."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次の無料セッションを開始できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je volgende gratis sessie is klaar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua próxima sessão gratuita está pronta."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一次免费会话已就绪。"
+          }
+        }
+      }
+    },
+    "Your next one-minute session is ready." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine nächste einminütige Sitzung ist bereit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu próxima sesión de un minuto está lista."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次の1分間のセッションを開始できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je volgende sessie van één minuut is klaar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua próxima sessão de um minuto está pronta."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一次一分钟会话已就绪。"
           }
         }
       }

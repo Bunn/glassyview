@@ -13,14 +13,14 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var isSessionPaywallPresented = false
     @State private var sessionPaywallSource: PaywallSource = .sessionLimit
     @State private var isFreeSessionTimerInfoPresented = false
-    @State private var freeSessionEndDate: Date?
-    @State private var shouldEndSessionOnPaywallDismiss = false
+    @State private var freeSession = FreeSessionLifecycle()
     @State private var opensPaywallAfterFreeSessionInfoDismissal = false
-    @State private var pendingPaywallEndsSessionOnDismiss = false
+    @State private var shouldRetryAfterDisconnect = false
     @State private var heldModifierKeys: Set<RemoteModifierKey> = []
     @State private var showsInputBar = false
     @State private var textToSend = ""
@@ -35,8 +35,6 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @State private var areBottomControlsCollapsed = false
     @State private var didRecordFreeSessionStart = false
     @State private var didRecordFreeSessionLimit = false
-
-    private let freeSessionDurationInterval: TimeInterval = 60
 
     private var analyticsSessionType: AnalyticsSessionType {
         glassyStream == nil ? .vnc : .glassyStream
@@ -63,15 +61,27 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            content
+            if let cooldown = freeSession.cooldown, !subscriptionStore.hasProAccess {
+                FreeSessionCooldownView(cooldown: cooldown,
+                                        sessionTitle: sessionTitle,
+                                        restart: restartFreeSession,
+                                        purchase: { presentSessionPaywall(source: .sessionLimit) },
+                                        close: closeSession)
+                    .transition(.opacity)
+            } else {
+                content
+                    .transition(.opacity)
+            }
         }
+        .animation(accessibilityReduceMotion ? nil : .smooth(duration: 0.3),
+                   value: freeSession.cooldown != nil)
         .overlay(alignment: .topTrailing) {
-            if session.status == .connected {
+            if canInteractWithSession {
                 controlPill
             }
         }
         .overlay(alignment: .topLeading) {
-            if isConnectedFreeSession, let freeSessionEndDate {
+            if isConnectedFreeSession, let freeSessionEndDate = freeSession.sessionEndDate {
                 FreeSessionTimerPill(endDate: freeSessionEndDate,
                                      action: presentFreeSessionTimerInfo)
                     .padding(.top, 20)
@@ -79,12 +89,12 @@ struct SessionView<Session: RemoteSessionControlling>: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if showsInputBar && session.status == .connected && !isExternalControllerActive {
+            if showsInputBar && canInteractWithSession && !isExternalControllerActive {
                 inputBar
             }
         }
         .overlay(alignment: .bottom) {
-            if session.status == .connected,
+            if canInteractWithSession,
                !showsInputBar,
                !isExternalControllerActive {
                 sessionBottomControls
@@ -104,11 +114,16 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
         .sheet(isPresented: $isFreeSessionTimerInfoPresented,
                onDismiss: handleFreeSessionTimerInfoDismissed) {
-            FreeSessionTimerSheet(endDate: freeSessionEndDate,
+            FreeSessionTimerSheet(endDate: freeSession.sessionEndDate,
                                   purchase: purchaseFromFreeSessionTimerInfo)
         }
         .onAppear {
             networkPathObserver.start()
+            if subscriptionStore.hasProAccess {
+                freeSession.clearLimits()
+            } else if freeSession.cooldown != nil {
+                stopSessionForCooldown()
+            }
             if glassyStream != nil {
                 deactivateExternalControllerIfNeeded()
             }
@@ -124,12 +139,17 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
         .onChange(of: session.status) { _, _ in
             logDisplayControlState(reason: "statusChanged")
+            endFreeSessionIfNeeded()
+            if freeSession.cooldown != nil, !subscriptionStore.hasProAccess {
+                stopSessionForCooldown()
+            }
             if session.status != .connected {
                 releaseHeldModifierKeys()
             }
 
             if case .disconnected = session.status {
                 deactivateExternalControllerIfNeeded()
+                retrySessionIfNeeded()
             }
         }
         .onChange(of: session.displays) { _, _ in
@@ -164,7 +184,11 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .onChange(of: subscriptionStore.hasProAccess) { _, hasProAccess in
             if hasProAccess {
                 handleSessionProAccessGranted()
-                freeSessionEndDate = nil
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                endFreeSessionIfNeeded()
             }
         }
         .task(id: isFreeSessionLifecycleActive) {
@@ -417,29 +441,29 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     }
 
     private var isConnectedFreeSession: Bool {
-        session.status == .connected && !subscriptionStore.hasProAccess
+        canInteractWithSession && !subscriptionStore.hasProAccess
+    }
+
+    private var canInteractWithSession: Bool {
+        session.status == .connected && freeSession.cooldown == nil && !shouldRetryAfterDisconnect
     }
 
     private var isFreeSessionLifecycleActive: Bool {
-        guard !subscriptionStore.hasProAccess else { return false }
+        guard !subscriptionStore.hasProAccess, freeSession.cooldown == nil,
+              !shouldRetryAfterDisconnect else { return false }
 
         switch session.status {
-        case .connected, .reconnecting:
+        case .connected:
             return true
-        case .connecting:
-            return freeSessionEndDate != nil
+        case .connecting, .reconnecting:
+            return freeSession.sessionEndDate != nil
         case .idle, .disconnected:
             return false
         }
     }
 
-    private var freeSessionHasExpired: Bool {
-        guard let freeSessionEndDate else { return false }
-        return freeSessionEndDate <= Date.now
-    }
-
     private var acceptsRemoteHardwareKeyboardInput: Bool {
-        session.status == .connected
+        canInteractWithSession
             && !showsInputBar
             && !isSessionPaywallPresented
             && !isFreeSessionTimerInfoPresented
@@ -487,62 +511,87 @@ struct SessionView<Session: RemoteSessionControlling>: View {
 
     private func enforceFreeSessionLimitIfNeeded() async {
         guard isFreeSessionLifecycleActive else {
-            freeSessionEndDate = nil
+            freeSession.resetActiveSession()
             return
         }
 
-        if freeSessionEndDate == nil {
-            freeSessionEndDate = Date.now.addingTimeInterval(freeSessionDurationInterval)
+        if freeSession.startIfNeeded() {
             recordFreeSessionStartIfNeeded()
         }
 
-        guard let freeSessionEndDate else { return }
+        guard let freeSessionEndDate = freeSession.sessionEndDate else { return }
         let remainingDuration = max(0, freeSessionEndDate.timeIntervalSinceNow)
 
         try? await Task.sleep(for: .seconds(remainingDuration))
 
         guard !Task.isCancelled else { return }
 
-        while isFreeSessionLifecycleActive {
-            if session.status == .connected {
-                AppLog.subscriptions.info("Free session limit reached; presenting paywall")
-                recordFreeSessionLimitIfNeeded()
-                presentSessionPaywall(
-                    endsSessionOnDismiss: true,
-                    source: .sessionLimit
-                )
-                return
-            }
+        endFreeSessionIfNeeded()
+    }
 
-            try? await Task.sleep(for: .seconds(1))
-            guard !Task.isCancelled else { return }
+    private func endFreeSessionIfNeeded() {
+        guard !subscriptionStore.hasProAccess, freeSession.endIfNeeded() else { return }
+
+        AppLog.subscriptions.info("Free session limit reached; starting cooldown")
+        recordFreeSessionLimitIfNeeded()
+        isFreeSessionTimerInfoPresented = false
+        stopSessionForCooldown()
+    }
+
+    private func stopSessionForCooldown() {
+        releaseHeldModifierKeys()
+        deactivateExternalControllerIfNeeded()
+        if showsInputBar {
+            toggleInputBar()
+        }
+        inputFocused = false
+
+        switch session.status {
+        case .idle, .disconnected:
+            break
+        case .connecting, .connected, .reconnecting:
+            session.disconnect()
         }
     }
 
-    private func handleSessionProAccessGranted() {
-        guard isSessionPaywallPresented else { return }
+    private func restartFreeSession() {
+        guard freeSession.prepareNextSession() else { return }
+        AppLog.subscriptions.info("Starting another free session after cooldown")
+        didRecordFreeSessionStart = false
+        didRecordFreeSessionLimit = false
+        shouldRetryAfterDisconnect = true
+        retrySessionIfNeeded()
+    }
 
-        AppLog.subscriptions.info("Pro access granted from session paywall; keeping remote session active")
-        shouldEndSessionOnPaywallDismiss = false
+    private func retrySessionIfNeeded() {
+        guard shouldRetryAfterDisconnect, case .disconnected = session.status else { return }
+        shouldRetryAfterDisconnect = false
+        session.retryConnect()
+    }
+
+    private func handleSessionProAccessGranted() {
+        guard subscriptionStore.hasProAccess else { return }
+
+        AppLog.subscriptions.info("Pro access granted; removing free session limits")
+        let needsReconnect = freeSession.cooldown != nil
+        freeSession.clearLimits()
+        opensPaywallAfterFreeSessionInfoDismissal = false
+        isFreeSessionTimerInfoPresented = false
         isSessionPaywallPresented = false
-        freeSessionEndDate = nil
+        if needsReconnect {
+            shouldRetryAfterDisconnect = true
+            retrySessionIfNeeded()
+        }
     }
 
     private func handleSessionPaywallDismissed() {
-        let shouldEndSession = shouldEndSessionOnPaywallDismiss
-        shouldEndSessionOnPaywallDismiss = false
-
         Task {
             await subscriptionStore.refresh()
-
-            guard shouldEndSession else { return }
-            guard session.status == .connected else { return }
-            guard !subscriptionStore.hasProAccess else { return }
-
-            AppLog.subscriptions.info("Session paywall dismissed without Pro access; ending remote session")
-            releaseHeldModifierKeys()
-            session.disconnect()
-            dismiss()
+            if subscriptionStore.hasProAccess {
+                handleSessionProAccessGranted()
+            } else {
+                endFreeSessionIfNeeded()
+            }
         }
     }
 
@@ -560,44 +609,29 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     private func purchaseFromFreeSessionTimerInfo() {
         AppLog.subscriptions.info("Free session timer purchase button tapped")
         funnelMilestones.record(.freeTimerUpgradeTapped)
-        presentSessionPaywall(
-            endsSessionOnDismiss: freeSessionHasExpired,
-            source: .freeSessionTimer
-        )
+        presentSessionPaywall(source: .freeSessionTimer)
     }
 
     private func handleFreeSessionTimerInfoDismissed() {
         guard opensPaywallAfterFreeSessionInfoDismissal else { return }
 
         opensPaywallAfterFreeSessionInfoDismissal = false
-        let endsSessionOnDismiss = pendingPaywallEndsSessionOnDismiss
-        pendingPaywallEndsSessionOnDismiss = false
-        presentSessionPaywall(
-            endsSessionOnDismiss: endsSessionOnDismiss,
-            source: sessionPaywallSource
-        )
+        presentSessionPaywall(source: sessionPaywallSource)
     }
 
-    private func presentSessionPaywall(
-        endsSessionOnDismiss: Bool,
-        source: PaywallSource
-    ) {
+    private func presentSessionPaywall(source: PaywallSource) {
+        guard !subscriptionStore.hasProAccess else { return }
         releaseHeldModifierKeys()
+
+        guard !isSessionPaywallPresented else { return }
         sessionPaywallSource = source
 
-        if isSessionPaywallPresented {
-            shouldEndSessionOnPaywallDismiss = shouldEndSessionOnPaywallDismiss || endsSessionOnDismiss
-            return
-        }
-
         if isFreeSessionTimerInfoPresented {
-            pendingPaywallEndsSessionOnDismiss = endsSessionOnDismiss
             opensPaywallAfterFreeSessionInfoDismissal = true
             isFreeSessionTimerInfoPresented = false
             return
         }
 
-        shouldEndSessionOnPaywallDismiss = endsSessionOnDismiss
         isSessionPaywallPresented = true
     }
 
