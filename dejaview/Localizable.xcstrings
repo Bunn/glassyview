@@ -501,6 +501,46 @@
         }
       }
     },
+    "1-minute free sessions. 30-second breaks." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kostenlose Sitzungen: 1 Minute. Pausen: 30 Sekunden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sesiones gratis de 1 minuto. Pausas de 30 segundos."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無料セッションは1分間。休憩は30秒。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gratis sessies van 1 minuut. Pauzes van 30 seconden."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessões grátis de 1 minuto. Pausas de 30 segundos."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费会话每次1分钟，间隔30秒。"
+          }
+        }
+      }
+    },
     "1080p · 30 FPS · ~5 Mbps" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9492,6 +9532,46 @@
         }
       }
     },
+    "Let’s Connect" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jetzt verbinden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectémonos"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続しましょう"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbinden maar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vamos conectar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始连接"
+          }
+        }
+      }
+    },
     "Let’s get back to your Mac." : {
       "localizations" : {
         "de" : {
@@ -11106,6 +11186,46 @@
         }
       }
     },
+    "One scan.\nAnd you’re in." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Scan.\nSchon bist du drin."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un escaneo.\nY ya estás dentro."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スキャンひとつで。\nすぐにつながる。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eén scan.\nEn je bent verbonden."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "É só escanear.\nE se conectar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻轻一扫。\n即刻连接。"
+          }
+        }
+      }
+    },
     "One-Time Code" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11424,6 +11544,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 Mac 上打开 Glassy Desk。对于远程访问，请输入其 Tailscale 名称或 100.x 地址。对于附近访问，请将两个设备保持在同一本地网络上。"
+          }
+        }
+      }
+    },
+    "Open Glassy Desk on your Mac, then scan its code to connect." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffne Glassy Desk auf deinem Mac und scanne seinen Code, um dich zu verbinden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Glassy Desk en tu Mac y escanea su código para conectarte."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MacでGlassy Deskを開いて、コードをスキャンするだけで接続できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Glassy Desk op je Mac en scan de code om verbinding te maken."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o Glassy Desk no seu Mac e escaneie o código para se conectar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Mac 上打开 Glassy Desk，扫描其中的代码即可连接。"
           }
         }
       }
@@ -19338,6 +19498,46 @@
         }
       }
     },
+    "Your Mac.\nRight here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Mac.\nDirekt hier."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu Mac.\nAquí mismo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたのMacを、\nすぐそばに。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je Mac.\nGewoon hier."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu Mac.\nBem aqui."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的 Mac。\n就在手边。"
+          }
+        }
+      }
+    },
     "Your analytics are private. No identifiable information is ever sent." : {
       "localizations" : {
         "de" : {
@@ -19374,6 +19574,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的分析数据是私密的。绝不会发送任何可识别身份的信息。"
+          }
+        }
+      }
+    },
+    "Your apps, files, and favorite shortcuts. All from your iPhone or iPad." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Apps, Dateien und vertrauten Kurzbefehle. Alles auf deinem iPhone oder iPad."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tus apps, archivos y atajos favoritos. Todo desde tu iPhone o iPad."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリもファイルも、いつものショートカットも。iPhoneやiPadから、そのまま使えます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je apps, bestanden en favoriete sneltoetsen. Allemaal vanaf je iPhone of iPad."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seus apps, arquivos e atalhos favoritos. Tudo pelo seu iPhone ou iPad."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "熟悉的 App、文件和常用快捷键，都能在 iPhone 或 iPad 上使用。"
           }
         }
       }
