@@ -71,7 +71,7 @@ struct OnboardingView: View {
     private var header: some View {
         HStack {
             Button("Back", systemImage: "chevron.left") {
-                changePage(to: .welcome)
+                changePage(to: selectedPage.previous)
             }
             .labelStyle(.iconOnly)
             .frame(width: 44, height: 44)
@@ -115,7 +115,7 @@ struct OnboardingView: View {
 
     private func illustrationHeight(in size: CGSize) -> CGFloat {
         if dynamicTypeSize.isAccessibilitySize { return 150 }
-        return min(310, max(175, size.height * 0.52))
+        return min(310, max(175, size.height * 0.46))
     }
 
     private func changePage(to page: OnboardingPage) {
@@ -128,7 +128,7 @@ struct OnboardingView: View {
         if selectedPage.isLast {
             complete()
         } else {
-            changePage(to: .pair)
+            changePage(to: selectedPage.next)
         }
     }
 

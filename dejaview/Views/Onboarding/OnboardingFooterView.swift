@@ -14,12 +14,6 @@ struct OnboardingFooterView: View {
             primaryButton
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("onboarding.continue")
-
-            Text("1-minute free sessions. 30-second breaks.")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.55))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: 380)
         .padding(.horizontal, 28)

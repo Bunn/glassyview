@@ -1,15 +1,16 @@
 import SwiftUI
 
-/// The same devices move from a mirrored desktop into a short pairing demo.
+/// The same devices introduce the desktop and both ways to connect.
 struct OnboardingIllustration: View {
     let page: OnboardingPage
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var hasAppeared = false
-    @State private var pairingComplete = false
+    @State private var demoComplete = false
 
     private var isPairing: Bool { page == .pair }
+    private var isScreenSharing: Bool { page == .screenSharing }
     private var animates: Bool { !reduceMotion && scenePhase == .active }
     private var accent: Color { isPairing ? .mint : .cyan }
 
@@ -27,19 +28,19 @@ struct OnboardingIllustration: View {
             }
         }
         .task(id: page) {
-            pairingComplete = false
-            guard isPairing else { return }
+            demoComplete = false
+            guard page != .welcome else { return }
             if reduceMotion {
-                pairingComplete = true
+                demoComplete = true
                 return
             }
             do {
-                try await Task.sleep(for: .seconds(1.3))
+                try await Task.sleep(for: .seconds(isPairing ? 1.3 : 0.55))
             } catch {
                 return
             }
             withAnimation(.spring(response: 0.55, dampingFraction: 0.7)) {
-                pairingComplete = true
+                demoComplete = true
             }
         }
         .animation(reduceMotion ? nil : .spring(response: 0.8, dampingFraction: 0.82), value: page)
@@ -77,7 +78,7 @@ struct OnboardingIllustration: View {
                 .animation(reduceMotion ? nil : .spring(response: 0.8, dampingFraction: 0.75).delay(0.12),
                            value: hasAppeared)
 
-            Image(systemName: isPairing ? "link" : "cursorarrow.click")
+            Image(systemName: isPairing ? "link" : isScreenSharing ? "switch.2" : "cursorarrow.click")
                 .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(accent)
                 .frame(width: 50, height: 50)
@@ -107,7 +108,7 @@ struct OnboardingIllustration: View {
                     .fill(Color(red: 0.08, green: 0.13, blue: 0.23))
 
                 OnboardingDesktopArtwork()
-                    .blur(radius: isPairing ? 2 : 0)
+                    .blur(radius: page == .welcome ? 0 : 2)
                     .padding(7)
                     .clipShape(.rect(cornerRadius: 20))
 
@@ -118,6 +119,11 @@ struct OnboardingIllustration: View {
                     .background(.white, in: .rect(cornerRadius: 14))
                     .scaleEffect(isPairing ? 1 : 0.6)
                     .opacity(isPairing ? 1 : 0)
+
+                if isScreenSharing {
+                    screenSharingSettings
+                        .transition(.opacity)
+                }
             }
             .frame(width: 250, height: 169)
             .overlay {
@@ -139,6 +145,36 @@ struct OnboardingIllustration: View {
         .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 18)
     }
 
+    private var screenSharingSettings: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Image(systemName: "desktopcomputer")
+                .font(.system(size: 25, weight: .medium))
+                .foregroundStyle(.blue)
+
+            HStack(spacing: 10) {
+                Text("Screen Sharing")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.03, green: 0.15, blue: 0.25))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 0)
+
+                Capsule()
+                    .fill(demoComplete ? .green : .gray.opacity(0.3))
+                    .frame(width: 32, height: 19)
+                    .overlay {
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 15, height: 15)
+                            .offset(x: demoComplete ? 6.5 : -6.5)
+                    }
+            }
+        }
+        .padding(14)
+        .frame(width: 185)
+        .background(.white, in: .rect(cornerRadius: 14))
+    }
+
     private var phone: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 25)
@@ -151,21 +187,21 @@ struct OnboardingIllustration: View {
 
             if isPairing {
                 ZStack {
-                    Image(systemName: pairingComplete ? "checkmark.circle.fill" : "viewfinder")
+                    Image(systemName: demoComplete ? "checkmark.circle.fill" : "viewfinder")
                         .font(.system(size: 45, weight: .light))
-                        .foregroundStyle(pairingComplete ? .mint : .white)
+                        .foregroundStyle(demoComplete ? .mint : .white)
                         .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
 
                     Capsule()
                         .fill(.cyan)
                         .frame(width: 42, height: 2)
                         .shadow(color: .cyan.opacity(0.7), radius: 5)
-                        .phaseAnimator(animates && !pairingComplete ? [false, true] : [false]) { content, scans in
+                        .phaseAnimator(animates && !demoComplete ? [false, true] : [false]) { content, scans in
                             content.offset(y: scans ? 19 : -19)
                         } animation: { _ in
                             .easeInOut(duration: 0.65)
                         }
-                        .opacity(pairingComplete ? 0 : 1)
+                        .opacity(demoComplete ? 0 : 1)
                 }
                 .transition(.opacity)
             }
@@ -249,6 +285,13 @@ private struct OnboardingDesktopArtwork: View {
 
 #Preview("Pairing") {
     OnboardingIllustration(page: .pair)
+        .frame(width: 360, height: 300)
+        .preferredColorScheme(.dark)
+        .background(Color(red: 0.025, green: 0.10, blue: 0.21))
+}
+
+#Preview("Screen Sharing") {
+    OnboardingIllustration(page: .screenSharing)
         .frame(width: 360, height: 300)
         .preferredColorScheme(.dark)
         .background(Color(red: 0.025, green: 0.10, blue: 0.21))

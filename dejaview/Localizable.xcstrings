@@ -501,46 +501,6 @@
         }
       }
     },
-    "1-minute free sessions. 30-second breaks." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kostenlose Sitzungen: 1 Minute. Pausen: 30 Sekunden."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sesiones gratis de 1 minuto. Pausas de 30 segundos."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "無料セッションは1分間。休憩は30秒。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gratis sessies van 1 minuut. Pauzes van 30 seconden."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sessões grátis de 1 minuto. Pausas de 30 segundos."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "免费会话每次1分钟，间隔30秒。"
-          }
-        }
-      }
-    },
     "1080p · 30 FPS · ~5 Mbps" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8191,6 +8151,46 @@
         }
       }
     },
+    "Glassy Desk for Mac is an optional faster way to connect. Install it, then scan its code." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk für Mac ist eine optionale, schnellere Verbindungsmöglichkeit. Installiere die App und scanne dann ihren Code."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk para Mac es una forma opcional y más rápida de conectarte. Instálalo y escanea su código."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk for Macは、より高速に接続するためのオプションです。インストールしてコードをスキャンするだけ。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk voor Mac is een optionele, snellere manier om verbinding te maken. Installeer de app en scan de code."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Glassy Desk para Mac é opcional e oferece uma conexão mais rápida. Instale o app e escaneie o código."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk for Mac 是可选的更快连接方式。安装后，扫描其中的代码即可连接。"
+          }
+        }
+      }
+    },
     "Glassy Desk is built for Macs exposing macOS Screen Sharing or Remote Management through the classic VNC/RFB path. Multiple displays may appear as separate choices or as one combined desktop depending on what the Mac exposes." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11548,46 +11548,6 @@
         }
       }
     },
-    "Open Glassy Desk on your Mac, then scan its code to connect." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Öffne Glassy Desk auf deinem Mac und scanne seinen Code, um dich zu verbinden."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abre Glassy Desk en tu Mac y escanea su código para conectarte."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "MacでGlassy Deskを開いて、コードをスキャンするだけで接続できます。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open Glassy Desk op je Mac en scan de code om verbinding te maken."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abra o Glassy Desk no seu Mac e escaneie o código para se conectar."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Mac 上打开 Glassy Desk，扫描其中的代码即可连接。"
-          }
-        }
-      }
-    },
     "Open Glassy Desk to a selected section." : {
       "localizations" : {
         "de" : {
@@ -14825,6 +14785,46 @@
         }
       }
     },
+    "Screen Sharing" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildschirmfreigabe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartir pantalla"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面共有"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schermdeling"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartilhamento de Tela"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "屏幕共享"
+          }
+        }
+      }
+    },
     "Screen Sharing hosts appear here automatically." : {
       "localizations" : {
         "de" : {
@@ -14861,6 +14861,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "屏幕共享主机会自动出现在此处。"
+          }
+        }
+      }
+    },
+    "Screen Sharing.\nBuilt into your Mac." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildschirmfreigabe.\nSchon auf deinem Mac."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartir pantalla.\nYa viene en tu Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面共有。\nMacに標準搭載。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schermdeling.\nIngebouwd in je Mac."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartilhamento de Tela.\nJá vem no seu Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "屏幕共享。\nMac 自带。"
           }
         }
       }
@@ -18273,6 +18313,46 @@
         }
       }
     },
+    "Use standard VNC with your Mac’s built-in Screen Sharing. Turn it on in System Settings → General → Sharing." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nutze Standard-VNC mit der integrierten Bildschirmfreigabe deines Mac. Aktiviere sie unter Systemeinstellungen → Allgemein → Teilen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa VNC estándar con la función Compartir pantalla integrada en tu Mac. Actívala en Ajustes del Sistema → General → Compartir."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macに標準搭載の画面共有で標準VNCを使えます。システム設定 → 一般 → 共有でオンにしてください。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gebruik standaard-VNC met de ingebouwde schermdeling van je Mac. Schakel dit in via Systeeminstellingen → Algemeen → Delen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use VNC padrão com o Compartilhamento de Tela integrado ao Mac. Ative-o em Ajustes do Sistema → Geral → Compartilhamento."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通过 Mac 内置的屏幕共享使用标准 VNC。在系统设置 → 通用 → 共享中开启即可。"
+          }
+        }
+      }
+    },
     "Use the Mac's hostname or IP address and normally port 5900 for VNC." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19498,46 +19578,6 @@
         }
       }
     },
-    "Your Mac.\nRight here." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dein Mac.\nDirekt hier."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu Mac.\nAquí mismo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "あなたのMacを、\nすぐそばに。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Je Mac.\nGewoon hier."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seu Mac.\nBem aqui."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的 Mac。\n就在手边。"
-          }
-        }
-      }
-    },
     "Your analytics are private. No identifiable information is ever sent." : {
       "localizations" : {
         "de" : {
@@ -19857,6 +19897,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "缩小"
+          }
+        }
+      }
+    },
+    "a beautiful way to feel right at your Mac." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "so schön, als säßest du direkt an deinem Mac."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "una forma preciosa de sentirte frente a tu Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まるでMacの前にいるような、美しい体験。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "een prachtige manier om je dicht bij je Mac te voelen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "um jeito bonito de se sentir bem na frente do seu Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一种让你仿佛坐在 Mac 前的美好体验。"
           }
         }
       }
