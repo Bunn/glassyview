@@ -126,6 +126,7 @@ struct ContentView<Session: RemoteSessionControlling,
         .sheet(item: $addMachineRequest, onDismiss: finishAddingMachine) { request in
             AddMachineView(
                 store: store,
+                browser: browser,
                 machine: request.machine,
                 initialCandidate: request.candidate,
                 startsWithScreenSharing: request.startsWithScreenSharing,

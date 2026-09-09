@@ -1,23 +1,29 @@
 import SwiftUI
 
 /// The standard VNC path has one form and one completion action.
-struct ScreenSharingSetupView<Store: MachineStoring>: View {
+struct ScreenSharingSetupView<Store: MachineStoring, Browser: BonjourBrowsing>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let store: Store
+    let browser: Browser
     let machine: SavedMachine
     let connect: (SavedMachine, String) -> Void
     @State private var host: String
     @State private var name: String
+    @State private var suggestedName: String
     @State private var username = ""
     @State private var password = ""
     @State private var portText: String
 
-    init(store: Store, machine: SavedMachine,
+    init(store: Store, browser: Browser, machine: SavedMachine,
          connect: @escaping (SavedMachine, String) -> Void) {
         self.store = store
+        self.browser = browser
         self.machine = machine
         self.connect = connect
         _host = State(initialValue: machine.host)
         _name = State(initialValue: machine.name)
+        _suggestedName = State(initialValue: machine.name)
         _portText = State(initialValue: String(machine.connectionMode == .vnc ? machine.port : 5_900))
     }
 
@@ -42,11 +48,18 @@ struct ScreenSharingSetupView<Store: MachineStoring>: View {
             }
 
             Section("Mac Address") {
-                TextField("Host name or IP address", text: $host)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.URL)
-                    .accessibilityIdentifier("connection.vnc.address")
+                HStack(spacing: 12) {
+                    TextField("Host or IP address", text: $host)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                        .accessibilityIdentifier("connection.vnc.address")
+
+                    if !nearbyServices.isEmpty {
+                        nearbyMacMenu
+                    }
+                }
+                .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: nearbyServices.isEmpty)
             }
 
             Section {
@@ -102,6 +115,55 @@ struct ScreenSharingSetupView<Store: MachineStoring>: View {
         }
         .navigationTitle("Standard VNC")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var nearbyServices: [DiscoveredService] {
+        browser.services.filter(\.isResolved)
+    }
+
+    private var nearbyMacMenu: some View {
+        Menu {
+            Section("Nearby Macs") {
+                ForEach(nearbyServices) { service in
+                    Button {
+                        selectNearbyMac(service)
+                    } label: {
+                        Label(service.name, systemImage: host == service.host && port == service.port
+                              ? "checkmark" : "desktopcomputer")
+                    }
+                    .accessibilityIdentifier("connection.vnc.bonjour.\(service.id)")
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "desktopcomputer")
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Text("Nearby")
+                }
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+            }
+            .font(.subheadline.weight(.medium))
+            .padding(.horizontal, 10)
+            .frame(minHeight: 44)
+            .background(Color.accentColor.opacity(0.1), in: .rect(cornerRadius: 12))
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.borderless)
+        .fixedSize()
+        .accessibilityLabel("Choose a nearby Mac")
+        .accessibilityHint("Fills the Mac address and port.")
+        .accessibilityIdentifier("connection.vnc.bonjour-menu")
+    }
+
+    private func selectNearbyMac(_ service: DiscoveredService) {
+        guard let serviceHost = service.host, let servicePort = service.port else { return }
+        host = serviceHost
+        portText = String(servicePort)
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name == suggestedName {
+            name = service.name
+        }
+        suggestedName = service.name
     }
 
     private var port: UInt16? {

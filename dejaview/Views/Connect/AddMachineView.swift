@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One entry point for a new Mac. Connection details appear only after choosing a path.
 @MainActor
-struct AddMachineView<Store: MachineStoring>: View {
+struct AddMachineView<Store: MachineStoring, Browser: BonjourBrowsing>: View {
     private enum Route: Hashable {
         case glassyStream, manualOptions, scanner, manual, nearby(NearbySelection), screenSharing
     }
@@ -18,6 +18,7 @@ struct AddMachineView<Store: MachineStoring>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(GlassyHostBrowser.self) private var hostBrowser
     let store: Store
+    let browser: Browser
     let machine: SavedMachine
     let initialCandidate: GlassyStreamEndpointCandidate?
     let startsWithScreenSharing: Bool
@@ -142,7 +143,7 @@ struct AddMachineView<Store: MachineStoring>: View {
     }
 
     private func screenSharing(showsCloseButton: Bool = false) -> some View {
-        ScreenSharingSetupView(store: store, machine: machine) { prepared, password in
+        ScreenSharingSetupView(store: store, browser: browser, machine: machine) { prepared, password in
             connectScreenSharing(prepared, password)
             dismiss()
         }

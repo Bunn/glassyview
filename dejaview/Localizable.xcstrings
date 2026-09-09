@@ -2454,6 +2454,46 @@
         }
       }
     },
+    "Choose a nearby Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einen Mac in der Nähe auswählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir un Mac cercano"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くのMacを選択"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kies een Mac in de buurt"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher um Mac próximo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择附近的 Mac"
+          }
+        }
+      }
+    },
     "Choose a saved Tailscale 100.64–100.127 address, Tailscale IPv6 address, or full .ts.net name. Use the one-time code for Nearby or other routes." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6935,6 +6975,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通过加密连接实现更快速、流畅的控制。需要 Mac 版 Glassy Desk，然后通过二维码或手动配对。"
+          }
+        }
+      }
+    },
+    "Fills the Mac address and port." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füllt die Adresse und den Port des Mac aus."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rellena la dirección y el puerto del Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macのアドレスとポートを入力します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vult het adres en de poort van de Mac in."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preenche o endereço e a porta do Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填入 Mac 的地址和端口。"
           }
         }
       }
