@@ -19,6 +19,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @State private var sessionPaywallSource: PaywallSource = .sessionLimit
     @State private var isFreeSessionTimerInfoPresented = false
     @State private var freeSession = FreeSessionLifecycle()
+    @State private var cooldownTracking = FreeSessionCooldownTracking()
     @State private var opensPaywallAfterFreeSessionInfoDismissal = false
     @State private var shouldRetryAfterDisconnect = false
     @State private var heldModifierKeys: Set<RemoteModifierKey> = []
@@ -65,9 +66,17 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                 FreeSessionCooldownView(cooldown: cooldown,
                                         sessionTitle: sessionTitle,
                                         restart: restartFreeSession,
-                                        purchase: { presentSessionPaywall(source: .sessionLimit) },
+                                        purchase: purchaseFromFreeSessionCooldown,
                                         close: closeSession)
                     .transition(.opacity)
+                    .onChange(of: cooldown.endDate, initial: true) { _, _ in
+                        cooldownTracking.recordView(
+                            of: cooldown,
+                            sessionType: analyticsSessionType,
+                            analytics: analytics,
+                            milestones: funnelMilestones
+                        )
+                    }
             } else {
                 content
                     .transition(.opacity)
@@ -610,6 +619,17 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         AppLog.subscriptions.info("Free session timer purchase button tapped")
         funnelMilestones.record(.freeTimerUpgradeTapped)
         presentSessionPaywall(source: .freeSessionTimer)
+    }
+
+    private func purchaseFromFreeSessionCooldown() {
+        guard freeSession.cooldown != nil, !subscriptionStore.hasProAccess,
+              !isSessionPaywallPresented else { return }
+        cooldownTracking.recordUpgradeTap(
+            sessionType: analyticsSessionType,
+            analytics: analytics,
+            milestones: funnelMilestones
+        )
+        presentSessionPaywall(source: .freeSessionCooldown)
     }
 
     private func handleFreeSessionTimerInfoDismissed() {

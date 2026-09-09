@@ -17,6 +17,8 @@ enum AnalyticsEventName: String, Codable, Sendable {
     case freeSessionRestartedAfterLimit = "free_session_restarted_after_limit"
     case freeSessionTimerOpened = "free_session_timer_opened"
     case freeSessionLimitReached = "free_session_limit_reached"
+    case freeSessionCooldownViewed = "free_session_cooldown_viewed"
+    case freeSessionCooldownUpgradeTapped = "free_session_cooldown_upgrade_tapped"
     case paywallPresented = "paywall_presented"
     case paywallDismissed = "paywall_dismissed"
     case purchaseStarted = "purchase_started"
@@ -33,6 +35,7 @@ enum AnalyticsEventSource: String, Codable, Sendable {
     case onboarding
     case settings
     case freeSessionTimer = "free_session_timer"
+    case freeSessionCooldown = "free_session_cooldown"
     case sessionLimit = "session_limit"
     case unknown
 }
@@ -87,6 +90,7 @@ enum AnalyticsDeviceClass: String, Codable, Sendable {
 enum PaywallSource: String, CaseIterable, Sendable {
     case settings
     case freeSessionTimer = "free_session_timer"
+    case freeSessionCooldown = "free_session_cooldown"
     case sessionLimit = "session_limit"
 
     var analyticsSource: AnalyticsEventSource {
@@ -95,6 +99,8 @@ enum PaywallSource: String, CaseIterable, Sendable {
             .settings
         case .freeSessionTimer:
             .freeSessionTimer
+        case .freeSessionCooldown:
+            .freeSessionCooldown
         case .sessionLimit:
             .sessionLimit
         }

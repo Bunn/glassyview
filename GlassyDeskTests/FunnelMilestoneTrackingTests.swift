@@ -63,6 +63,32 @@ struct FunnelMilestoneTrackingTests {
         }) == 1)
     }
 
+    @Test("Cooldown conversion milestones are written once and removed on opt-out")
+    func cooldownMilestones() {
+        let revenueCat = RevenueCatAttributeWriterSpy()
+        let tracker = makeTracker(revenueCat: revenueCat)
+        tracker.setCollectionEnabled(true)
+        let milestones: [FunnelMilestone] = [
+            .freeSessionCooldownViewed, .freeSessionCooldownUpgradeTapped, .paywallCooldownPresented,
+        ]
+        for milestone in milestones {
+            tracker.record(milestone)
+            tracker.record(milestone)
+        }
+        #expect(revenueCat.writes == [
+            ["gv_ms_cooldown_viewed": "1"],
+            ["gv_ms_cooldown_upgrade_tapped": "1"],
+            ["gv_ms_paywall_cooldown": "1"],
+        ])
+        tracker.setCollectionEnabled(false)
+        for milestone in milestones {
+            #expect(revenueCat.writes.last?[milestone.revenueCatAttributeKey] == "")
+        }
+        let writeCount = revenueCat.writes.count
+        milestones.forEach(tracker.record)
+        #expect(revenueCat.writes.count == writeCount)
+    }
+
     @Test("A session after the limit is classified as a refresh")
     func detectsRefreshAfterLimit() {
         let revenueCat = RevenueCatAttributeWriterSpy()

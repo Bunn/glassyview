@@ -177,6 +177,23 @@ struct AnalyticsTests {
         #expect(fields["sessionType"] == nil)
     }
 
+    @Test("Cooldown payloads expose only the fixed source and connection type",
+          arguments: [AnalyticsEventName.freeSessionCooldownViewed, .freeSessionCooldownUpgradeTapped])
+    func cooldownPayload(eventName: AnalyticsEventName) throws {
+        let event = AnalyticsEvent(name: eventName,
+                                   context: AnalyticsEventContext(source: .freeSessionCooldown, sessionType: .vnc),
+                                   metadata: metadata)
+        let request = try AnalyticsRequestBuilder().makeRequest(events: [event], token: "temporary-rate-limit-token")
+        let body = try #require(request.httpBody)
+        let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let events = try #require(json["events"] as? [[String: Any]])
+        let context = try #require(events.first?["context"] as? [String: Any])
+        #expect(Set(context.keys) == ["source", "sessionType"])
+        #expect(context["source"] as? String == "free_session_cooldown")
+        #expect(context["sessionType"] as? String == "vnc")
+        #expect(try JSONDecoder().decode(AnalyticsBatch.self, from: body).events == [event])
+    }
+
     @Test("Rate-limit token stays in the header")
     func rateLimitTokenIsHeaderOnly() throws {
         let token = "temporary-rate-limit-token"

@@ -10,9 +10,12 @@ nonisolated enum FunnelMilestone: CaseIterable, Equatable, Sendable {
     case freeSessionRestartedAfterLimit
     case freeSessionLimitReached
     case freeTimerUpgradeTapped
+    case freeSessionCooldownViewed
+    case freeSessionCooldownUpgradeTapped
     case paywallSettingsPresented
     case paywallFreeTimerPresented
     case paywallSessionLimitPresented
+    case paywallCooldownPresented
     case purchaseStarted
     case purchaseCompleted
     case purchaseCancelled
@@ -34,12 +37,18 @@ nonisolated enum FunnelMilestone: CaseIterable, Equatable, Sendable {
             "gv_ms_free_limit_reached"
         case .freeTimerUpgradeTapped:
             "gv_ms_free_timer_upgrade_tapped"
+        case .freeSessionCooldownViewed:
+            "gv_ms_cooldown_viewed"
+        case .freeSessionCooldownUpgradeTapped:
+            "gv_ms_cooldown_upgrade_tapped"
         case .paywallSettingsPresented:
             "gv_ms_paywall_settings"
         case .paywallFreeTimerPresented:
             "gv_ms_paywall_free_timer"
         case .paywallSessionLimitPresented:
             "gv_ms_paywall_session_limit"
+        case .paywallCooldownPresented:
+            "gv_ms_paywall_cooldown"
         case .purchaseStarted:
             "gv_ms_purchase_started"
         case .purchaseCompleted:
@@ -59,6 +68,8 @@ extension PaywallSource {
             .paywallSettingsPresented
         case .freeSessionTimer:
             .paywallFreeTimerPresented
+        case .freeSessionCooldown:
+            .paywallCooldownPresented
         case .sessionLimit:
             .paywallSessionLimitPresented
         }
