@@ -19,7 +19,7 @@ final class HostController {
     }
 
     private(set) var runState: HostRunState = .stopped
-    let permissions = HostPermissionController()
+    let permissions: HostPermissionController
 
     var screenRecordingAuthorization: ScreenRecordingAuthorization {
         permissions.screenRecordingAuthorization
@@ -166,6 +166,9 @@ final class HostController {
     private static let pipelineRetryStabilityInterval: Duration = .seconds(10)
 
     init() {
+        permissions = HostPermissionController(onSnapshotChange: { [remoteInputService] snapshot in
+            remoteInputService.setAccessibilityGranted(snapshot?.accessibility == true)
+        })
         allowsConnections = hostServer.allowsConnections
         pairedDevices = hostServer.pairedDevices
         // The menu-bar host outlives its dashboard. A Settings visit must also
@@ -567,7 +570,7 @@ final class HostController {
             activeCaptureConfiguration = streamConfiguration
             handleAdaptiveBitRateChange(adaptiveBitRateBudget)
             publishRuntimeStreamStatus(.streaming)
-            remoteInputService.setEnabled(allowsConnections && isServerReady && accessibilityAuthorization == .granted)
+            updateRemoteInputAvailability()
             if isServerReady {
                 runState = .ready
             }
@@ -661,6 +664,8 @@ final class HostController {
                 updateDisplays(availableDisplays)
                 lastError = nil
             }
+            updateRemoteInputAvailability()
+            publishRuntimeStreamStatus()
         }
     }
 
@@ -742,7 +747,7 @@ final class HostController {
             selectedDisplayID = nil
         }
 
-        remoteInputService.setEnabled(isStreaming && allowsConnections && isServerReady && permissions.canCaptureScreen && accessibilityAuthorization == .granted)
+        updateRemoteInputAvailability()
         publishRuntimeStreamStatus()
         if let pane = permissionFlowController?.currentPane,
            (pane == .screenRecording && screenRecordingAuthorization == .granted)
@@ -750,6 +755,10 @@ final class HostController {
             permissionFlowController?.closePanel()
             permissionFlowController = nil
         }
+    }
+
+    private func updateRemoteInputAvailability() {
+        remoteInputService.setEnabled(isStreaming && allowsConnections && isServerReady && permissions.canCaptureScreen && accessibilityAuthorization == .granted)
     }
 
     private func guidePermission(_ pane: PermissionFlowPane) async {

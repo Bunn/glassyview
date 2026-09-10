@@ -1,4 +1,3 @@
-import ApplicationServices
 import CoreGraphics
 import Foundation
 
@@ -8,11 +7,11 @@ import Foundation
 final class RemoteInputService: @unchecked Sendable {
     private let queue: DispatchQueue
     private let clipboardPaste: HostClipboardPasteService
-    private let accessibilityCheck: @Sendable () -> Bool
-    private let postKeyboardEvent: @Sendable (CGEvent) -> Void
+    private let postEvent: @Sendable (CGEvent) -> Void
 
     private var selectedDisplayID: CGDirectDisplayID?
     private var isEnabled = false
+    private var isAccessibilityGranted = false
     private var pressedButtons: HostProtocol.PointerButtonMask = []
     private var pressedModifierKeysyms: Set<UInt32> = []
     private var pressedOrdinaryKeys: [CGKeyCode: CGEventFlags] = [:]
@@ -24,24 +23,25 @@ final class RemoteInputService: @unchecked Sendable {
         qos: .userInteractive
     ),
          clipboardPaste: HostClipboardPasteService = HostClipboardPasteService(),
-         accessibilityCheck: @escaping @Sendable () -> Bool = { AXIsProcessTrusted() },
-         postKeyboardEvent: @escaping @Sendable (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }) {
+         postEvent: @escaping @Sendable (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }) {
         queue = inputQueue
         self.clipboardPaste = clipboardPaste
-        self.accessibilityCheck = accessibilityCheck
-        self.postKeyboardEvent = postKeyboardEvent
+        self.postEvent = postEvent
     }
 
-    static var isAccessibilityGranted: Bool {
-        AXIsProcessTrusted()
-    }
-
-    @discardableResult
-    static func requestAccessibilityAccess() -> Bool {
-        let options = [
-            "AXTrustedCheckOptionPrompt": true
-        ] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
+    /// Use the same fresh-process result as setup. An in-process AX trust
+    /// check can retain a denial after Settings grants access and silently
+    /// discard every event until relaunch. macOS still authorizes event posting.
+    func setAccessibilityGranted(_ granted: Bool) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            if !granted {
+                // Balance held input while the previous grant may still work
+                // (for example, when a status probe failed), then fail closed.
+                releasePressedInputLocked()
+            }
+            isAccessibilityGranted = granted
+        }
     }
 
     func setDisplayID(_ displayID: CGDirectDisplayID?) {
@@ -66,7 +66,7 @@ final class RemoteInputService: @unchecked Sendable {
 
     func handle(_ event: HostProtocol.RemoteInputEvent) {
         queue.async { [weak self] in
-            guard let self, self.isEnabled, self.accessibilityCheck() else { return }
+            guard let self, self.isEnabled, self.isAccessibilityGranted else { return }
             switch event {
             case .pointer(let input):
                 handlePointer(input)
@@ -181,7 +181,7 @@ final class RemoteInputService: @unchecked Sendable {
             wheel2: horizontal,
             wheel3: 0
         ) else { return }
-        event.post(tap: .cghidEventTap)
+        postEvent(event)
     }
 
     private func handleKey(_ input: HostProtocol.KeyInput) {
@@ -257,14 +257,14 @@ final class RemoteInputService: @unchecked Sendable {
                     unicodeString: baseAddress
                 )
             }
-            postKeyboardEvent(keyDown)
-            postKeyboardEvent(keyUp)
+            postEvent(keyDown)
+            postEvent(keyUp)
         }
     }
 
     private func releasePressedInputLocked() {
         defer { mouseEventBuilder = RemoteMouseEventBuilder() }
-        guard accessibilityCheck() else {
+        guard isAccessibilityGranted else {
             pressedButtons = []
             pressedModifierKeysyms.removeAll()
             pressedOrdinaryKeys.removeAll()
@@ -322,7 +322,7 @@ final class RemoteInputService: @unchecked Sendable {
         guard let event = mouseEventBuilder.makeEvent(type: type,
                                                      location: location,
                                                      button: button) else { return }
-        event.post(tap: .cghidEventTap)
+        postEvent(event)
     }
 
     private func postKeyboard(keyCode: CGKeyCode,
@@ -340,7 +340,7 @@ final class RemoteInputService: @unchecked Sendable {
             let units = Array(text.utf16)
             event.keyboardSetUnicodeString(stringLength: units.count, unicodeString: units)
         }
-        postKeyboardEvent(event)
+        postEvent(event)
     }
 }
 

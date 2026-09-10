@@ -122,8 +122,8 @@ func remoteInputOrdinaryKeyReleaseIsIdempotent() {
 @Test("Disabling input releases the key before its chord modifier exactly once")
 func remoteInputDisableReleasesChord() {
     let recorder = KeyboardEventRecorder()
-    let service = RemoteInputService(accessibilityCheck: { true },
-                                     postKeyboardEvent: { recorder.append($0) })
+    let service = RemoteInputService(postEvent: { recorder.append($0) })
+    service.setAccessibilityGranted(true)
     service.setEnabled(true)
     service.handle(.key(.init(keysym: 0xFFE1, isDown: true)))
     service.handle(.key(.init(keysym: 0xFF51, isDown: true)))
@@ -138,8 +138,8 @@ func remoteInputDisableReleasesChord() {
 
 private func keyboardEvents(for inputs: [HostProtocol.RemoteInputEvent]) -> [CGEvent] {
     let recorder = KeyboardEventRecorder()
-    let service = RemoteInputService(accessibilityCheck: { true },
-                                     postKeyboardEvent: { recorder.append($0) })
+    let service = RemoteInputService(postEvent: { recorder.append($0) })
+    service.setAccessibilityGranted(true)
     service.setEnabled(true)
     for input in inputs {
         service.handle(input)

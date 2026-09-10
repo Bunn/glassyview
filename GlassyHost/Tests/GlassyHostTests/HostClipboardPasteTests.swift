@@ -74,10 +74,11 @@ func clipboardPasteRequiresRemoteControl() {
         writeText: { text in recorder.append(.write(text)); return true },
         postKey: { _, _, _ in }
     )
-    let disabled = RemoteInputService(clipboardPaste: paste, accessibilityCheck: { true })
+    let disabled = RemoteInputService(clipboardPaste: paste)
+    disabled.setAccessibilityGranted(true)
     disabled.handle(.clipboardPaste("disabled"))
     disabled.releasePressedInput()
-    let untrusted = RemoteInputService(clipboardPaste: paste, accessibilityCheck: { false })
+    let untrusted = RemoteInputService(clipboardPaste: paste)
     untrusted.setEnabled(true)
     untrusted.handle(.clipboardPaste("untrusted"))
     untrusted.releasePressedInput()

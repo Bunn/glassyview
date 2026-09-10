@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import GlassyHost
@@ -21,7 +22,7 @@ private final class PermissionFixture {
         defaults.removePersistentDomain(forName: suiteName)
     }
 
-    func controller() -> HostPermissionController {
+    func controller(onSnapshotChange: @escaping @MainActor (HostPermissionSnapshot?) -> Void = { _ in }) -> HostPermissionController {
         HostPermissionController(defaults: defaults, readStatus: {
             if self.statusError { throw TestError.unavailable }
             return self.status
@@ -29,7 +30,7 @@ private final class PermissionFixture {
             self.captureRequests += 1
             if self.captureError { throw TestError.unavailable }
             return Self.displays
-        })
+        }, onSnapshotChange: onSnapshotChange)
     }
 
     enum TestError: Error { case unavailable }
@@ -228,4 +229,108 @@ func overlappingPermissionRefreshesReadLatestStatus() async {
     #expect(reads == 2)
     #expect(controller.screenRecordingAuthorization == .granted)
     #expect(controller.accessibilityAuthorization == .granted)
+}
+
+@Test("Fresh Accessibility grants reach input without relaunch, including direct-access confirmation",
+      arguments: [false, true])
+@MainActor
+func remoteInputFreshAccessibilityGrant(confirmDirectAccess: Bool) async {
+    let fixture = PermissionFixture()
+    defer { fixture.cleanUp() }
+    let recorder = PermissionInputRecorder()
+    // There is deliberately no in-process trust override here: production input
+    // must consume the fresh probe result, even if AX has cached an old denial.
+    let service = RemoteInputService(
+        clipboardPaste: .init(writeText: { recorder.write($0); return true }, postKey: { _, _, _ in }),
+        postEvent: { recorder.append($0) }
+    )
+    let controller = fixture.controller { service.setAccessibilityGranted($0?.accessibility == true) }
+    service.setEnabled(true)
+    service.handle(.pointer(.init(normalizedX: 32768, normalizedY: 32768, buttonMask: [])))
+    service.releasePressedInput()
+    #expect(recorder.eventTypes.isEmpty)
+
+    // Match first-install setup: Screen Recording is ready before Accessibility.
+    fixture.status = .init(screenRecording: true, accessibility: false)
+    await controller.refresh()
+    service.handle(.pointer(.init(normalizedX: 32768, normalizedY: 32768, buttonMask: [])))
+    service.releasePressedInput()
+    #expect(recorder.eventTypes.isEmpty)
+
+    fixture.status = .init(screenRecording: true, accessibility: true)
+    if confirmDirectAccess {
+        #expect(await controller.confirmDirectScreenAccess() == PermissionFixture.displays)
+    } else {
+        await controller.refresh()
+    }
+    #expect(controller.accessibilityAuthorization == .granted)
+    service.handle(.pointer(.init(normalizedX: 32768, normalizedY: 32768, buttonMask: [])))
+    service.handle(.scroll(.init(direction: .down, steps: 1)))
+    service.handle(.key(.init(keysym: 0xFF51, isDown: true)))
+    service.handle(.key(.init(keysym: 0xFF51, isDown: false)))
+    service.handle(.text(.init(modifierMask: [], text: "a")))
+    service.handle(.clipboardPaste("allowed after grant"))
+    service.releasePressedInput()
+    #expect(recorder.eventTypes == [.mouseMoved, .scrollWheel, .keyDown, .keyUp, .keyDown, .keyUp])
+    #expect(recorder.clipboardWrites == ["allowed after grant"])
+}
+
+@Test("Revoked or unknown Accessibility releases held input, blocks events, and recovers without relaunch",
+      arguments: [false, true])
+@MainActor
+func remoteInputAccessibilityRevocation(statusCheckFails: Bool) async {
+    let fixture = PermissionFixture()
+    defer { fixture.cleanUp() }
+    let recorder = PermissionInputRecorder()
+    let inputQueue = DispatchQueue(label: "GlassyHostTests.permission-input")
+    let service = RemoteInputService(
+        inputQueue: inputQueue,
+        clipboardPaste: .init(writeText: { recorder.write($0); return true }, postKey: { _, _, _ in }),
+        postEvent: { recorder.append($0) }
+    )
+    let controller = fixture.controller { service.setAccessibilityGranted($0?.accessibility == true) }
+    fixture.status = .init(screenRecording: true, accessibility: true)
+    await controller.refresh()
+    service.setEnabled(true)
+    service.handle(.pointer(.init(normalizedX: 100, normalizedY: 100, buttonMask: .left)))
+    service.handle(.key(.init(keysym: 0xFFE1, isDown: true)))
+    service.handle(.key(.init(keysym: 0x61, isDown: true)))
+    inputQueue.sync {}
+    #expect(recorder.eventTypes == [.leftMouseDown, .flagsChanged, .keyDown])
+
+    fixture.statusError = statusCheckFails
+    fixture.status = .init(screenRecording: true, accessibility: false)
+    await controller.refresh()
+    #expect(controller.accessibilityAuthorization == (statusCheckFails ? .unknown : .denied))
+    service.handle(.pointer(.init(normalizedX: 200, normalizedY: 200, buttonMask: [])))
+    service.handle(.scroll(.init(direction: .down, steps: 1)))
+    service.handle(.key(.init(keysym: 0xFF51, isDown: true)))
+    service.handle(.text(.init(modifierMask: [], text: "blocked")))
+    service.handle(.clipboardPaste("blocked"))
+    service.releasePressedInput()
+    // Cleanup attempts balancing releases before closing the gate. macOS may
+    // discard those releases if the user has already revoked system access.
+    let released: [CGEventType] = [.leftMouseDown, .flagsChanged, .keyDown,
+                                  .leftMouseUp, .keyUp, .flagsChanged]
+    #expect(recorder.eventTypes == released)
+    #expect(recorder.clipboardWrites.isEmpty)
+
+    fixture.statusError = false
+    fixture.status = .init(screenRecording: true, accessibility: true)
+    await controller.refresh()
+    service.handle(.pointer(.init(normalizedX: 300, normalizedY: 300, buttonMask: [])))
+    service.releasePressedInput()
+    #expect(recorder.eventTypes == released + [.mouseMoved])
+}
+
+private final class PermissionInputRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var types: [CGEventType] = []
+    private var writes: [String] = []
+
+    var eventTypes: [CGEventType] { lock.withLock { types } }
+    var clipboardWrites: [String] { lock.withLock { writes } }
+
+    func append(_ event: CGEvent) { lock.withLock { types.append(event.type) } }
+    func write(_ text: String) { lock.withLock { writes.append(text) } }
 }

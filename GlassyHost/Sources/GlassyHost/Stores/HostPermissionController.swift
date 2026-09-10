@@ -12,6 +12,7 @@ final class HostPermissionController {
 
     @ObservationIgnored private let readStatus: @MainActor () async throws -> HostPermissionSnapshot
     @ObservationIgnored private let requestDirectAccess: @MainActor () async throws -> [CaptureDisplay]
+    @ObservationIgnored private let onSnapshotChange: @MainActor (HostPermissionSnapshot?) -> Void
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var refreshTask: Task<Bool, Never>?
     @ObservationIgnored private var needsAnotherRefresh = false
@@ -26,11 +27,13 @@ final class HostPermissionController {
         },
         requestDirectAccess: @escaping @MainActor () async throws -> [CaptureDisplay] = {
             try await ScreenCaptureService.confirmDirectScreenAccess()
-        }
+        },
+        onSnapshotChange: @escaping @MainActor (HostPermissionSnapshot?) -> Void = { _ in }
     ) {
         self.defaults = defaults
         self.readStatus = readStatus
         self.requestDirectAccess = requestDirectAccess
+        self.onSnapshotChange = onSnapshotChange
         hasConfirmedDirectScreenAccess = defaults.bool(forKey: Self.confirmationKey)
     }
 
@@ -70,12 +73,14 @@ final class HostPermissionController {
                 do {
                     let fresh = try await readStatus()
                     snapshot = fresh
+                    onSnapshotChange(fresh)
                     if !fresh.screenRecording {
                         invalidateDirectScreenAccess()
                     }
                     if !isConfirmingScreenAccess { errorMessage = nil }
                 } catch {
                     snapshot = nil
+                    onSnapshotChange(nil)
                     errorMessage = "Couldn’t check permissions. Choose Check Again to retry."
                 }
             } while needsAnotherRefresh
