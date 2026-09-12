@@ -30,6 +30,7 @@ final class HostController {
     }
     private(set) var displays: [CaptureDisplay] = []
     private(set) var isStreaming = false
+    private var isCaptureDisplayAvailable = true
     private(set) var clientCount = 0
     private(set) var pairingCode = "Starting…"
     private(set) var pairingCodeRemainingSeconds = 0
@@ -62,12 +63,16 @@ final class HostController {
     private let hostServer = HostServer()
     private let loginItemService = LoginItemService()
     private let remoteInputService = RemoteInputService()
+    private let remoteSessionPower = HostRemoteSessionPowerService()
 
     @ObservationIgnored
     private var permissionFlowController: PermissionFlowController?
 
     @ObservationIgnored
     private var authorizationActivationObserver: AnyCancellable?
+
+    @ObservationIgnored
+    private var workspaceWakeObserver: AnyCancellable?
 
     @ObservationIgnored
     private let pairingAddressService = HostPairingAddressService()
@@ -181,6 +186,17 @@ final class HostController {
             .sink { [weak self] _ in
                 Task { await self?.refreshAuthorizationStatuses() }
             }
+
+        // Workspace notifications use their own center, not NotificationCenter.default.
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspaceWakeObserver = workspace.publisher(for: NSWorkspace.didWakeNotification)
+            .map { _ in true }
+            .merge(with: workspace.publisher(for: NSWorkspace.screensDidWakeNotification).map { _ in false })
+            .merge(with: workspace.publisher(for: NSWorkspace.sessionDidBecomeActiveNotification).map { _ in false })
+            .receive(on: RunLoop.main)
+            .sink { [weak self] systemWoke in
+                Task { await self?.recoverAfterWake(restartListener: systemWoke) }
+            }
     }
 
     var isTransitioning: Bool {
@@ -224,6 +240,9 @@ final class HostController {
             return streamingDemand.wantsCapture ? "Starting capture…" : "Stopping capture…"
         }
         if isStreaming {
+            if !isCaptureDisplayAvailable {
+                return "Waiting for the Mac display to become available"
+            }
             if streamingOwnership == .manual {
                 return "Streaming continuously until you stop it"
             }
@@ -377,6 +396,7 @@ final class HostController {
         let previousServerReady = isServerReady
         let previousServerPort = serverPort
         self.allowsConnections = allowsConnections
+        remoteSessionPower.update(authenticatedClientCount: clientCount, allowsConnections: allowsConnections)
         defer { isUpdatingConnectionAccess = false }
 
         if !allowsConnections {
@@ -406,13 +426,14 @@ final class HostController {
             lastError = nil
         } catch {
             self.allowsConnections = previousValue
+            remoteSessionPower.update(authenticatedClientCount: clientCount, allowsConnections: previousValue)
             lastError = "Could not save connection access: \(error.localizedDescription)"
             if previousValue {
                 // A failed atomic write leaves the server running with its
                 // original permissions. Restore the local presentation/gate.
                 isServerReady = previousServerReady
                 serverPort = previousServerPort
-                remoteInputService.setEnabled(previousServerReady && isStreaming && permissions.canCaptureScreen && accessibilityAuthorization == .granted)
+                updateRemoteInputAvailability()
             }
         }
         refreshPairingCode()
@@ -435,15 +456,24 @@ final class HostController {
         quality: HostProtocol.StreamQuality
     ) async -> HostCapturePipelineStartResult {
         guard !isStreaming else { return .started }
-        guard allowsConnections, isServerReady else {
-            lastError = "The authenticated local streaming service is not ready yet."
+        guard allowsConnections else {
             return .terminalFailure
+        }
+        guard isServerReady else {
+            lastError = "The authenticated local streaming service is not ready yet."
+            return .retryableFailure
         }
 
         let streamConfiguration = HostStreamQualityConfiguration(quality: quality, availableBitRate: adaptiveBitRateBudget, maximumCaptureWidth: adaptiveMaximumWidth)
 
         let requestedOwnership = streamingDemand.ownership
         await refreshAuthorizationStatuses()
+        guard screenRecordingAuthorization != .unknown else {
+            // The permission probe can be interrupted while macOS wakes.
+            // Keep demand, fail closed, and retry instead of discarding setup.
+            publishRuntimeStreamStatus(.captureFailed)
+            return .retryableFailure
+        }
         if screenRecordingAuthorization != .granted {
             // A remote connection must never cause a macOS consent prompt.
             // Permission requests remain tied to an explicit local user action.
@@ -484,6 +514,7 @@ final class HostController {
             return .superseded
         }
 
+        isCaptureDisplayAvailable = true
         let pipelineGeneration = pipelineGenerations.begin()
         let server = hostServer
         let encoder = H264Encoder(
@@ -587,8 +618,7 @@ final class HostController {
             }
             await encoder.finish()
             await hostServer.clearVideoState()
-            if let streamError = error as? SCStreamError, streamError.code == .userDeclined {
-                permissions.invalidateDirectScreenAccess()
+            if permissions.handleCaptureFailure(error) {
                 await refreshAuthorizationStatuses()
                 lastError = "Screen access was declined. Confirm Direct Screen Access in Permissions on this Mac, then reconnect."
                 publishRuntimeStreamStatus(.screenPermissionRequired)
@@ -630,6 +660,7 @@ final class HostController {
         await encoderToStop?.finish()
         await hostServer.clearVideoState()
         isStreaming = false
+        isCaptureDisplayAvailable = true
         activeStreamQuality = nil
         activeCaptureConfiguration = nil
         publishRuntimeStreamStatus()
@@ -670,7 +701,23 @@ final class HostController {
     }
 
     private func publishRuntimeStreamStatus(_ state: HostProtocol.StreamState? = nil) {
-        let current = state ?? (!permissions.canCaptureScreen ? .screenPermissionRequired : (isStreaming ? .streaming : .stopped))
+        var current: HostProtocol.StreamState
+        if let state {
+            current = state
+        } else if screenRecordingAuthorization == .unknown {
+            current = .captureFailed
+        } else if !permissions.canCaptureScreen {
+            current = .screenPermissionRequired
+        } else if isStreaming {
+            current = .streaming
+        } else if isPipelineRetryDeferred {
+            current = .captureFailed
+        } else {
+            current = streamingDemand.wantsCapture ? .starting : .stopped
+        }
+        if !isCaptureDisplayAvailable, current == .streaming || current == .starting {
+            current = .displayUnavailable
+        }
         hostServer.publishStreamStatus(state: current, accessibilityGranted: accessibilityAuthorization == .granted)
     }
 
@@ -758,7 +805,7 @@ final class HostController {
     }
 
     private func updateRemoteInputAvailability() {
-        remoteInputService.setEnabled(isStreaming && allowsConnections && isServerReady && permissions.canCaptureScreen && accessibilityAuthorization == .granted)
+        remoteInputService.setEnabled(isStreaming && isCaptureDisplayAvailable && allowsConnections && isServerReady && permissions.canCaptureScreen && accessibilityAuthorization == .granted)
     }
 
     private func guidePermission(_ pane: PermissionFlowPane) async {
@@ -902,6 +949,7 @@ final class HostController {
             refreshPairingCode()
             let effects = streamingDemand.authenticatedClientCountChanged(to: 0)
             clientCount = streamingDemand.authenticatedClientCount
+            remoteSessionPower.update(authenticatedClientCount: clientCount, allowsConnections: allowsConnections)
             remoteInputService.releasePressedInput()
             applyStreamingDemandEffects(effects)
             updateInitialOnDemandStartCoalescing()
@@ -923,8 +971,10 @@ final class HostController {
         } catch {
             displays = []
             lastError = error.localizedDescription
-            permissions.invalidateDirectScreenAccess()
-            await refreshAuthorizationStatuses()
+            HostLog.capture.notice("Display discovery unavailable: \(error.localizedDescription, privacy: .public)")
+            if permissions.handleCaptureFailure(error) {
+                await refreshAuthorizationStatuses()
+            }
         }
     }
 
@@ -941,6 +991,7 @@ final class HostController {
         guard allowsConnections || count == 0 else { return }
         let effects = streamingDemand.authenticatedClientCountChanged(to: count)
         clientCount = streamingDemand.authenticatedClientCount
+        remoteSessionPower.update(authenticatedClientCount: clientCount, allowsConnections: allowsConnections)
         updatePermissionRefreshTask()
         applyStreamingDemandEffects(effects)
         updateInitialOnDemandStartCoalescing()
@@ -948,6 +999,26 @@ final class HostController {
             schedulePendingStreamQualityUpgradeIfNeeded()
         }
         await reconcileCapturePipeline()
+    }
+
+    private func recoverAfterWake(restartListener: Bool) async {
+        guard isPrepared, allowsConnections else { return }
+        let interruptedCapture = isStreaming ? pipelineGenerations.current : nil
+        if restartListener {
+            // Retire pre-sleep transports and re-advertise the stable endpoint.
+            // Paired credentials and explicit continuous-sharing demand survive.
+            hostServer.restartAfterSystemWake()
+        }
+        await refreshAuthorizationStatuses()
+        if let interruptedCapture, pipelineGenerations.isCurrent(interruptedCapture) {
+            await handlePipelineFailure(
+                HostPipelineError(message: "Refreshing screen capture after the Mac woke."),
+                generation: interruptedCapture
+            )
+        } else if !isStreaming, streamingDemand.wantsCapture {
+            cancelPipelineRetry(resetAttempt: true)
+            await reconcileCapturePipeline()
+        }
     }
 
     private func handleStreamQualityChange(
@@ -1094,6 +1165,7 @@ final class HostController {
         let attempt = pipelineRetryAttempt
         let delay = HostPipelineRetryPolicy.delay(forAttempt: attempt)
         isPipelineRetryDeferred = true
+        publishRuntimeStreamStatus(.captureFailed)
         HostLog.capture.notice(
             "Retrying capture after transient pipeline failure (attempt \(attempt, privacy: .public))"
         )
@@ -1346,9 +1418,9 @@ final class HostController {
             serverPort = nil
             runState = .starting
         case .listening(let port):
-            remoteInputService.setEnabled(isStreaming && permissions.canCaptureScreen && accessibilityAuthorization == .granted)
             isServerReady = true
             serverPort = port
+            updateRemoteInputAvailability()
             runState = .ready
             lastError = nil
             refreshPairingCode()
@@ -1360,10 +1432,16 @@ final class HostController {
             serverPort = nil
             runState = .failed(message)
             lastError = message
-            let effects = streamingDemand.forceStop()
-            applyStreamingDemandEffects(effects)
-            Task {
-                await reconcileCapturePipeline()
+            if let generation = pipelineGenerations.current {
+                Task {
+                    await handlePipelineFailure(HostPipelineError(message: message), generation: generation)
+                }
+            } else {
+                // Listener errors already retry in HostServer. Retain explicit
+                // continuous sharing across a sleep/wake network transition.
+                let effects = streamingDemand.captureStartFailed(isRetryable: true)
+                applyStreamingDemandEffects(effects)
+                schedulePipelineRetryIfNeeded()
             }
         }
     }
@@ -1397,6 +1475,11 @@ final class HostController {
 
     private func handleCaptureEvent(_ event: ScreenCaptureEvent) {
         switch event {
+        case .displayAvailabilityChanged(let isAvailable, let generation):
+            guard pipelineGenerations.isCurrent(generation) else { return }
+            isCaptureDisplayAvailable = isAvailable
+            updateRemoteInputAvailability()
+            publishRuntimeStreamStatus(isStreaming ? .streaming : .starting)
         case .started:
             break
         case .stopped(let generation):

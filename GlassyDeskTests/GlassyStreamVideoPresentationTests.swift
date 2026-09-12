@@ -209,7 +209,7 @@ struct GlassyStreamVideoPresentationTests {
     }
 }
 
-private struct PresentationFixture {
+struct PresentationFixture {
     let configuration: GlassyStreamVideoConfiguration
     let frames: [GlassyStreamVideoAccessUnit]
     let dimensions: CGSize
@@ -246,7 +246,7 @@ private final class PresentationSampleCapture: @unchecked Sendable {
     var samples: [CMSampleBuffer] { lock.withLock { result } }
 }
 
-private func presentationFixture(width: Int, height: Int, frameCount: Int = 1) throws -> PresentationFixture {
+func presentationFixture(width: Int, height: Int, frameCount: Int = 1) throws -> PresentationFixture {
     let capture = PresentationSampleCapture()
     var session: VTCompressionSession?
     let status = VTCompressionSessionCreate(allocator: kCFAllocatorDefault,

@@ -1221,17 +1221,11 @@ struct ContentView<Session: RemoteSessionControlling,
     // MARK: - Wake on LAN
 
     private func wakeAction(for machine: SavedMachine) -> (() -> Void)? {
-        guard machine.connectionMode == .vnc,
-              machine.wakeOnLANAddress != nil else { return nil }
+        guard machine.wakeOnLANAddress != nil else { return nil }
         return { wakeAndConnect(to: machine) }
     }
 
     private func connectOrWake(to machine: SavedMachine, password: String) {
-        guard machine.connectionMode == .vnc else {
-            connectUsingConfiguredMethod(to: machine, password: password)
-            return
-        }
-
         guard machine.wakeOnLANAddress != nil,
               reachabilityStatus(for: machine) != .reachable else {
             connectUsingConfiguredMethod(to: machine, password: password)

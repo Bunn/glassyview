@@ -73,6 +73,13 @@ final class HostServer: @unchecked Sendable {
         core.stop()
     }
 
+    /// A full system sleep can leave an apparently ready listener or TCP
+    /// session attached to a retired network path. Reconnect with the same
+    /// pairing identity and access rules when macOS wakes.
+    func restartAfterSystemWake() {
+        core.restartAfterSystemWake()
+    }
+
     var allowsConnections: Bool { deviceAccessStore.allowsConnections }
 
     var pairedDevices: [HostPairedDevice] { deviceAccessStore.pairedDevices() }
@@ -366,6 +373,15 @@ private extension HostServer {
         func stop() {
             queue.async { [weak self] in
                 self?.stopLocked(publishStopped: true)
+            }
+        }
+
+        func restartAfterSystemWake() {
+            queue.async { [weak self] in
+                guard let self, rootSecretData != nil, deviceAccessStore.allowsConnections else { return }
+                stopLocked(publishStopped: false)
+                publishStatus(.starting)
+                startListenerLocked(activeGeneration: generation)
             }
         }
 

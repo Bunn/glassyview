@@ -40,3 +40,19 @@ func frameRelayRestartsAfterConsumerCancellation() async {
     #expect(await secondIterator.next() == 42)
     secondCapture.finish()
 }
+
+@Test("A blank or suspended display reports unavailability once and recovers on a real frame")
+func displayAvailabilityRecoversAfterSleep() {
+    var availability = CaptureDisplayAvailability()
+    #expect(availability.update(.complete) == nil)
+    #expect(availability.update(.idle) == nil)
+    #expect(availability.update(.blank) == false)
+    #expect(availability.update(.blank) == nil)
+    #expect(availability.update(.suspended) == nil)
+    #expect(availability.update(.idle) == nil)
+    #expect(availability.update(.started) == nil)
+    #expect(availability.update(.complete) == true)
+    #expect(availability.update(.complete) == nil)
+    #expect(availability.update(.suspended) == false)
+    #expect(availability.update(.complete) == true)
+}

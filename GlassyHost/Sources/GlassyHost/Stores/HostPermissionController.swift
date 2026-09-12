@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import ScreenCaptureKit
 
 @MainActor
 @Observable
@@ -125,5 +126,16 @@ final class HostPermissionController {
         authorizationGeneration &+= 1
         hasConfirmedDirectScreenAccess = false
         defaults.removeObject(forKey: Self.confirmationKey)
+    }
+
+    /// A sleeping or switching display can temporarily disappear from
+    /// ScreenCaptureKit. Only an explicit authorization denial invalidates the
+    /// completed setup; transient capture failures must remain retryable.
+    @discardableResult
+    func handleCaptureFailure(_ error: any Error) -> Bool {
+        guard let streamError = error as? SCStreamError,
+              streamError.code == .userDeclined else { return false }
+        invalidateDirectScreenAccess()
+        return true
     }
 }

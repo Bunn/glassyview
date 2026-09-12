@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import ScreenCaptureKit
 import Testing
 @testable import GlassyHost
 
@@ -333,4 +334,46 @@ private final class PermissionInputRecorder: @unchecked Sendable {
 
     func append(_ event: CGEvent) { lock.withLock { types.append(event.type) } }
     func write(_ text: String) { lock.withLock { writes.append(text) } }
+}
+
+@Test("Temporary display discovery errors preserve setup and capture demand",
+      arguments: [SCStreamError.Code.noDisplayList, .noCaptureSource, .noWindowList,
+                  .failedToStart, .internalError])
+@MainActor
+func transientDisplayFailurePreservesPermissions(code: SCStreamError.Code) async {
+    let fixture = PermissionFixture()
+    defer { fixture.cleanUp() }
+    fixture.status = .init(screenRecording: true, accessibility: true)
+    let controller = fixture.controller()
+    _ = await controller.confirmDirectScreenAccess()
+    var demand = StreamingDemandPolicy()
+    _ = demand.authenticatedClientCountChanged(to: 1)
+
+    let error = NSError(domain: SCStreamErrorDomain, code: code.rawValue)
+    #expect(!controller.handleCaptureFailure(error))
+    _ = demand.captureStartFailed(isRetryable: controller.canCaptureScreen)
+    #expect(controller.canCaptureScreen)
+    #expect(fixture.defaults.bool(forKey: HostPermissionController.confirmationKey))
+    #expect(demand.wantsCapture)
+
+    // A wake/permission refresh needs no local consent dialog to restore capture.
+    await controller.refresh()
+    #expect(controller.canCaptureScreen)
+    #expect(fixture.captureRequests == 1)
+}
+
+@Test("An actual ScreenCaptureKit denial still requires local confirmation")
+@MainActor
+func declinedCaptureInvalidatesPermissions() async {
+    let fixture = PermissionFixture()
+    defer { fixture.cleanUp() }
+    fixture.status = .init(screenRecording: true, accessibility: true)
+    let controller = fixture.controller()
+    _ = await controller.confirmDirectScreenAccess()
+    #expect(controller.handleCaptureFailure(NSError(domain: SCStreamErrorDomain,
+                                                      code: SCStreamError.Code.userDeclined.rawValue)))
+    #expect(!controller.canCaptureScreen)
+    #expect(!fixture.defaults.bool(forKey: HostPermissionController.confirmationKey))
+    await controller.refresh()
+    #expect(!controller.canCaptureScreen)
 }

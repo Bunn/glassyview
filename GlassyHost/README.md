@@ -42,6 +42,16 @@ Connected Glassy Desk devices can request Data Saver (720p/15 FPS/~2 Mbps), Bala
 
 Connected devices can also explicitly paste copied text into the active Mac app. The host receives the text over the authenticated, encrypted session, writes it to the Mac clipboard, then posts Cmd-V using the existing Accessibility permission. Text remains on the Mac clipboard for subsequent pastes. This requires compatible builds on both devices; clipboard contents are never monitored or synchronized in the background. See [clipboard behavior and verification](../docs/md/clipboard-paste.md).
 
+## Sleep, screen saver, and wake
+
+After a device authenticates, Glassy Desk requests remote display activity before starting capture and prevents idle display/system sleep while a viewer remains connected. Disconnecting the last viewer releases those assertions, including when continuous sharing is enabled. Explicit Sleep, lid closure, locking, and macOS login requirements still apply.
+
+When macOS wakes, the host recreates its listener with the same pairing identity and refreshes capture. Display wake and session activation also recover the current capture generation. Temporary display-discovery errors preserve completed permission setup and retry automatically. Blank or suspended ScreenCaptureKit frames report an unavailable display so the authenticated client can wait for capture to resume.
+
+Wake-on-LAN is available for both Standard VNC and Fast Connection in the iPhone/iPad machine editor. Enter the network interface’s MAC address and enable **Wake for network access** on the Mac. Wake broadcasts normally need the same local network; Tailscale does not carry these broadcasts to an offline remote Mac. The companion must already be running in a logged-in user session. A powered-off Mac, unsupported closed-lid state, or FileVault screen before login cannot be fixed by restarting the stream.
+
+See [sleep and wake verification](../docs/md/sleep-wake-recovery-2026-09-12.md) for the code findings, regression coverage, and physical acceptance checks.
+
 ## Connect remotely with Tailscale
 
 Tailscale provides a private route to a remote Mac without exposing Glassy Desk for Mac to the public internet:

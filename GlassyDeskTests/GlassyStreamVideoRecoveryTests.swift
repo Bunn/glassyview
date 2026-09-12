@@ -1,8 +1,38 @@
+@preconcurrency import AVFoundation
 import Foundation
 import Testing
 @testable import GlassyDesk
 
 struct GlassyStreamVideoRecoveryTests {
+    @Test @MainActor
+    func unavailableDisplayPausesRealRecoveryDeadlineUntilTheHostResumes() async throws {
+        let fixture = try presentationFixture(width: 320, height: 180)
+        let renderer = GlassyStreamVideoRenderer()
+        let layer = AVSampleBufferDisplayLayer()
+        var failures: [GlassyStreamVideoRendererError] = []
+        renderer.onError = { failures.append($0) }
+        renderer.attach(to: layer)
+        defer { renderer.detach(from: layer); renderer.reset() }
+        let consume = renderer.makeMediaConsumer()
+        renderer.mediaQueue.sync {
+            _ = consume(.hostStreamStatus(.init(state: .displayUnavailable,
+                                                accessibilityGranted: true, ownsInput: true)))
+            _ = consume(.videoConfiguration(fixture.configuration))
+            _ = consume(.videoDiscontinuity)
+        }
+        try await Task.sleep(for: .milliseconds(5_300))
+        #expect(failures.isEmpty)
+        renderer.mediaQueue.sync {
+            _ = consume(.hostStreamStatus(.init(state: .streaming,
+                                                accessibilityGranted: true, ownsInput: true)))
+        }
+        // No video is supplied: once the host resumes, the normal bounded
+        // recovery deadline must become active again instead of staying paused.
+        try await Task.sleep(for: .milliseconds(5_300))
+        #expect(failures.count == 1)
+        #expect(failures.first?.localizedDescription.contains("Video recovery timed out") == true)
+    }
+
     @Test
     func repeatedRecoveryRequestsCannotExtendDeadline() throws {
         var recovery = GlassyStreamVideoRecoveryState()

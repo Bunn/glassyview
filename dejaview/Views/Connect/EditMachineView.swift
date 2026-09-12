@@ -243,25 +243,23 @@ struct EditMachineView<Store: MachineStoring>: View {
                     .id(glassyHostIdentifier)
                 }
 
-                if connectionMode == .vnc {
-                    Section {
-                        TextField("MAC Address (optional)", text: $macAddress)
-                            .textInputAutocapitalization(.characters)
-                            .autocorrectionDisabled()
-                            .keyboardType(.asciiCapable)
-                            .textContentType(.none)
+                Section {
+                    TextField("MAC Address (optional)", text: $macAddress)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .keyboardType(.asciiCapable)
+                        .textContentType(.none)
 
-                        if !isMACAddressValid {
-                            Label("Enter six hexadecimal pairs, such as A1:B2:C3:D4:E5:F6.",
-                                  systemImage: "exclamationmark.triangle.fill")
-                                .font(.footnote)
-                                .foregroundStyle(.red)
-                        }
-                    } header: {
-                        Text("Wake on LAN")
-                    } footer: {
-                        Text("When this Mac is unreachable, Glassy Desk can wake it and connect automatically. Enable “Wake for network access” in macOS System Settings.")
+                    if !isMACAddressValid {
+                        Label("Enter six hexadecimal pairs, such as A1:B2:C3:D4:E5:F6.",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.red)
                     }
+                } header: {
+                    Text("Wake on LAN")
+                } footer: {
+                    Text("Wake this Mac before connecting with Standard VNC or Fast Connection. Enable “Wake for network access” on the Mac. Both devices must be on the same local network; Tailscale does not forward wake broadcasts.")
                 }
 
                 if isNew, connectAfterDismiss != nil {

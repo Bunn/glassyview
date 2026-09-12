@@ -69,6 +69,7 @@ enum ScreenCaptureEvent: Sendable {
     )
     case stopped(generation: HostPipelineGeneration)
     case failed(message: String, generation: HostPipelineGeneration)
+    case displayAvailabilityChanged(isAvailable: Bool, generation: HostPipelineGeneration)
 }
 
 /// Owns one ScreenCaptureKit display stream.
@@ -206,7 +207,9 @@ actor ScreenCaptureService {
         streamConfiguration.capturesAudio = false
 
         let frameRelay = CaptureFrameRelay<CapturedScreenFrame>()
-        let frameOutput = CaptureOutput(frameRelay: frameRelay)
+        let frameOutput = CaptureOutput(frameRelay: frameRelay) { [eventHandler] isAvailable in
+            eventHandler(.displayAvailabilityChanged(isAvailable: isAvailable, generation: pipelineGeneration))
+        }
         let streamDelegate = CaptureStreamDelegate { [weak self] message in
             Task {
                 await self?.captureDidStop(generation: generation, message: message)
@@ -414,9 +417,13 @@ private final class CaptureOutput: NSObject, SCStreamOutput, @unchecked Sendable
     )
 
     private let frameRelay: CaptureFrameRelay<CapturedScreenFrame>
+    private let availabilityHandler: @Sendable (Bool) -> Void
+    private var availability = CaptureDisplayAvailability()
 
-    init(frameRelay: CaptureFrameRelay<CapturedScreenFrame>) {
+    init(frameRelay: CaptureFrameRelay<CapturedScreenFrame>,
+         availabilityHandler: @escaping @Sendable (Bool) -> Void) {
         self.frameRelay = frameRelay
+        self.availabilityHandler = availabilityHandler
     }
 
     func stream(
@@ -426,10 +433,11 @@ private final class CaptureOutput: NSObject, SCStreamOutput, @unchecked Sendable
     ) {
         guard outputType == .screen,
               sampleBuffer.isValid,
-              Self.isCompleteFrame(sampleBuffer),
-              let pixelBuffer = sampleBuffer.imageBuffer else {
+              let status = Self.frameStatus(sampleBuffer) else {
             return
         }
+        if let isAvailable = availability.update(status) { availabilityHandler(isAvailable) }
+        guard status == .complete, let pixelBuffer = sampleBuffer.imageBuffer else { return }
 
         let duration = sampleBuffer.duration.isValid
             ? sampleBuffer.duration
@@ -443,7 +451,7 @@ private final class CaptureOutput: NSObject, SCStreamOutput, @unchecked Sendable
         )
     }
 
-    private static func isCompleteFrame(_ sampleBuffer: CMSampleBuffer) -> Bool {
+    private static func frameStatus(_ sampleBuffer: CMSampleBuffer) -> SCFrameStatus? {
         guard let attachmentArray = CMSampleBufferGetSampleAttachmentsArray(
             sampleBuffer,
             createIfNecessary: false
@@ -451,9 +459,27 @@ private final class CaptureOutput: NSObject, SCStreamOutput, @unchecked Sendable
               let attachments = attachmentArray.first,
               let rawStatus = attachments[.status] as? Int,
               let status = SCFrameStatus(rawValue: rawStatus) else {
-            return false
+            return nil
         }
-        return status == .complete
+        return status
+    }
+}
+
+/// Blank/suspended frames describe a temporarily unavailable display, not a
+/// broken connection. Idle frames are normal for an unchanged desktop.
+struct CaptureDisplayAvailability {
+    private var isAvailable = true
+
+    mutating func update(_ status: SCFrameStatus) -> Bool? {
+        let available: Bool
+        switch status {
+        case .complete: available = true
+        case .blank, .suspended: available = false
+        default: return nil
+        }
+        guard available != isAvailable else { return nil }
+        isAvailable = available
+        return available
     }
 }
 

@@ -73,7 +73,7 @@ struct GlassyStreamHostStatus: Equatable, Sendable {
         case .starting: return nil
         case .stopped: return String(localized: "Screen sharing is stopped. Open Glassy Desk on your Mac to resume sharing.")
         case .screenPermissionRequired: return String(localized: "On your Mac, open Glassy Desk and allow Screen Recording and Direct Screen Access.")
-        case .displayUnavailable: return String(localized: "The selected Mac display is unavailable. Choose an available display in Glassy Desk on your Mac.")
+        case .displayUnavailable: return String(localized: "Waiting for the Mac display. If the Mac is asleep or locked, wake or unlock it. Sharing resumes when the display is available.")
         case .captureFailed: return String(localized: "Your Mac could not start screen capture. Open Glassy Desk on the Mac to check its display and permissions.")
         case .streaming:
             if !accessibilityGranted {
