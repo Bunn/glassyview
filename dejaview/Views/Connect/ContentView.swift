@@ -6,6 +6,7 @@ struct ContentView<Session: RemoteSessionControlling,
                    Store: MachineStoring,
                    Router: AppIntentRouting>: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.analyticsTracker) private var analytics
     @Environment(\.funnelMilestoneTracker) private var funnelMilestones
 
@@ -109,8 +110,8 @@ struct ContentView<Session: RemoteSessionControlling,
                     .navigationTitle("Settings")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done", action: dismissSettings)
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done", systemImage: "checkmark", action: dismissSettings)
                         }
                     }
             }
@@ -344,30 +345,33 @@ struct ContentView<Session: RemoteSessionControlling,
             Color(.systemGroupedBackground)
                 .ignoresSafeArea()
 
-            ScrollView {
-                detailContentStack
-            }
-            .refreshable {
-                await refreshCurrentSection()
+            GeometryReader { geometry in
+                ScrollView {
+                    detailContentStack(availableWidth: max(1, min(geometry.size.width, 1280) - 40))
+                }
+                .refreshable {
+                    await refreshCurrentSection()
+                }
             }
         }
     }
 
-    private var detailContentStack: some View {
+    private func detailContentStack(availableWidth: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 24) {
             ConnectHeaderView(section: currentSection)
 
             switch currentSection {
             case .hosts:
-                hostsContent
+                hostsContent(availableWidth: availableWidth)
             case .recents:
                 RecentConnectionsView(entries: filteredRecentConnections,
+                                      availableWidth: availableWidth,
                                       isSearching: isSearching,
                                       canReconnectDirectly: canReconnectDirectly(to:),
                                       connect: connect(to:),
                                       delete: deleteRecentConnection(_:))
             case .nearby:
-                nearbyContent
+                nearbyContent(availableWidth: availableWidth)
             }
         }
         .padding(.horizontal, 20)
@@ -376,7 +380,7 @@ struct ContentView<Session: RemoteSessionControlling,
     }
 
     @ViewBuilder
-    private var hostsContent: some View {
+    private func hostsContent(availableWidth: CGFloat) -> some View {
         if filteredMachines.isEmpty && filteredServices.isEmpty {
             if hasUnresolvedServices && !isSearching {
                 scanningPanel
@@ -384,14 +388,14 @@ struct ContentView<Session: RemoteSessionControlling,
                 unavailableHostsView
             }
         } else {
-            hostGrid
+            hostGrid(availableWidth: availableWidth)
         }
 
         addMacPanel
     }
 
     @ViewBuilder
-    private var nearbyContent: some View {
+    private func nearbyContent(availableWidth: CGFloat) -> some View {
         if filteredServices.isEmpty {
             if isSearching {
                 ContentUnavailableView.search
@@ -399,19 +403,19 @@ struct ContentView<Session: RemoteSessionControlling,
                 scanningPanel
             }
         } else {
-            nearbyGrid
+            nearbyGrid(availableWidth: availableWidth)
         }
     }
 
     @ViewBuilder
-    private var hostGrid: some View {
+    private func hostGrid(availableWidth: CGFloat) -> some View {
         GlassEffectContainer(spacing: 16) {
-            hostGridContent
+            hostGridContent(availableWidth: availableWidth)
         }
     }
 
-    private var hostGridContent: some View {
-        LazyVGrid(columns: gridColumns, alignment: .leading, spacing: 16) {
+    private func hostGridContent(availableWidth: CGFloat) -> some View {
+        LazyVGrid(columns: gridColumns(availableWidth: availableWidth), alignment: .leading, spacing: 16) {
             ForEach(filteredMachines) { machine in
                 SavedMachineTile(machine: machine,
                                  reachabilityStatus: reachabilityStatus(for: machine),
@@ -435,14 +439,14 @@ struct ContentView<Session: RemoteSessionControlling,
     }
 
     @ViewBuilder
-    private var nearbyGrid: some View {
+    private func nearbyGrid(availableWidth: CGFloat) -> some View {
         GlassEffectContainer(spacing: 16) {
-            nearbyGridContent
+            nearbyGridContent(availableWidth: availableWidth)
         }
     }
 
-    private var nearbyGridContent: some View {
-        LazyVGrid(columns: gridColumns, alignment: .leading, spacing: 16) {
+    private func nearbyGridContent(availableWidth: CGFloat) -> some View {
+        LazyVGrid(columns: gridColumns(availableWidth: availableWidth), alignment: .leading, spacing: 16) {
             ForEach(filteredServices) { service in
                 let isGlassyHostDetected = matchingGlassyHost(for: service) != nil
 
@@ -506,8 +510,11 @@ struct ContentView<Session: RemoteSessionControlling,
         .accessibilityIdentifier("connection.add-mac.primary")
     }
 
-    private var gridColumns: [GridItem] {
-        [GridItem(.adaptive(minimum: 300), spacing: 16, alignment: .top)]
+    private func gridColumns(availableWidth: CGFloat) -> [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible(), alignment: .top)]
+        }
+        return [GridItem(.adaptive(minimum: min(300, availableWidth)), spacing: 16, alignment: .top)]
     }
 
     private var filteredMachines: [SavedMachine] {

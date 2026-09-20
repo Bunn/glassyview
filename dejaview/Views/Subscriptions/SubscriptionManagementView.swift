@@ -59,8 +59,8 @@ struct SubscriptionManagementView: View {
             }
             .navigationTitle("Glassy Desk Pro")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", systemImage: "checkmark") {
                         dismiss()
                     }
                 }

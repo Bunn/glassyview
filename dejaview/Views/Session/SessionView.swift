@@ -33,7 +33,11 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @State private var externalDisplayCoordinator = ExternalDisplayCoordinator.shared
     @State private var inputFocused = false
     @State private var externalKeyboardFocused = true
+    @State private var isSessionSeparated = false
+    @State private var foldedKeyboardFocused = false
+    @State private var foldFocusState = SessionFoldFocusState()
     @State private var areBottomControlsCollapsed = false
+    @State private var inputBarHeight: CGFloat = 0
     @State private var didRecordFreeSessionStart = false
     @State private var didRecordFreeSessionLimit = false
 
@@ -59,61 +63,56 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        SessionArrangement(overlayBottomInset: isInputBarVisible ? inputBarHeight : 0,
+                           usesDividedLayout: !isExternalControllerActive,
+                           onSeparationChange: { isSessionSeparated = $0 }) {
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-            if let cooldown = freeSession.cooldown, !subscriptionStore.hasProAccess {
-                FreeSessionCooldownView(cooldown: cooldown,
-                                        sessionTitle: sessionTitle,
-                                        restart: restartFreeSession,
-                                        purchase: purchaseFromFreeSessionCooldown,
-                                        close: closeSession)
-                    .transition(.opacity)
-                    .onChange(of: cooldown.endDate, initial: true) { _, _ in
-                        cooldownTracking.recordView(
-                            of: cooldown,
-                            sessionType: analyticsSessionType,
-                            analytics: analytics,
-                            milestones: funnelMilestones
-                        )
-                    }
-            } else {
-                content
-                    .transition(.opacity)
+                if let cooldown = freeSession.cooldown, !subscriptionStore.hasProAccess {
+                    FreeSessionCooldownView(cooldown: cooldown,
+                                            sessionTitle: sessionTitle,
+                                            restart: restartFreeSession,
+                                            purchase: purchaseFromFreeSessionCooldown,
+                                            close: closeSession)
+                        .transition(.opacity)
+                        .onChange(of: cooldown.endDate, initial: true) { _, _ in
+                            cooldownTracking.recordView(
+                                of: cooldown,
+                                sessionType: analyticsSessionType,
+                                analytics: analytics,
+                                milestones: funnelMilestones
+                            )
+                        }
+                } else {
+                    content
+                        .transition(.opacity)
+                }
             }
+            .overlay(alignment: .top) {
+                if isFoldedControllerActive {
+                    SessionFoldedToolbarPlacement(isControlsPane: false) {
+                        foldedSessionHeader
+                    }
+                }
+            }
+        } controls: {
+            sessionControls
         }
+        .background { Color.black.ignoresSafeArea() }
         .animation(accessibilityReduceMotion ? nil : .smooth(duration: 0.3),
                    value: freeSession.cooldown != nil)
-        .overlay(alignment: .topTrailing) {
-            if canInteractWithSession {
-                controlPill
-            }
-        }
-        .overlay(alignment: .topLeading) {
-            if isConnectedFreeSession, let freeSessionEndDate = freeSession.sessionEndDate {
-                FreeSessionTimerPill(endDate: freeSessionEndDate,
-                                     action: presentFreeSessionTimerInfo)
-                    .padding(.top, 20)
-                    .padding(.leading, 20)
-            }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if showsInputBar && canInteractWithSession && !isExternalControllerActive {
-                inputBar
-            }
-        }
-        .overlay(alignment: .bottom) {
-            if canInteractWithSession,
-               !showsInputBar,
-               !isExternalControllerActive {
-                sessionBottomControls
-                    .padding(.horizontal, horizontalSizeClass == .compact ? 4 : 20)
-                    .padding(.bottom, 28)
-            }
-        }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .preferredColorScheme(.dark)
+        .alert("Couldn't Paste", isPresented: Binding(
+            get: { session.clipboardPasteError != nil },
+            set: { if !$0 { session.clearClipboardPasteError() } }
+        )) {
+            Button("OK") { session.clearClipboardPasteError() }
+        } message: {
+            Text(session.clipboardPasteError ?? "")
+        }
         .sheet(isPresented: $isSessionPaywallPresented,
                onDismiss: handleSessionPaywallDismissed) {
             RevenueCatPaywallSheet(
@@ -190,6 +189,19 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .onChange(of: showsInputBar) { _, _ in
             logDisplayControlState(reason: "inputBarVisibilityChanged")
         }
+        .onChange(of: foldedKeyboardFocused) { _, focused in
+            // UIKit can also hide the keyboard when a menu or another window
+            // takes focus. Never leave a remote modifier held without its keys.
+            if !focused { releaseHeldModifierKeys() }
+        }
+        .onChange(of: foldFocusPresentation, initial: true) { _, presentation in
+            let update = foldFocusState.update(presentation, inputFocused: inputFocused)
+            if let foldedFocus = update.foldedFocus {
+                releaseHeldModifierKeys()
+                foldedKeyboardFocused = foldedFocus
+            }
+            if let flatFocus = update.flatFocus { inputFocused = flatFocus }
+        }
         .onChange(of: subscriptionStore.hasProAccess) { _, hasProAccess in
             if hasProAccess {
                 handleSessionProAccessGranted()
@@ -211,23 +223,25 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     private var content: some View {
         switch session.status {
         case .idle, .connecting:
-            VStack(spacing: 20) {
-                ProgressView()
-                    .controlSize(.large)
+            SessionStatusContainer {
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .controlSize(.large)
 
-                Text("Connecting…")
-                    .foregroundStyle(.secondary)
+                    Text("Connecting…")
+                        .foregroundStyle(.secondary)
 
-                Button("Cancel") {
-                    AppLog.ui.info("Connection cancel button tapped")
-                    session.disconnect()
-                    dismiss()
+                    Button("Cancel") {
+                        AppLog.ui.info("Connection cancel button tapped")
+                        session.disconnect()
+                        dismiss()
+                    }
+                    .buttonStyle(.glass)
                 }
-                .buttonStyle(.glass)
             }
 
-        case .connected:
-            if isExternalControllerActive {
+        case .connected, .reconnecting:
+            if session.status == .connected && isExternalControllerActive {
                 ExternalSessionControllerView(session: session,
                                               sessionTitle: sessionTitle,
                                               heldModifierKeys: $heldModifierKeys,
@@ -235,62 +249,145 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                               stopControllerMode: deactivateExternalControllerIfNeeded)
             } else {
                 SessionRemoteContent(session: session,
-                                     reconnectState: nil,
+                                     reconnectState: reconnectState,
                                      zoomScale: $streamZoomScale,
                                      followsCursor: followsCursorWhenZoomed,
                                      pansViewportWithTwoFingers: pansViewportWithTwoFingers,
-                                     keyboardAvoidanceActive: showsInputBar,
+                                     keyboardAvoidanceActive: isInputBarVisible,
                                      showsTrackpadCursorDot: preferences.showsTrackpadCursorDot,
                                      acceptsHardwareKeyboardInput: acceptsRemoteHardwareKeyboardInput,
+                                     acceptsPointerInput: true,
+                                     touchModeOverride: isFoldedControllerActive ? .trackpad : nil,
                                      glassyStream: glassyStream)
             }
 
-        case .reconnecting(let reconnectState):
-            SessionRemoteContent(session: session,
-                                 reconnectState: reconnectState,
-                                 zoomScale: $streamZoomScale,
-                                 followsCursor: followsCursorWhenZoomed,
-                                 pansViewportWithTwoFingers: pansViewportWithTwoFingers,
-                                 showsTrackpadCursorDot: preferences.showsTrackpadCursorDot,
-                                 acceptsHardwareKeyboardInput: false,
-                                 glassyStream: glassyStream)
-
         case .disconnected(let message):
-            VStack(spacing: 14) {
-                Image(systemName: "rectangle.on.rectangle.slash")
-                    .font(.system(size: 44))
-                    .foregroundStyle(.secondary)
-
-                Text("Disconnected")
-                    .font(.title3.weight(.semibold))
-
-                if let message {
-                    Text(message)
-                        .font(.footnote)
+            SessionStatusContainer {
+                VStack(spacing: 14) {
+                    Image(systemName: "rectangle.on.rectangle.slash")
+                        .font(.system(size: 44))
                         .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
 
-                HStack(spacing: 12) {
-                    Button("Close") {
-                        AppLog.ui.info("Disconnected session close button tapped")
-                        dismiss()
-                    }
-                    .buttonStyle(.glass)
+                    Text("Disconnected")
+                        .font(.title3.weight(.semibold))
 
-                    Button("Reconnect") {
-                        AppLog.ui.info("Reconnect button tapped")
-                        session.retryConnect()
+                    if let message {
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
                     }
-                    .buttonStyle(.glassProminent)
+
+                    HStack(spacing: 12) {
+                        Button("Close") {
+                            AppLog.ui.info("Disconnected session close button tapped")
+                            dismiss()
+                        }
+                        .buttonStyle(.glass)
+
+                        Button("Reconnect") {
+                            AppLog.ui.info("Reconnect button tapped")
+                            session.retryConnect()
+                        }
+                        .buttonStyle(.glassProminent)
+                    }
+                    .padding(.top, 8)
                 }
-                .padding(.top, 8)
             }
         }
     }
 
+    private var reconnectState: RemoteReconnectState? {
+        if case .reconnecting(let state) = session.status { return state }
+        return nil
+    }
+
     // MARK: - Floating controls
+
+    private var sessionControls: some View {
+        GeometryReader { geometry in
+            let compactSpacing = geometry.size.height < 260
+            let sidePadding: CGFloat = geometry.size.width < 320 ? 4 : 20
+            VStack(spacing: compactSpacing ? 4 : 8) {
+                if isFoldedControllerActive {
+                    SessionFoldedToolbarPlacement(isControlsPane: true) {
+                        foldedSessionHeader
+                    }
+                }
+                if canInteractWithSession, !isFoldedControllerActive {
+                    sessionHeader
+                    .padding(.horizontal, sidePadding)
+                    .padding(.top, compactSpacing || isFoldedControllerActive ? 4 : 20)
+                }
+
+                if isFoldedControllerActive {
+                    ExternalSessionControllerView(session: session,
+                                                  sessionTitle: sessionTitle,
+                                                  heldModifierKeys: $heldModifierKeys,
+                                                  isKeyboardFocused: $foldedKeyboardFocused,
+                                                  stopControllerMode: {},
+                                                  presentation: .folded,
+                                                  allowsHardwareKeyboardInput: !isSessionPaywallPresented
+                                                      && !isFreeSessionTimerInfoPresented)
+                        .accessibilityIdentifier("session.folded-controller")
+                } else {
+                    Spacer(minLength: 0)
+
+                    if isInputBarVisible {
+                        inputBar
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { inputBarHeight = $0 }
+                    }
+                }
+
+                if canInteractWithSession, !isExternalControllerActive,
+                   !isFoldedControllerActive, !showsInputBar {
+                    sessionBottomControls
+                        .padding(.horizontal, min(sidePadding, horizontalSizeClass == .compact ? 4 : 20))
+                        .padding(.bottom, compactSpacing ? 4 : 28)
+                }
+            }
+        }
+    }
+
+    private var sessionHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) {
+                sessionTimer
+                Spacer(minLength: 0)
+                controlPill
+            }
+            VStack(alignment: .trailing, spacing: 8) {
+                controlPill
+                sessionTimer
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+
+    private var foldedSessionHeader: some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            SessionFoldedToolbar(isKeyboardVisible: foldedKeyboardFocused,
+                                 toggleKeyboard: toggleFoldedKeyboard,
+                                 close: closeSession) {
+                sessionMenuControls(showsDisplayMenu: false,
+                                    includesResetZoom: true,
+                                    includesZoomModes: true,
+                                    includesZoomSteps: true)
+            }
+            sessionTimer
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    private var sessionTimer: some View {
+        if isConnectedFreeSession, let endDate = freeSession.sessionEndDate {
+            FreeSessionTimerPill(endDate: endDate, action: presentFreeSessionTimerInfo)
+        }
+    }
 
     @ViewBuilder
     private var sessionBottomControls: some View {
@@ -311,6 +408,10 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                     sessionBottomControlContent(showsDisplayMenu: false,
                                                 showsResetZoom: false,
                                                 showsZoomModes: false)
+                    sessionMenuControls(showsDisplayMenu: false,
+                                        includesResetZoom: true,
+                                        includesZoomModes: true,
+                                        includesZoomSteps: true)
                 }
                 .transition(sessionControlsTransition)
             }
@@ -349,7 +450,8 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     private func sessionMenuControls(
         showsDisplayMenu: Bool,
         includesResetZoom: Bool,
-        includesZoomModes: Bool
+        includesZoomModes: Bool,
+        includesZoomSteps: Bool = false
     ) -> some View {
         HStack(spacing: 0) {
             if showsDisplayMenu,
@@ -368,7 +470,9 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                usesGlassyStream: glassyStream != nil,
                                includesDisplayPicker: !showsDisplayMenu,
                                includesResetZoom: includesResetZoom,
-                               includesZoomModes: includesZoomModes)
+                               includesZoomModes: includesZoomModes,
+                               includesZoomSteps: includesZoomSteps,
+                               usesTrackpadController: isFoldedControllerActive)
         }
     }
 
@@ -437,20 +541,25 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .font(.body.weight(.medium))
         .foregroundStyle(.white)
         .liquidGlass(in: Capsule())
-        .padding(.top, 20)
-        .padding(.trailing, 20)
-        .alert("Couldn't Paste", isPresented: Binding(
-            get: { session.clipboardPasteError != nil },
-            set: { if !$0 { session.clearClipboardPasteError() } }
-        )) {
-            Button("OK") { session.clearClipboardPasteError() }
-        } message: {
-            Text(session.clipboardPasteError ?? "")
-        }
     }
 
     private var isConnectedFreeSession: Bool {
         canInteractWithSession && !subscriptionStore.hasProAccess
+    }
+
+    private var isInputBarVisible: Bool {
+        showsInputBar && canInteractWithSession && !isExternalControllerActive && !isFoldedControllerActive
+    }
+
+    private var isFoldedControllerActive: Bool {
+        isSessionSeparated && canInteractWithSession && !isExternalControllerActive
+    }
+
+    private var foldFocusPresentation: SessionFoldFocusState.Presentation {
+        .init(isSeparated: isSessionSeparated,
+              isControllerActive: isFoldedControllerActive,
+              isInputBarRequested: showsInputBar,
+              isInputBarVisible: isInputBarVisible)
     }
 
     private var canInteractWithSession: Bool {
@@ -474,6 +583,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     private var acceptsRemoteHardwareKeyboardInput: Bool {
         canInteractWithSession
             && !showsInputBar
+            && !isFoldedControllerActive
             && !isSessionPaywallPresented
             && !isFreeSessionTimerInfoPresented
     }
@@ -705,6 +815,10 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
 
         AppLog.ui.info("Software input bar visibility changed; visible=\(self.showsInputBar, privacy: .public)")
+    }
+
+    private func toggleFoldedKeyboard() {
+        foldedKeyboardFocused.toggle()
     }
 
     private func toggleBottomControls() {

@@ -12,6 +12,7 @@ struct GlassyPairingScannerView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     @State private var cameraState = CameraState.checking
+    let previewHeight: CGFloat
     let onScan: (String) -> Void
 
     var body: some View {
@@ -19,12 +20,12 @@ struct GlassyPairingScannerView: View {
             switch cameraState {
             case .checking:
                 ProgressView("Preparing Camera…")
-                    .frame(maxWidth: .infinity, minHeight: 260)
+                    .frame(maxWidth: .infinity, minHeight: previewHeight)
             case .ready:
                 PairingCameraPreview(onScan: onScan) {
                     cameraState = .unavailable
                 }
-                .frame(height: 300)
+                .frame(height: previewHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .accessibilityLabel("Camera scanner for the Glassy Desk pairing QR code")
             case .denied:

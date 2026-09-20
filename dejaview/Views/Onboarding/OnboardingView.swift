@@ -4,7 +4,6 @@ struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var selectedPage: OnboardingPage = .welcome
 
     let onComplete: (() -> Void)?
@@ -20,23 +19,19 @@ struct OnboardingView: View {
             GeometryReader { geometry in
                 ScrollViewReader { scrollProxy in
                     ScrollView {
-                        Group {
-                            if verticalSizeClass == .compact, !dynamicTypeSize.isAccessibilitySize {
-                                HStack(spacing: 28) {
-                                    OnboardingIllustration(page: selectedPage)
-                                        .frame(width: 260, height: 230)
-                                    pageContent
-                                }
-                                .frame(maxWidth: 780)
-                            } else {
-                                VStack(spacing: 16) {
-                                    OnboardingIllustration(page: selectedPage)
-                                        .frame(height: illustrationHeight(in: geometry.size))
-                                    pageContent
-                                }
-                                .frame(maxWidth: 460)
-                            }
+                        let isHorizontal = usesHorizontalLayout(in: geometry.size)
+                        let layout = isHorizontal
+                            ? AnyLayout(HStackLayout(spacing: 28))
+                            : AnyLayout(VStackLayout(spacing: 16))
+
+                        // Preserve the page subtree when a fold or window resize changes the layout.
+                        layout {
+                            OnboardingIllustration(page: selectedPage)
+                                .frame(width: isHorizontal ? 260 : nil,
+                                       height: isHorizontal ? 230 : illustrationHeight(in: geometry.size))
+                            pageContent
                         }
+                        .frame(maxWidth: isHorizontal ? 780 : 460)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 16)
                         .frame(maxWidth: .infinity)
@@ -111,6 +106,11 @@ struct OnboardingView: View {
                 insertion: .opacity.combined(with: .offset(y: 12)),
                 removal: .opacity.combined(with: .offset(y: -8))
             ))
+    }
+
+    private func usesHorizontalLayout(in size: CGSize) -> Bool {
+        // A compact height alone does not guarantee enough width in a sheet or split scene.
+        !dynamicTypeSize.isAccessibilitySize && size.width >= 600 && size.width > size.height
     }
 
     private func illustrationHeight(in size: CGSize) -> CGFloat {

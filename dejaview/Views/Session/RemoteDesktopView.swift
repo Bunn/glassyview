@@ -34,6 +34,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
     @Binding var zoomScale: CGFloat
     /// Keeps the fitted desktop size stable when the keyboard shortens the visible view.
     var fitsContentToWindow = false
+    /// The local content pane before keyboard avoidance, when supplied by its container.
+    var fittingViewportSize: CGSize?
     var followsCursor: Bool
     var pansViewportWithTwoFingers: Bool = false
     var keyboardAvoidanceActive = false
@@ -50,6 +52,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         let view = ScreenView()
         view.session = session
         view.setFitsContentToWindow(fitsContentToWindow)
+        view.setFittingViewportSize(fittingViewportSize)
         view.setAcceptsHardwareKeyboardInput(acceptsHardwareKeyboardInput)
         view.setAcceptsPointerInput(acceptsPointerInput)
         view.setShowsFramebuffer(showsFramebuffer)
@@ -90,6 +93,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         context.coordinator.zoomScale = $zoomScale
         uiView.session = session
         uiView.setFitsContentToWindow(fitsContentToWindow)
+        uiView.setFittingViewportSize(fittingViewportSize)
         uiView.setVisibleFramebufferFrame(selectedFramebufferFrame)
         uiView.setFollowsCursor(followsCursor)
         uiView.setZoomScale(zoomScale, notify: false)
@@ -161,16 +165,19 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private var framebufferRenderInterval = RemoteFrameRate.balanced.updateInterval
         private var keyboardFocusTask: Task<Void, Never>?
         private var zoomScaleReconciliationTask: Task<Void, Never>?
-        private let hardwareKeyboardInputView = UIView(frame: .zero)
         private var acceptsHardwareKeyboardInput = true
+        private var acceptsPointerInput = true
         private var showsFramebuffer = true
         private var showsCursorOverlay = true
         private var showsTrackpadCursorDot = false
         private var allowsZoom = true
         private var pansViewportWithTwoFingers = false
         private var keyboardAvoidanceActive = false
+        private var revealsCursorAfterKeyboardLayout = false
         private var fitsContentToWindow = false
+        private var preferredFittingViewportSize: CGSize?
         private var touchModeOverride: RemoteTouchMode?
+        private var appliedTouchMode: RemoteTouchMode?
 
         private var zoomScale: CGFloat = 1
         private var followsCursor = true
@@ -306,13 +313,6 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             true
         }
 
-        /// This responder handles physical keyboard presses only. Returning an
-        /// empty input view prevents UIKit from presenting the software
-        /// keyboard when focus is restored around menus and other windows.
-        override var inputView: UIView? {
-            hardwareKeyboardInputView
-        }
-
         /// Grabs keyboard focus for hardware-keyboard forwarding — but only
         /// while our window is key. Stealing first responder while another
         /// window is presenting (e.g. the session options menu, which iOS 26
@@ -342,7 +342,14 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         func setAcceptsPointerInput(_ accepts: Bool) {
-            isUserInteractionEnabled = accepts
+            // Disabling a first-responder UIView synchronously resigns it.
+            // Keep responder lifecycle independent of pointer hit testing so
+            // representable updates cannot re-enter keyboard layout.
+            acceptsPointerInput = accepts
+        }
+
+        override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+            acceptsPointerInput && super.point(inside: point, with: event)
         }
 
         func setShowsFramebuffer(_ showsFramebuffer: Bool) {
@@ -388,6 +395,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             guard keyboardAvoidanceActive != active else { return }
 
             keyboardAvoidanceActive = active
+            revealsCursorAfterKeyboardLayout = active
+            setNeedsLayout()
             logViewport("Keyboard avoidance changed; active=\(active)")
         }
 
@@ -398,9 +407,61 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             updateFramebufferViewFrame()
         }
 
+        func setFittingViewportSize(_ size: CGSize?) {
+            let usableSize = size.flatMap { candidate in
+                candidate.width.isFinite && candidate.height.isFinite
+                    && candidate.width > 0 && candidate.height > 0 ? candidate : nil
+            }
+            guard preferredFittingViewportSize != usableSize else { return }
+
+            preferredFittingViewportSize = usableSize
+            setNeedsLayout()
+        }
+
         func setTouchModeOverride(_ touchMode: RemoteTouchMode?) {
+            let nextMode = touchMode ?? session?.touchMode ?? .direct
+            let previousMode = appliedTouchMode ?? effectiveTouchMode
+            if previousMode != nextMode {
+                cancelInputForTouchModeChange()
+            }
             touchModeOverride = touchMode
+            appliedTouchMode = nextMode
             updateCursorLayerFrame()
+        }
+
+        private func cancelInputForTouchModeChange() {
+            let hadPressedButton = isDragging || directPressed
+            let releasePoint = isDragging
+                ? relativePointer.target ?? session?.cursorLocation ?? .zero
+                : session?.cursorLocation ?? .zero
+            cancelLongPress()
+            cancelPendingPress()
+            pendingPressPoint = nil
+            isDragging = false
+            directPressed = false
+            relativePointer.reset()
+            // Ignore the old touch sequence until it ends. A fresh touchesBegan
+            // starts a new sequence under the new mode.
+            multiTouchActive = true
+            touchMoved = true
+            touchScrollAccumulator = .zero
+            pointerScrollAccumulator = .zero
+            pointerWheelScrollAccumulator = .zero
+            touchPendingTranslation = .zero
+            pointerPendingTranslation = .zero
+            touchPanIntent = .undecided
+            pointerPanIntent = .undecided
+            pinchIsActive = false
+            pinchIsSuppressedByThreeFingerPan = false
+            if hadPressedButton {
+                session?.leftButtonUp(at: releasePoint)
+            }
+            // Cancel recognizers, not the UIView: disabling the view itself can
+            // synchronously resign its keyboard responder during a layout pass.
+            for recognizer in gestureRecognizers ?? [] where recognizer.isEnabled {
+                recognizer.isEnabled = false
+                recognizer.isEnabled = true
+            }
         }
 
         private func requestKeyboardFocus() {
@@ -532,14 +593,20 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             super.layoutSubviews()
 
             let zoomWasReconciled = reconcileZoomScaleWithMinimumIfNeeded()
-            guard !zoomWasReconciled else {
-                logViewportBoundsChangeIfNeeded(reason: "zoom reconciled")
-                return
+            if !zoomWasReconciled {
+                updateFramebufferViewFrame()
             }
 
-            updateFramebufferViewFrame()
-            revealCursorIfNeeded(requiresOutwardMovement: false)
-            logViewportBoundsChangeIfNeeded(reason: "layout completed")
+            // A stationary cursor must not replace the reading/pan anchor when
+            // the display folds, rotates, or receives new container geometry.
+            // Cursor movement continues to reveal its edge through the publisher.
+            // Opening the keyboard retains the existing keep-cursor-visible
+            // behavior once, after its shortened viewport has been laid out.
+            if revealsCursorAfterKeyboardLayout {
+                revealsCursorAfterKeyboardLayout = false
+                revealCursorIfNeeded(requiresOutwardMovement: false)
+            }
+            logViewportBoundsChangeIfNeeded(reason: zoomWasReconciled ? "zoom reconciled" : "layout completed")
         }
 
         override func didMoveToWindow() {
@@ -727,7 +794,16 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             let imageSizeChanged = imageSize != previousImageSize
 
             if imageSizeChanged || viewportCenter == nil {
-                resetViewportCenter()
+                if let center = viewportCenter,
+                   previousImageSize.width > 0, previousImageSize.height > 0,
+                   imageSize.width > 0, imageSize.height > 0 {
+                    // A host resolution change preserves the same relative
+                    // desktop location instead of jumping back to its center.
+                    viewportCenter = CGPoint(x: center.x / previousImageSize.width * imageSize.width,
+                                             y: center.y / previousImageSize.height * imageSize.height)
+                } else {
+                    resetViewportCenter()
+                }
                 lastLocalCursorLocation = localCursorLocation()
                 AppLog.ui.info("Remote desktop image size changed; fullImageSize=\(Self.sizeDescription(self.fullImageSize), privacy: .public) selectedFramebufferFrame=\(Self.rectDescription(self.selectedFramebufferFrame), privacy: .public) visibleFramebufferFrame=\(Self.rectDescription(self.visibleFramebufferFrame), privacy: .public)")
             }
@@ -991,6 +1067,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         private var fittingViewportSize: CGSize {
+            if let preferredFittingViewportSize { return preferredFittingViewportSize }
             guard fitsContentToWindow, let window else { return bounds.size }
             return window.bounds.size
         }
@@ -1050,18 +1127,9 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             guard imageSize.width > 0, imageSize.height > 0,
                   bounds.width > 0, bounds.height > 0 else { return nil }
 
-            let scale = effectiveScale
-            let origin = framebufferView.frame.origin
-            let visibleFrame = visibleFramebufferFrame
-
-            let fx = (point.x - origin.x) / scale
-            let fy = (point.y - origin.y) / scale
-
-            guard fx >= 0, fy >= 0,
-                  fx <= imageSize.width, fy <= imageSize.height else { return nil }
-
-            return CGPoint(x: visibleFrame.minX + fx,
-                           y: visibleFrame.minY + fy)
+            return RemoteViewportGeometry.framebufferPoint(for: point,
+                                                           contentFrame: framebufferView.frame,
+                                                           sourceFrame: visibleFramebufferFrame)
         }
 
         private func localPoint(for framebufferPoint: CGPoint) -> CGPoint? {
@@ -1212,33 +1280,17 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             }
 
             let scale = effectiveScale
-            let renderedSize = CGSize(width: imageSize.width * scale,
-                                      height: imageSize.height * scale)
             if pannableViewportAxes.isEmpty {
                 manualViewportPositionActive = false
             }
-            let center = clampedViewportCenter(viewportCenter ?? CGPoint(x: imageSize.width / 2,
-                                                                         y: imageSize.height / 2),
-                                               renderedSize: renderedSize)
-            viewportCenter = center
-
-            var origin = CGPoint(x: bounds.midX - center.x * scale,
-                                 y: bounds.midY - center.y * scale)
-
-            if renderedSize.width <= bounds.width {
-                origin.x = (bounds.width - renderedSize.width) / 2
-            } else {
-                origin.x = min(max(origin.x, bounds.width - renderedSize.width), 0)
-            }
-
-            if renderedSize.height <= bounds.height {
-                origin.y = (bounds.height - renderedSize.height) / 2
-            } else {
-                origin.y = min(max(origin.y, bounds.height - renderedSize.height), 0)
-            }
+            let anchor = viewportCenter ?? CGPoint(x: imageSize.width / 2,
+                                                    y: imageSize.height / 2)
+            let contentFrame = RemoteViewportGeometry.contentFrame(contentSize: imageSize,
+                                                                    viewportBounds: bounds,
+                                                                    effectiveScale: scale,
+                                                                    center: anchor)
 
             UIView.performWithoutAnimation {
-                let contentFrame = CGRect(origin: origin, size: renderedSize)
                 framebufferView.frame = contentFrame
                 glassyStreamView?.frame = contentFrame
             }
@@ -1346,6 +1398,10 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             framebufferView.frame
         }
 
+        func debugFramebufferPoint(for point: CGPoint) -> CGPoint? {
+            framebufferPoint(for: point)
+        }
+
         var debugZoomScale: CGFloat {
             zoomScale
         }
@@ -1378,6 +1434,14 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                           accumulator: &pointerWheelScrollAccumulator)
         }
 
+        func debugBeginSingleTouch(at point: CGPoint, timestamp: TimeInterval) {
+            beginSingleTouch(at: point, timestamp: timestamp)
+        }
+
+        func debugEndSingleTouch(at point: CGPoint, timestamp: TimeInterval) {
+            endSingleTouch(at: point, timestamp: timestamp, remainingTouchCount: 0)
+        }
+
         var debugCursorIsVisible: Bool {
             !cursorLayer.isHidden || !fallbackCursorLayer.isHidden
         }
@@ -1400,31 +1464,11 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             updateCursorLayerFrame()
         }
 
-        private func clampedViewportCenter(_ center: CGPoint,
-                                           renderedSize: CGSize) -> CGPoint {
-            return CGPoint(x: clampedViewportCoordinate(center.x,
-                                                        imageLength: imageSize.width,
-                                                        renderedLength: renderedSize.width,
-                                                        viewportLength: bounds.width),
-                           y: clampedViewportCoordinate(center.y,
-                                                        imageLength: imageSize.height,
-                                                        renderedLength: renderedSize.height,
-                                                        viewportLength: bounds.height))
-        }
-
-        private func clampedViewportCoordinate(_ coordinate: CGFloat,
-                                               imageLength: CGFloat,
-                                               renderedLength: CGFloat,
-                                               viewportLength: CGFloat) -> CGFloat {
-            guard renderedLength > viewportLength else {
-                return imageLength / 2
-            }
-
-            let visibleHalfLength = viewportLength / (2 * effectiveScale)
-            let lowerBound = visibleHalfLength
-            let upperBound = imageLength - visibleHalfLength
-
-            return min(max(coordinate, lowerBound), upperBound)
+        private func clampedViewportCenter(_ center: CGPoint) -> CGPoint {
+            RemoteViewportGeometry.clampedCenter(center,
+                                                 contentSize: imageSize,
+                                                 viewportSize: bounds.size,
+                                                 effectiveScale: effectiveScale)
         }
 
         private func revealCursorIfNeeded(previousCursor: CGPoint? = nil,
@@ -1434,12 +1478,9 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                   !manualViewportPositionActive || allowsManualViewportOverride,
                   let localCursor = localCursorLocation() else { return }
 
-            let renderedSize = CGSize(width: imageSize.width * effectiveScale,
-                                      height: imageSize.height * effectiveScale)
             let currentCenter = clampedViewportCenter(
                 viewportCenter ?? CGPoint(x: imageSize.width / 2,
-                                          y: imageSize.height / 2),
-                renderedSize: renderedSize
+                                          y: imageSize.height / 2)
             )
             let candidate = RemoteViewportGeometry.centerRevealingCursor(
                 currentCenter,
@@ -1450,8 +1491,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                 effectiveScale: effectiveScale,
                 requiresOutwardMovement: requiresOutwardMovement
             )
-            let revealedCenter = clampedViewportCenter(candidate,
-                                                       renderedSize: renderedSize)
+            let revealedCenter = clampedViewportCenter(candidate)
             guard revealedCenter != currentCenter else { return }
 
             manualViewportPositionActive = false
@@ -1682,12 +1722,9 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                 return
             }
 
-            let renderedSize = CGSize(width: imageSize.width * effectiveScale,
-                                      height: imageSize.height * effectiveScale)
             let currentCenter = clampedViewportCenter(
                 viewportCenter ?? CGPoint(x: imageSize.width / 2,
-                                          y: imageSize.height / 2),
-                renderedSize: renderedSize
+                                          y: imageSize.height / 2)
             )
             let candidate = RemoteViewportGeometry.centerByPanning(
                 currentCenter,
@@ -1695,8 +1732,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                 pannableAxes: axes,
                 effectiveScale: effectiveScale
             )
-            let pannedCenter = clampedViewportCenter(candidate,
-                                                     renderedSize: renderedSize)
+            let pannedCenter = clampedViewportCenter(candidate)
             guard pannedCenter != currentCenter else {
                 logViewport("Viewport pan stopped at boundary; translation=\(Self.pointDescription(translation)) current=\(Self.pointDescription(currentCenter)) candidate=\(Self.pointDescription(candidate)) clamped=\(Self.pointDescription(pannedCenter))")
                 return
@@ -1712,7 +1748,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         @objc private func handlePointerHover(_ gesture: UIHoverGestureRecognizer) {
-            guard let session,
+            guard acceptsPointerInput, let session,
                   gesture.state == .began || gesture.state == .changed,
                   let point = framebufferPoint(for: gesture.location(in: self)) else {
                 return
@@ -1756,8 +1792,12 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                                shouldReceive touch: UITouch) -> Bool {
-            gestureRecognizer !== pointerScrollPan
+            acceptsPointerInput && gestureRecognizer !== pointerScrollPan
                 && gestureRecognizer !== pointerWheelScrollPan
+        }
+
+        override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            acceptsPointerInput && super.gestureRecognizerShouldBegin(gestureRecognizer)
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
@@ -1776,7 +1816,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-            guard let touch = touches.first, let session else { return }
+            guard acceptsPointerInput, let touch = touches.first, session != nil else { return }
 
             becomeFirstResponderIfAppropriate()
 
@@ -1787,7 +1827,11 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                 return
             }
 
-            let location = touch.location(in: self)
+            beginSingleTouch(at: touch.location(in: self), timestamp: touch.timestamp)
+        }
+
+        private func beginSingleTouch(at location: CGPoint, timestamp: TimeInterval) {
+            guard let session else { return }
 
             switch effectiveTouchMode {
             case .trackpad:
@@ -1795,7 +1839,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                     touchLocation: location,
                     cursorLocation: session.cursorLocation
                 )
-                touchStartTime = touch.timestamp
+                touchStartTime = timestamp
                 touchMoved = false
                 isDragging = false
                 multiTouchActive = false
@@ -1813,7 +1857,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         // MARK: - Hardware keyboard input
 
         override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-            guard let session else {
+            guard acceptsHardwareKeyboardInput, let session else {
                 super.pressesBegan(presses, with: event)
                 return
             }
@@ -1871,7 +1915,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-            guard let touch = touches.first, let session,
+            guard acceptsPointerInput, let touch = touches.first, let session,
                   !multiTouchActive, activeTouchCount(event) < 2 else { return }
 
             let location = touch.location(in: self)
@@ -1913,10 +1957,17 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-            guard let touch = touches.first, let session else { return }
+            guard let touch = touches.first else { return }
+            endSingleTouch(at: touch.location(in: self), timestamp: touch.timestamp,
+                           remainingTouchCount: activeTouchCount(event))
+        }
+
+        private func endSingleTouch(at location: CGPoint, timestamp: TimeInterval,
+                                    remainingTouchCount: Int) {
+            guard let session else { return }
 
             if multiTouchActive {
-                if activeTouchCount(event) == 0 { multiTouchActive = false }
+                if remainingTouchCount == 0 { multiTouchActive = false }
                 return
             }
 
@@ -1929,7 +1980,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                     session.leftButtonUp(at: point)
                     isDragging = false
                 } else if !touchMoved,
-                          touch.timestamp - touchStartTime < tapDurationThreshold {
+                          timestamp - touchStartTime < tapDurationThreshold {
                     let point = relativePointer.target ?? session.cursorLocation
                     session.leftButtonDown(at: point)
                     session.leftButtonUp(at: point)
@@ -1944,7 +1995,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
                 directPressed = false
 
-                let point = framebufferPoint(for: touch.location(in: self))
+                let point = framebufferPoint(for: location)
                     ?? session.cursorLocation
                 session.leftButtonUp(at: point)
                 cursorLocationDidChange()

@@ -90,25 +90,31 @@ struct GlassyStreamPairingView: View {
 
     private var pairingContent: some View {
         // Keep the task owner mounted while scan, form, and success content transition.
-        ZStack {
-            if hasConnected {
-                VStack(spacing: 12) {
-                    MacPairingIllustration(isRecognized: true)
-                    Text("You’re connected.")
-                        .font(.largeTitle.bold())
-                    Text("Your Mac is coming right up.")
-                        .foregroundStyle(.secondary)
+        GeometryReader { geometry in
+            ZStack {
+                if hasConnected {
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            MacPairingIllustration(isRecognized: true)
+                            Text("You’re connected.")
+                                .font(.largeTitle.bold())
+                            Text("Your Mac is coming right up.")
+                                .foregroundStyle(.secondary)
+                        }
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .transition(.opacity)
+                } else if isShowingQRScanner {
+                    scannerContent(previewHeight: min(300, max(160, geometry.size.height * 0.55)))
+                        .transition(stepTransition)
+                } else {
+                    Form { manualPairingContent }
+                        .scrollDismissesKeyboard(.interactively)
+                        .safeAreaInset(edge: .bottom, spacing: 0) { manualConnectButton }
+                        .transition(stepTransition)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .transition(.opacity)
-            } else if isShowingQRScanner {
-                scannerContent
-                    .transition(stepTransition)
-            } else {
-                Form { manualPairingContent }
-                    .scrollDismissesKeyboard(.interactively)
-                    .safeAreaInset(edge: .bottom, spacing: 0) { manualConnectButton }
-                    .transition(stepTransition)
             }
         }
         .background(Color(.systemGroupedBackground))
@@ -314,7 +320,7 @@ struct GlassyStreamPairingView: View {
         .background(Color(.systemGroupedBackground))
     }
 
-    private var scannerContent: some View {
+    private func scannerContent(previewHeight: CGFloat) -> some View {
         ScrollView {
             VStack(spacing: 24) {
                 if let invitation = scannedInvitation {
@@ -344,9 +350,9 @@ struct GlassyStreamPairingView: View {
                         Button("Scan Again", action: beginScanning)
                             .buttonStyle(.glassProminent)
                     } else {
-                        GlassyPairingScannerView(onScan: receiveScan)
+                        GlassyPairingScannerView(previewHeight: previewHeight, onScan: receiveScan)
                             .id(scannerID)
-                            .frame(minHeight: 300)
+                            .frame(minHeight: previewHeight)
                             .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 28))
                     }
 
