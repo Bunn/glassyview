@@ -189,3 +189,12 @@ absence of unnegotiated status messages. This fixture intentionally covers the
 current protocol extension against commit
 `485335bc393c173d5f6e39cd5ef73932036ee6fa` by default. Use `--legacy-revision`
 to test another known historical implementation.
+
+For the release matrix, use `--compatibility released-client --legacy-revision 2.1`
+and `--compatibility released-host --legacy-revision 3e13148`. These modes snapshot
+all compiled transport, wire, credential, and support sources belonging to the
+selected historical peer. They test pairing and resume, every runtime status,
+all input types, quality selection, cursor telemetry, video payloads, and ping.
+The other peer uses the working tree. See the
+[mixed-version release check](mixed-version-compatibility-2026-09-20.md) for the
+version boundaries, user-visible behavior, and limits of this fixture.

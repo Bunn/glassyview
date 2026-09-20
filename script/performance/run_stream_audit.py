@@ -18,9 +18,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def declaration(path, start):
+def declaration(path, start, source=None):
     """Extract an intact top-level declaration, including its nested braces."""
-    source = (ROOT / path).read_text()
+    source = (ROOT / path).read_text() if source is None else source
     begin = source.index(start)
     opening = source.index("{", begin)
     depth = 1
@@ -33,14 +33,42 @@ def declaration(path, start):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scenario", choices=["healthy-best", "slow-bootstrap", "regression", "codec-ordering"])
-    parser.add_argument("--compatibility", choices=["legacy-client", "legacy-host"],
-                        help="Compile the selected peer's pre-adaptive committed source against the current other peer")
-    parser.add_argument("--legacy-revision", default="485335bc393c173d5f6e39cd5ef73932036ee6fa",
-                        help="Pre-adaptive commit used for compatibility peers")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--scenario", choices=["healthy-best", "slow-bootstrap", "regression", "codec-ordering"])
+    selection.add_argument("--compatibility", choices=["legacy-client", "legacy-host", "released-client", "released-host"],
+                           help="Test a historical peer against the current other peer; released-* snapshots the entire transport")
+    parser.add_argument("--legacy-revision",
+                        help="Historical peer's Git revision; required for released-*, defaults to the pre-adaptive commit for legacy-*")
     args = parser.parse_args()
+    released = args.compatibility in ("released-client", "released-host")
+    if released and not args.legacy_revision:
+        parser.error("released-* requires --legacy-revision for the released peer")
+    args.legacy_revision = args.legacy_revision or "485335bc393c173d5f6e39cd5ef73932036ee6fa"
+    if args.compatibility:
+        args.legacy_revision = subprocess.run(
+            ["git", "rev-parse", "--verify", "--end-of-options", args.legacy_revision + "^{commit}"],
+            cwd=ROOT, check=True, text=True, capture_output=True,
+        ).stdout.strip()
     host = "GlassyHost/Sources/GlassyHost/"
     client = "dejaview/Services/GlassyStream/"
+
+    def source_text(path):
+        historical = (
+            args.compatibility == "released-host" and path.startswith(host)
+            or args.compatibility == "released-client" and (
+                path.startswith(client)
+                or path in ("dejaview/Models/RemoteSessionTypes.swift", "dejaview/Infrastructure/AppLog.swift")
+            )
+            or args.compatibility == "legacy-client" and path == client + "GlassyStreamClient.swift"
+            or args.compatibility == "legacy-host" and path in (
+                host + "Services/HostProtocol.swift", host + "Services/HostServer.swift"
+            )
+        )
+        if historical:
+            return subprocess.run(["git", "show", args.legacy_revision + ":" + path], cwd=ROOT,
+                                  check=True, text=True, capture_output=True).stdout
+        return (ROOT / path).read_text()
+
     sources = [
         host + "Services/HostProtocol.swift",
         host + "Services/HostDeviceAccessStore.swift",
@@ -58,16 +86,21 @@ def main():
         client + "GlassyStreamPairingPassword.swift",
         client + "GlassyStreamResumeCredentialStore.swift",
         "dejaview/Infrastructure/AppLog.swift",
-        "script/performance/StreamCompatibilityProbe.swift" if args.compatibility else "script/performance/StreamAuditProbe.swift",
+        "script/performance/ReleasedPeerCompatibilityProbe.swift" if released else (
+            "script/performance/StreamCompatibilityProbe.swift" if args.compatibility else "script/performance/StreamAuditProbe.swift"
+        ),
     ]
     with tempfile.TemporaryDirectory(prefix="glassy-stream-audit-") as directory:
         work = Path(directory)
         # Keep these source declarations verbatim; avoid importing SwiftData/UI.
         support = "import Foundation\nimport Network\nimport CoreMedia\nimport CoreVideo\n"
-        support += declaration("dejaview/Models/RemoteSessionTypes.swift", "enum RemoteSessionQuality:")
-        support += "\n" + declaration(client + "GlassyStreamEndpoint.swift", "struct GlassyStreamDirectAddress:")
-        support += "\n" + declaration(host + "Services/ScreenCaptureService.swift", "struct CapturedScreenFrame:")
-        support += "\n" + declaration(host + "Services/ScreenCaptureService.swift", "struct ScreenCaptureConfiguration:")
+        for path, start in [
+            ("dejaview/Models/RemoteSessionTypes.swift", "enum RemoteSessionQuality:"),
+            (client + "GlassyStreamEndpoint.swift", "struct GlassyStreamDirectAddress:"),
+            (host + "Services/ScreenCaptureService.swift", "struct CapturedScreenFrame:"),
+            (host + "Services/ScreenCaptureService.swift", "struct ScreenCaptureConfiguration:"),
+        ]:
+            support += "\n" + declaration(path, start, source_text(path))
         support += """
 enum GlassyStreamEndpoint {
     static func isRecognizedTailscaleEndpoint(_ endpoint: NWEndpoint) -> Bool {
@@ -76,21 +109,7 @@ enum GlassyStreamEndpoint {
 }
 """
         (work / "Support.swift").write_text(support)
-        compile_sources = [ROOT / source for source in sources]
-        def committed_source(source):
-            return subprocess.run(["git", "show", args.legacy_revision + ":" + source], cwd=ROOT,
-                                  check=True, text=True, capture_output=True).stdout
-        legacy_sources = []
-        if args.compatibility == "legacy-client":
-            legacy_sources = [client + "GlassyStreamClient.swift"]
-        elif args.compatibility == "legacy-host":
-            legacy_sources = [host + "Services/HostProtocol.swift"]
-        for source in legacy_sources:
-            legacy = work / ("Legacy" + Path(source).name)
-            legacy.write_text(committed_source(source))
-            compile_sources[compile_sources.index(ROOT / source)] = legacy
-        server = (committed_source(host + "Services/HostServer.swift") if args.compatibility == "legacy-host"
-                  else (ROOT / (host + "Services/HostServer.swift")).read_text())
+        server = source_text(host + "Services/HostServer.swift")
         binding = "let parameters = NWParameters(tls: nil, tcp: tcpOptions)"
         assert server.count(binding) == 1
         server = server.replace(binding, binding + '\n                parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)')
@@ -101,14 +120,17 @@ enum GlassyStreamEndpoint {
         # Snapshot the source list before compilation: parallel UI work must
         # not invalidate a long Swift frontend read midway through this probe.
         snapshots = []
-        for index, source in enumerate(compile_sources):
-            snapshot = work / (str(index) + "-" + source.name)
-            snapshot.write_text(source.read_text())
+        for index, source in enumerate(sources):
+            snapshot = work / (str(index) + "-" + Path(source).name)
+            snapshot.write_text(source_text(source))
             snapshots.append(snapshot)
         compile_sources = snapshots
         binary = work / "stream-audit"
+        # Match the app's Release compilation mode, including when both peers
+        # share one diagnostic module. Swift 6.4's per-file -O build rejects valid
+        # pairing codes here; debug and whole-module builds agree on the result.
         subprocess.run(
-            ["xcrun", "swiftc", "-O", "-swift-version", "6", "-parse-as-library",
+            ["xcrun", "swiftc", "-O", "-whole-module-optimization", "-swift-version", "6", "-parse-as-library",
              *[str(source) for source in compile_sources],
              str(work / "Support.swift"), str(work / "HostServer.swift"),
              "-o", str(binary)], check=True, cwd=ROOT, timeout=180,
@@ -123,6 +145,8 @@ enum GlassyStreamEndpoint {
                 print(result.stderr, file=sys.stderr)
                 result.check_returncode()
             reports[scenario or "audit"] = json.loads(result.stdout)
+            if args.compatibility:
+                reports[scenario or "audit"]["historical_peer_revision"] = args.legacy_revision
         print(json.dumps(reports if len(reports) > 1 else next(iter(reports.values())), indent=2))
 
 
