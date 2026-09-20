@@ -20,17 +20,17 @@ The person operating the new Mac can change. The app must still be signed using 
 
 ## Public identity to preserve
 
-These values were checked against version **0.2.7 (11)** and the release scripts on **2026-09-05**. For later migrations, recheck [host-release.json](../script/host-release.json), [the host Info.plist](../GlassyHost/Support/Info.plist), and the most recent shipped app before relying on this snapshot.
+These values describe the recovered release setup for **0.2.14 (18)**, checked on **2026-09-20**. For later migrations, recheck [host-release.json](../script/host-release.json), [the host Info.plist](../GlassyHost/Support/Info.plist), and the most recent shipped app before relying on this snapshot. Version 0.2.13 and earlier use the previous Sparkle public key; see [lost-key recovery](#certificate-renewal-or-lost-keys) below.
 
 | Item | Current value |
 | --- | --- |
 | Developer ID Application identity | `Developer ID Application: Fernando Bunn (B2RUA6XMHC)` |
 | Apple Developer Team ID | `B2RUA6XMHC` |
-| Current signing certificate SHA-1, for exact selection | `C4BF2CFE6BEDB7CBD8656F332685D0AE3B4FB6B3` |
-| Current certificate expiry | **2027-02-01 at 22:12:15 UTC**; inspect again before migration or renewal |
+| Current signing certificate SHA-1, for exact selection | `6B0F5C09E54FB305E358F5F0ED252800D05DF62C` |
+| Current certificate expiry | **2031-09-17 at 00:00:00 UTC**; inspect again before migration or renewal |
 | Bundle and code-signing identifier | `dev.bunn.glassydesk.host` |
 | App bundle / executable | `Glassy Desk.app` / `GlassyHost` |
-| Sparkle public key (`SUPublicEDKey`) | `ipAMEzRnoCI5mU96B1X14pX/XJJFShB7NlVpJwIG+Yg=` |
+| Sparkle public key (`SUPublicEDKey`) | `4Rre8LBS6LmX3rAR/I8srcEJbkEQJTnxZ96v6WuFifI=` |
 | Sparkle tools' Keychain account | `dev.bunn.glassydesk.host` |
 | Release credential Keychain service | `dev.bunn.glassydesk.release` |
 | Sparkle feed (`SUFeedURL`) | `https://glassydesk-host.pages.dev/glassy-host/appcast.xml` |
@@ -84,8 +84,8 @@ If only the release store retains the key, recover its existing `sparkle-key` va
 
 | Item | What to preserve or restore |
 | --- | --- |
-| Apple Developer membership | Access to team `B2RUA6XMHC`, account recovery, and the ability to authenticate Xcode. The current local route uses the signed-in Xcode account; it does not require an existing `.p8` file. |
-| Optional `notarytool` setup | If using it, preserve the `.p8`, key ID, and team issuer ID, or recreate the Keychain profile with authorized credentials. A profile name alone is not a credential backup. |
+| Apple Developer membership | Access to team `B2RUA6XMHC`, account recovery, and the ability to authenticate Xcode or an authorized notarization API key. |
+| `notarytool` setup | The recovered Mac uses Keychain profile `GlassyDesk-Release-2026`. Preserve the `.p8`, key ID, and team issuer ID, or recreate the profile with authorized credentials. A profile name alone is not a credential backup. |
 | GitHub | Access to the source repo and **Contents: write** on the distribution repo. Preserve or replace the publishing token. Source Git SSH access and the release HTTP API token are separate. |
 | Cloudflare | Access to the existing account and Pages project, plus a token with **Account → Cloudflare Pages → Edit** scoped to that account. |
 | Release artifacts | Final ZIPs, DMGs, receipts, packaging manifests, original `.xcarchive` directories, notarization records, and available debug symbols. Keep the last known-good public app for upgrade testing. |
@@ -151,7 +151,9 @@ The last two commands prompt with hidden input. Use the same trusted `python3` e
 
 An installed Developer ID identity is sufficient for the local Xcode route. If choosing the automation's PKCS#12 path, also import `codesign-p12` from the binary `.p12` and `codesign-password` using the commands in the release runbook. This path is required in CI. A stale saved `codesign-p12` or environment override takes precedence over the installed identity, so inspect your intended credential setup if the wrong certificate is selected.
 
-The release command does **not** automatically use `gh auth login`, `wrangler login`, or `asc auth login` credentials. Configure its own environment variables or release Keychain entries. Some releases on the original Mac used a Wrangler OAuth token supplied to the process; that temporary session is not portable. On the replacement machine, configure a scoped Cloudflare API token with sufficient lifetime for compilation, both notarizations, and deployment. Existing sessions or tokens must be refreshed through their provider when expired; do not copy an expired OAuth value into the release store.
+The release command does **not** automatically use `gh auth login` or `asc auth login` credentials. Configure its own environment variables, release Keychain entries, or a supported notarization profile. Cloudflare uses a scoped API token by default; local runs can explicitly select an existing Wrangler session with `--cloudflare-oauth`. Restore that session on the replacement machine through `wrangler login`; do not copy an expired OAuth value into the release store. The [runbook](macos-release.md#credentials) includes the supported modes.
+
+Release-store entries explicitly disable iCloud Keychain synchronization. Keep an encrypted backup of the Sparkle export and password-protected Developer ID `.p12` independently of the Mac; iCloud sign-in cannot be relied on to restore them.
 
 ## Prove continuity before retiring the old setup
 
@@ -201,10 +203,12 @@ Do not repeat `--xcode-notarization` on resume; the receipt remembers the mode. 
 
 ## Certificate renewal or lost keys
 
-Moving a computer does not require a new certificate. The currently recorded certificate expires on **2027-02-01**, so a later migration may also require a planned renewal. Apple explains that already distributed apps can remain usable after certificate expiry, while new releases need a valid signing certificate. Expiry and revocation are different; do not revoke a working identity as a migration step. See [Developer ID certificate expiration](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/#manage-developer-id-certificate-and-provisioning-profile-expiration).
+Moving a computer does not require a new certificate. The currently recorded certificate expires on **2031-09-17**, so a later migration may also require a planned renewal. Apple explains that already distributed apps can remain usable after certificate expiry, while new releases need a valid signing certificate. Expiry and revocation are different; do not revoke a working identity as a migration step. See [Developer ID certificate expiration](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/#manage-developer-id-certificate-and-provisioning-profile-expiration).
 
 If renewal is necessary, use an authorized Developer ID Application certificate in the **same team**, keep the existing Sparkle key, record the new fingerprint/expiry, and repeat the real old-to-new upgrade check. Update the selected signing identity where necessary; do not change the bundle ID or Sparkle public key to make a signing error go away.
 
-Sparkle supports deliberate rotation of one trust mechanism while the other remains trusted. Do not replace both the Developer ID identity and Sparkle key in the same transition. Loss of the Sparkle key requires a separate recovery/rotation plan, not routine new-Mac setup. Consult [Sparkle's rotation rules](https://sparkle-project.org/documentation/#rotating-signing-keys) against the versions and settings already shipped; pre-extraction verification settings affect available recovery paths. Our normal script pins one public key and is not an automatic key-rotation tool.
+Sparkle supports deliberate rotation of one trust mechanism while the other remains trusted. A replacement Developer ID certificate in the same team can preserve the old app's designated requirement even though the certificate fingerprint and private key change. Verify that requirement against the actual new app; matching the certificate's display name alone is insufficient. Loss of the Sparkle key requires a separate recovery/rotation plan, not routine new-Mac setup. Consult [Sparkle's rotation rules](https://sparkle-project.org/documentation/#rotating-signing-keys) against the versions and settings already shipped; pre-extraction verification settings affect available recovery paths. Our normal script pins one public key and is not an automatic key-rotation tool.
+
+The September 2026 recovery uses this path. The old Sparkle private key and Developer ID private key were unavailable, including in iCloud Keychain. A new Developer ID Application certificate was issued for the same team from a locally generated CSR, and a new Sparkle key was generated. Version 0.2.13 ships Sparkle 2.9.6 without `SUVerifyUpdateBeforeExtraction` or `SURequireSignedFeed`. Its post-extraction validation can accept the new ZIP through the old app's designated requirement, then requires the ZIP signature to verify with the new app's embedded key. Preserve the bundle identifier, team, feed URL, and pairing storage namespaces throughout this transition. Record artifact-level and installation checks in the release verification report.
 
 Keep the original encrypted backups until the replacement setup has passed the full upgrade check, then maintain recoverable backups of the signing identity, Sparkle key, and release records independently of either computer.

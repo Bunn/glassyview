@@ -109,6 +109,8 @@ class ServiceFixture:
             return SIGNATURE.encode(), b""
         elif args[0] == "swift":
             self.events.append("verify-signature")
+        elif args[:3] == ["xcrun", "lipo", "-archs"]:
+            return b"x86_64 arm64\n", b""
         elif args[0] == "/usr/bin/codesign" and "-d" in args:
             return b"", (b"Authority=Developer ID Application: Test\nTeamIdentifier=B2RUA6XMHC\n"
                          b"Timestamp=Sep 3 2026\nCodeDirectory flags=0x10000(runtime)\n")

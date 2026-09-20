@@ -11,6 +11,17 @@ usage() {
   printf 'The optional JSON manifest is created after successful packaging; its parent must exist and the file must not.\n'
 }
 
+verify_universal_binary() {
+  local architectures required_architecture
+  architectures="$(/usr/bin/xcrun lipo -archs "$1")"
+  for required_architecture in arm64 x86_64; do
+    if [[ " $architectures " != *" $required_architecture "* ]]; then
+      printf 'Missing required architecture %s in %s.\n' "$required_architecture" "$1" >&2
+      return 1
+    fi
+  done
+}
+
 OUTPUT_MANIFEST=""
 POSITIONAL_IDENTITY=""
 HAS_POSITIONAL_IDENTITY=false
@@ -152,7 +163,7 @@ if [[ ! -d "$BUILD_DIR/Sparkle.framework" || ! -f "$SPARKLE_ARTIFACT/LICENSE" ]]
   printf 'The resolved Sparkle framework or its artifact-root LICENSE is missing.\n' >&2
   exit 1
 fi
-/usr/bin/xcrun lipo "$BUILD_DIR/$APP_NAME" -verify_arch arm64 x86_64
+verify_universal_binary "$BUILD_DIR/$APP_NAME"
 
 # Every invocation gets a fresh workspace. Failed output remains available for
 # inspection; no cleanup trap can remove a previous or in-progress release.
@@ -214,8 +225,8 @@ done
   --entitlements "$ENTITLEMENTS" \
   "$APP_BUNDLE"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
-/usr/bin/xcrun lipo "$APP_BINARY" -verify_arch arm64 x86_64
-/usr/bin/xcrun lipo "$SPARKLE_FRAMEWORK/Sparkle" -verify_arch arm64 x86_64
+verify_universal_binary "$APP_BINARY"
+verify_universal_binary "$SPARKLE_FRAMEWORK/Sparkle"
 
 SIGNING_DETAILS="$(/usr/bin/codesign -d --verbose=4 "$APP_BUNDLE" 2>&1)"
 SIGNING_AUTHORITY="$(printf '%s\n' "$SIGNING_DETAILS" | /usr/bin/awk '/^Authority=/ { sub(/^Authority=/, ""); print; exit }')"

@@ -279,6 +279,12 @@ def app_metadata(path, config):
             "minimum_system": info["LSMinimumSystemVersion"]}
 
 
+def validate_architectures(binary, run):
+    output, _ = run.run(["xcrun", "lipo", "-archs", binary], "Verify universal architectures")
+    if not {"arm64", "x86_64"}.issubset(set(output.decode().split())):
+        raise ReleaseError(f"The release binary must contain arm64 and x86_64: {binary}")
+
+
 def validate_app(app, config, state, run):
     if app_metadata(app / "Contents/Info.plist", config) != {
         key: state[key] for key in ("version", "build", "minimum_system")
@@ -293,7 +299,7 @@ def validate_app(app, config, state, run):
             not re.search(r"^Timestamp=(?!none\s*$).+", text, re.MULTILINE)):
         raise ReleaseError("The app needs this team's Developer ID signature, hardened runtime, and timestamp.")
     for binary in (app / "Contents/MacOS/GlassyHost", app / "Contents/Frameworks/Sparkle.framework/Sparkle"):
-        run.run(["xcrun", "lipo", binary, "-verify_arch", "arm64", "x86_64"], "Verify universal architectures")
+        validate_architectures(binary, run)
 
 
 @contextlib.contextmanager

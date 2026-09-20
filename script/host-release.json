@@ -2,7 +2,7 @@
   "bundle_id": "dev.bunn.glassydesk.host",
   "team_id": "B2RUA6XMHC",
   "identity": "Developer ID Application: Fernando Bunn (B2RUA6XMHC)",
-  "sparkle_public_key": "ipAMEzRnoCI5mU96B1X14pX/XJJFShB7NlVpJwIG+Yg=",
+  "sparkle_public_key": "4Rre8LBS6LmX3rAR/I8srcEJbkEQJTnxZ96v6WuFifI=",
   "repository": "Bunn/GlassyDesk-Host",
   "branch": "main",
   "feed_path": "glassy-host/appcast.xml",

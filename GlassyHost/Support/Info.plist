@@ -19,15 +19,15 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.2.13</string>
+	<string>0.2.14</string>
 	<key>CFBundleVersion</key>
-	<string>17</string>
+	<string>18</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>SUFeedURL</key>
 	<string>https://glassydesk-host.pages.dev/glassy-host/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>ipAMEzRnoCI5mU96B1X14pX/XJJFShB7NlVpJwIG+Yg=</string>
+	<string>4Rre8LBS6LmX3rAR/I8srcEJbkEQJTnxZ96v6WuFifI=</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_glassydesk._tcp</string>

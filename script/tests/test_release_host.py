@@ -756,6 +756,23 @@ class CloudflareAuthModeTests(SyntheticCase):
         self.process.assert_not_called()
 
 
+class UniversalArchitectureTests(unittest.TestCase):
+    def test_accepts_both_architectures_in_either_order(self):
+        for output in (b"arm64 x86_64\n", b"x86_64 arm64\n"):
+            with self.subTest(output=output):
+                runner = Mock()
+                runner.run.return_value = output, b""
+                release.validate_architectures(Path("Glassy Desk.app/Contents/MacOS/GlassyHost"), runner)
+
+    def test_rejects_missing_or_wrong_architectures(self):
+        for output in (b"arm64\n", b"x86_64\n", b"arm64e x86_64\n", b""):
+            with self.subTest(output=output):
+                runner = Mock()
+                runner.run.return_value = output, b""
+                with self.assertRaisesRegex(release.ReleaseError, "must contain arm64 and x86_64"):
+                    release.validate_architectures(Path("GlassyHost"), runner)
+
+
 class EnvironmentAndDryRunTests(SyntheticCase):
     def test_unrelated_children_receive_no_release_credentials(self):
         secret_names = ("GH_TOKEN", "GITHUB_TOKEN", "CLOUDFLARE_API_TOKEN", "SPARKLE_PRIVATE_KEY",

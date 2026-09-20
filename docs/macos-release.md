@@ -1,6 +1,6 @@
 # Release Glassy Desk for Mac
 
-Moving to another computer? Start with [the release migration guide](macos-release-migration.md), which records the production identity, certificate expiry, backup and restore steps, and an existing-user upgrade check. The local setup used for 0.2.7 uses `--xcode-notarization` with the signed-in Xcode account; the default command below uses configured `notarytool` credentials.
+Moving to another computer? Start with [the release migration guide](macos-release-migration.md), which records the production identity, certificate expiry, backup and restore steps, and an existing-user upgrade check. The recovered release Mac uses `NOTARY_KEYCHAIN_PROFILE=GlassyDesk-Release-2026` with the default `notarytool` route and `--cloudflare-oauth` for publishing. The local setup used for 0.2.7 used `--xcode-notarization` with the signed-in Xcode account.
 
 Run the release automation from the `Bunn/glassyview` source repository:
 
@@ -57,6 +57,8 @@ On a development Mac with an existing authenticated Wrangler OAuth session, choo
 
 This uses the same configured Cloudflare account and Pages project, skips the saved API token, and removes token/key/email environment overrides from the deployment command, including Wrangler's deprecated aliases. Wrangler runs noninteractively: the release tool never opens a browser or starts a login flow. If the existing session is missing or cannot refresh, deployment stops and remains resumable. The receipt saves only the authentication mode, never OAuth credentials. API-token authentication remains the default and is required in CI; explicit or saved OAuth mode is rejected when `CI` or `GITHUB_ACTIONS` is enabled.
 
+Restore the local session before releasing with `npx --yes wrangler@4.128.0 login --scopes account:read user:read pages:write --use-keyring`. Complete the browser authorization promptly; rerun login if it times out. The keyring option keeps the OAuth credential in macOS Keychain.
+
 For notarization, provide the `.p8` private key plus `NOTARY_KEY_ID`. Team API keys also require `NOTARY_ISSUER_ID`; omit the issuer for individual API keys. Locally, `NOTARY_KEY_PATH` can point to the private PEM file instead of supplying its contents. An existing `NOTARY_KEYCHAIN_PROFILE`, with optional `NOTARY_KEYCHAIN`, is another local option if it is already accessible without an authentication dialog. This `notarytool` path is the default and is required in CI. Apple documents the submission process in [Notarization with notarytool](https://developer.apple.com/documentation/technotes/tn3147-migrating-to-the-latest-notarization-tool).
 
 On a development Mac that is already signed into the correct Apple developer account in Xcode, a local fallback can use that account without a `.p8` key:
@@ -91,6 +93,8 @@ For a private file, use `--file`. Files must be owned by the current user, with 
 Use the same trusted Python executable for setup and releases, and unlock the user Keychain before running. Keychain access disables authentication UI; inaccessible items fail with an actionable error. The store trusts the Python executable used during setup, so other scripts running through that executable share its access. Environment credentials are an alternative when local Keychain access is unavailable.
 
 ### Export the existing Sparkle key
+
+Version 0.2.14 deliberately rotates the lost original key through the preserved Developer ID trust requirement. Future routine releases must preserve the new key in the committed configuration. See [lost-key recovery](macos-release-migration.md#certificate-renewal-or-lost-keys) for that exceptional transition.
 
 The deployed app trusts the existing Sparkle public key. **Do not generate a replacement key for this automation.** Export the matching private key once from the existing Sparkle Keychain account `dev.bunn.glassydesk.host`, then import that export into the release credential store:
 
