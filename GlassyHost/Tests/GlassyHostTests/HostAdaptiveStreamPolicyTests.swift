@@ -246,3 +246,28 @@ func largePreviewRemainsTemporary() {
     #expect(policy.maximumCaptureWidth == nil)
     #expect(policy.bitRate == 12_000_000)
 }
+
+@Test("A 200 ms internet path keeps Balanced instead of treating latency as congestion")
+func distantHostRoundTripIsNotCongestion() throws {
+    var policy = HostAdaptiveRatePolicy()
+    // Authentication feedback overestimates the path; acknowledgements refine it.
+    policy.observeInitialRoundTrip(0.6)
+    policy.acknowledged(deliveryAge: 0.5, queueAge: 0, ceiling: 5_000_000, at: 0, deliveredBytes: 8_000)
+    #expect(policy.bitRate == 5_000_000)
+    // 30 fps deltas acknowledged one RTT plus batching later, with jitter.
+    for step in 0..<300 {
+        let jitter = step % 7 == 0 ? 0.08 : 0
+        policy.acknowledged(deliveryAge: 0.25 + jitter, queueAge: 0.01, ceiling: 5_000_000,
+                            at: 1 + Double(step) / 30, deliveredBytes: 20_000)
+    }
+    #expect(policy.bitRate == 5_000_000)
+    #expect(policy.roundTripTime > 0.18 && policy.roundTripTime < 0.25)
+    // Credit must span the RTT: 5 Mbps over ~450 ms holds far more than 200 ms.
+    var window = HostMediaDeliveryWindow()
+    for sequence in 1...12 { window.sent(sequence: UInt64(sequence), bytes: 20_000, at: 0) }
+    #expect(window.hasCredit(bitRate: policy.bitRate, window: policy.creditWindow))
+    #expect(!window.hasCredit(bitRate: policy.bitRate))
+    // Real queueing well beyond the measured path still backs off.
+    policy.acknowledged(deliveryAge: 0.9, queueAge: 0.01, ceiling: 5_000_000, at: 20, deliveredBytes: 20_000)
+    #expect(policy.bitRate < 5_000_000)
+}

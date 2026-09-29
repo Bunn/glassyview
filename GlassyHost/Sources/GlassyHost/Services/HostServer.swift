@@ -526,8 +526,10 @@ private extension HostServer {
                 mediaMaintenanceWorkItem = nil
                 let now = ProcessInfo.processInfo.systemUptime
                 for client in authenticatedClients where client.supportsAdaptiveStream {
-                    if client.deliveryWindow.oldestAge(at: now) > client.ratePolicy.congestionAgeBudget(bytes: client.deliveryWindow.frames.first?.bytes ?? 0) {
-                        client.ratePolicy.congested(at: now)
+                    let oldestAge = client.deliveryWindow.oldestAge(at: now)
+                    if oldestAge > client.ratePolicy.congestionAgeBudget(bytes: client.deliveryWindow.frames.first?.bytes ?? 0),
+                       client.ratePolicy.congested(at: now) {
+                        Self.logger.info("Receiver stalled oldestUnacknowledged=\(Int(oldestAge * 1_000))ms rtt=\(Int(client.ratePolicy.roundTripTime * 1_000))ms")
                     }
                     let recoveryDeadline = max(8, min(60, Double(client.deliveryWindow.outstandingBytes * 8) / Double(client.ratePolicy.bitRate) * 3))
                     if client.deliveryWindow.oldestAge(at: now) > recoveryDeadline {
@@ -537,7 +539,7 @@ private extension HostServer {
                         continue
                     }
                     sendNextPacket(for: client)
-                    if client.needsKeyFrame, client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate, allowsMultipleFrames: !client.ratePolicy.awaitingFirstDelivery) {
+                    if client.needsKeyFrame, client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate, window: client.ratePolicy.creditWindow, allowsMultipleFrames: !client.ratePolicy.awaitingFirstDelivery) {
                         requestKeyFrameIfNeeded(for: [client])
                     }
                 }
@@ -711,7 +713,7 @@ private extension HostServer {
             for client in clients where client.isMediaReady && client.needsKeyFrame
                 && !client.keyFrameRequestOutstanding {
                 if client.supportsAdaptiveStream,
-                   !client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate, allowsMultipleFrames: !client.ratePolicy.awaitingFirstDelivery) { continue }
+                   !client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate, window: client.ratePolicy.creditWindow, allowsMultipleFrames: !client.ratePolicy.awaitingFirstDelivery) { continue }
                 client.keyFrameRequestOutstanding = true
                 shouldRequest = true
             }
@@ -1329,9 +1331,13 @@ private extension HostServer {
                 let wasAwaitingFirstDelivery = client.ratePolicy.awaitingFirstDelivery
                 if feedback.latestHandledVideoSequence <= client.deliveryWindow.latestSentSequence,
                    let age = try client.deliveryWindow.acknowledge(sequence: feedback.latestHandledVideoSequence, at: now) {
-                    client.ratePolicy.acknowledged(deliveryAge: age,
-                                                  queueAge: Double(feedback.callbackQueueAgeMilliseconds) / 1_000,
+                    let previousBitRate = client.ratePolicy.bitRate
+                    let queueAge = Double(feedback.callbackQueueAgeMilliseconds) / 1_000
+                    client.ratePolicy.acknowledged(deliveryAge: age, queueAge: queueAge,
                                                   ceiling: ceiling, at: now, deliveredBytes: acknowledgedBytes)
+                    if client.ratePolicy.bitRate < previousBitRate {
+                        Self.logger.info("Receiver congestion deliveryAge=\(Int(age * 1_000))ms queueAge=\(Int(queueAge * 1_000))ms bytes=\(acknowledgedBytes) rtt=\(Int(client.ratePolicy.roundTripTime * 1_000))ms")
+                    }
                 }
                 if wasAwaitingFirstDelivery, !client.ratePolicy.awaitingFirstDelivery {
                     // Preview frames are obsolete after their one capacity
@@ -1446,7 +1452,7 @@ private extension HostServer {
                     }
                 }
                 let maximumFrameBytes = client.supportsAdaptiveStream
-                    ? max(65_536, client.ratePolicy.bitRate / 8 / 5)
+                    ? max(65_536, Int(Double(client.ratePolicy.bitRate) / 8 * client.ratePolicy.creditWindow))
                     : Self.maximumQueuedBytesPerClient
                 if packet.byteCount > maximumFrameBytes, packet.policy == .keyFrame,
                    client.supportsAdaptiveStream {
@@ -1498,7 +1504,7 @@ private extension HostServer {
             expireQueuedMedia(for: client, now: ProcessInfo.processInfo.systemUptime)
             guard let pending = client.pendingPackets.first else { return }
             if pending.policy.isVideoFrame, client.supportsAdaptiveStream,
-               !client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate, allowsMultipleFrames: !client.ratePolicy.awaitingFirstDelivery) { return }
+               !client.deliveryWindow.hasCredit(bitRate: client.ratePolicy.bitRate, window: client.ratePolicy.creditWindow, allowsMultipleFrames: !client.ratePolicy.awaitingFirstDelivery) { return }
             client.pendingPackets.removeFirst()
             client.pendingByteCount -= pending.byteCount
             do {

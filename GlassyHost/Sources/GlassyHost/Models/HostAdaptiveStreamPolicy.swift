@@ -11,14 +11,17 @@ struct HostMediaDeliveryWindow: Sendable {
     private(set) var frames: [SentFrame] = []
     private(set) var latestSentSequence: UInt64 = 0
     private(set) var latestAcknowledgedSequence: UInt64 = 0
-    // Cover 60 fps across 100 ms RTT plus feedback batching. The independent
-    // 200 ms byte window still bounds traffic committed to TCP.
-    static let maximumFrames = 16
+    // Cover 60 fps across a ~450 ms internet RTT plus feedback batching. The
+    // independent byte window, sized from the measured RTT, still bounds
+    // traffic committed to TCP.
+    static let maximumFrames = 32
 
     var outstandingBytes: Int { frames.reduce(0) { $0 + $1.bytes } }
-    func hasCredit(bitRate: Int, allowsMultipleFrames: Bool = true) -> Bool {
+    /// `window` is the delivery time the in-flight bytes may represent. It must
+    /// cover the path RTT, or throughput is capped below the selected bitrate.
+    func hasCredit(bitRate: Int, window: TimeInterval = 0.2, allowsMultipleFrames: Bool = true) -> Bool {
         (allowsMultipleFrames || frames.isEmpty) && frames.count < Self.maximumFrames
-            && outstandingBytes < max(32_768, bitRate / 8 / 5)
+            && outstandingBytes < max(32_768, Int(Double(bitRate) / 8 * window))
     }
     func oldestAge(at now: TimeInterval) -> TimeInterval {
         frames.first.map { max(0, now - $0.sentAt) } ?? 0
@@ -55,6 +58,17 @@ struct HostAdaptiveRatePolicy: Sendable {
     private var rateHeadroomSince: TimeInterval?
     private var lastReceiverCongestion: TimeInterval = -.infinity
     private var initialRoundTripTime: TimeInterval = 0
+    private var roundTripSamples: [(time: TimeInterval, value: TimeInterval)] = []
+
+    /// Windowed minimum of acknowledged path latency. Budgets are relative to
+    /// it so a distant host's round trip is not mistaken for congestion.
+    var roundTripTime: TimeInterval {
+        min(0.6, roundTripSamples.map(\.value).min() ?? initialRoundTripTime)
+    }
+
+    /// In-flight credit must span the round trip, or delivery is limited to
+    /// window/RTT regardless of link capacity and frames back up on the host.
+    var creditWindow: TimeInterval { max(0.2, roundTripTime * 2 + 0.05) }
 
     var maximumCaptureWidth: Int? {
         if awaitingFirstDelivery { return previewWidth }
@@ -106,22 +120,35 @@ struct HostAdaptiveRatePolicy: Sendable {
     }
 
     mutating func observeInitialRoundTrip(_ age: TimeInterval) {
-        initialRoundTripTime = max(0, min(0.25, age))
+        // The first feedback also includes authentication processing, so it
+        // overestimates; acknowledged samples replace it with the path minimum.
+        initialRoundTripTime = max(0, min(1, age))
+    }
+
+    private mutating func observeRoundTrip(deliveryAge: TimeInterval, bytes: Int, at now: TimeInterval) {
+        // Remove serialization and the receiver's 30 ms feedback batching. A
+        // nonpositive remainder means the link outpaced the rate: no RTT data.
+        let sample = deliveryAge - 0.03 - Double(bytes * 8) / Double(bitRate)
+        roundTripSamples.removeAll { now - $0.time > 10 }
+        guard sample > 0 else { return }
+        roundTripSamples.append((now, sample))
     }
 
     /// A single large IDR may serialize longer than a delta frame while still
     /// exceeding the selected bitrate. Compare byte delivery, not age alone.
     func congestionAgeBudget(bytes: Int) -> TimeInterval {
-        max(0.35, initialRoundTripTime + 0.03 + Double(bytes * 8) / Double(bitRate) * 1.5)
+        max(0.35, roundTripTime * 1.5 + 0.03 + Double(bytes * 8) / Double(bitRate) * 1.5)
     }
 
     mutating func selectQuality(ceiling: Int) {
         let currentPreviewWidth = previewWidth
         let roundTripTime = initialRoundTripTime
+        let samples = roundTripSamples
         let needsBootstrap = awaitingFirstDelivery
         self = Self()
         awaitingFirstDelivery = needsBootstrap
         initialRoundTripTime = roundTripTime
+        roundTripSamples = samples
         previewWidth = currentPreviewWidth
         constrain(to: ceiling)
     }
@@ -170,8 +197,9 @@ struct HostAdaptiveRatePolicy: Sendable {
             stableSince = now
             return true
         }
+        observeRoundTrip(deliveryAge: deliveryAge, bytes: deliveredBytes, at: now)
         var resolutionChanged = false
-        if emergencyResolutionLevel > 0, deliveryAge < 0.20, queueAge < 0.08,
+        if emergencyResolutionLevel > 0, deliveryAge < max(0.20, roundTripTime * 1.25 + 0.03), queueAge < 0.08,
            let resolutionRecoverySince, now - resolutionRecoverySince >= 15,
            now - lastResolutionChange >= 15 {
             emergencyResolutionLevel -= 1
@@ -183,7 +211,7 @@ struct HostAdaptiveRatePolicy: Sendable {
             rateHeadroomSince = nil
             return congested(at: now)
         }
-        let timelyAge = max(0.20, initialRoundTripTime + 0.03 + Double(deliveredBytes * 8) / Double(bitRate))
+        let timelyAge = max(0.20, roundTripTime * 1.25 + 0.03 + Double(deliveredBytes * 8) / Double(bitRate))
         // One jittery acknowledgement is not congestion, so it pauses growth
         // without discarding the accumulated stable time. Resetting on every
         // marginal sample let a busy 60 fps link stay pinned at a low rate.
