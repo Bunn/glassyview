@@ -52,6 +52,7 @@ struct HostAdaptiveRatePolicy: Sendable {
     private(set) var emergencyResolutionLevel = 0
     private var lastResolutionChange: TimeInterval = -.infinity
     private var resolutionRecoverySince: TimeInterval?
+    private var rateHeadroomSince: TimeInterval?
     private var lastReceiverCongestion: TimeInterval = -.infinity
     private var initialRoundTripTime: TimeInterval = 0
 
@@ -152,10 +153,11 @@ struct HostAdaptiveRatePolicy: Sendable {
                 // throughput limit (or a tiny preview for proof of capacity).
                 let serializationAge = max(0.001, deliveryAge - initialRoundTripTime - 0.03)
                 let measured = Int(Double(deliveredBytes * 8) / serializationAge * 0.8)
-                // Sub-20 ms samples are dominated by scheduling and timer
-                // granularity; a tiny flat preview cannot establish a lower
-                // capacity than the selected quality.
-                if serializationAge >= 0.02 {
+                // Sub-100 ms samples are dominated by scheduling, Wi-Fi jitter
+                // and feedback batching; a small preview cannot establish a
+                // lower capacity than the selected quality. Real congestion
+                // is handled continuously and recovers quickly.
+                if serializationAge >= 0.1 {
                     bitRate = max(Self.minimumBitRate, min(bitRate, measured))
                 }
                 lastReceiverCongestion = now
@@ -178,18 +180,33 @@ struct HostAdaptiveRatePolicy: Sendable {
             resolutionChanged = true
         }
         if deliveryAge > congestionAgeBudget(bytes: deliveredBytes) || queueAge > 0.12 {
+            rateHeadroomSince = nil
             return congested(at: now)
         }
         let timelyAge = max(0.20, initialRoundTripTime + 0.03 + Double(deliveredBytes * 8) / Double(bitRate))
-        guard deliveryAge < timelyAge, queueAge < 0.08 else {
-            stableSince = nil
-            return resolutionChanged
+        // One jittery acknowledgement is not congestion, so it pauses growth
+        // without discarding the accumulated stable time. Resetting on every
+        // marginal sample let a busy 60 fps link stay pinned at a low rate.
+        guard deliveryAge < timelyAge, queueAge < 0.08 else { return resolutionChanged }
+        // A recovered rate restores capture detail without waiting for a
+        // small keyframe, which a busy desktop may never produce.
+        if emergencyResolutionLevel > 0, bitRate >= 1_500_000 {
+            if rateHeadroomSince == nil { rateHeadroomSince = now }
+            if let since = rateHeadroomSince, now - since >= 4, now - lastResolutionChange >= 4 {
+                emergencyResolutionLevel -= 1
+                lastResolutionChange = now
+                rateHeadroomSince = nil
+                resolutionRecoverySince = nil
+                resolutionChanged = true
+            }
+        } else {
+            rateHeadroomSince = nil
         }
         guard let stableSince else { self.stableSince = now; return resolutionChanged }
-        guard now - stableSince >= 3 else { return resolutionChanged }
+        guard now - stableSince >= 1 else { return resolutionChanged }
         self.stableSince = now
         let previous = bitRate
-        bitRate = min(ceiling, max(bitRate + 100_000, Int(Double(bitRate) * 1.2)))
+        bitRate = min(ceiling, max(bitRate + 250_000, Int(Double(bitRate) * 1.5)))
         return bitRate != previous || resolutionChanged
     }
 }

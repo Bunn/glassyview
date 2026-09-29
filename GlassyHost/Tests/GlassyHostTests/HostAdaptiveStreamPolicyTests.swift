@@ -30,10 +30,18 @@ func adaptiveRateCongestionAndRecovery() {
     #expect(policy.bitRate == HostAdaptiveRatePolicy.minimumBitRate)
     let lowered = policy.bitRate
     policy.acknowledged(deliveryAge: 0.04, queueAge: 0.01, ceiling: 12_000_000, at: 5)
-    policy.acknowledged(deliveryAge: 0.04, queueAge: 0.01, ceiling: 12_000_000, at: 7.9)
+    policy.acknowledged(deliveryAge: 0.04, queueAge: 0.01, ceiling: 12_000_000, at: 5.9)
     #expect(policy.bitRate == lowered)
-    policy.acknowledged(deliveryAge: 0.04, queueAge: 0.01, ceiling: 12_000_000, at: 8)
+    policy.acknowledged(deliveryAge: 0.04, queueAge: 0.01, ceiling: 12_000_000, at: 6)
     #expect(policy.bitRate > lowered)
+    // Marginal jitter pauses growth but does not restart the stable clock.
+    policy.acknowledged(deliveryAge: 0.3, queueAge: 0.01, ceiling: 12_000_000, at: 6.5)
+    policy.acknowledged(deliveryAge: 0.04, queueAge: 0.01, ceiling: 12_000_000, at: 7)
+    #expect(policy.bitRate >= 900_000)
+    for step in 0..<12 {
+        policy.acknowledged(deliveryAge: 0.04, queueAge: 0.01, ceiling: 12_000_000, at: 8 + Double(step))
+    }
+    #expect(policy.bitRate == 12_000_000)
     policy.constrain(to: 400_000)
     #expect(policy.bitRate == 400_000)
 }
@@ -123,6 +131,29 @@ func emergencyResolutionRequiresMeasuredPressure() {
     #expect(emergency.maximumWidth == 320)
     #expect(emergency.maximumHeight == 180)
     #expect(emergency.framesPerSecond == 6)
+}
+
+@Test("A recovered bit rate restores emergency capture detail without needing a small keyframe")
+func emergencyResolutionRecoversWithRate() {
+    var policy = HostAdaptiveRatePolicy()
+    policy.acknowledged(deliveryAge: 0.05, queueAge: 0, ceiling: 12_000_000, at: -1)
+    for time in stride(from: 0.0, through: 4.0, by: 0.5) { policy.congested(at: time) }
+    _ = policy.oversizedKeyFrame(encodedWidth: 960, at: 4)
+    _ = policy.oversizedKeyFrame(encodedWidth: 640, at: 4.6)
+    #expect(policy.maximumCaptureWidth == 320)
+    for step in 0..<40 {
+        policy.acknowledged(deliveryAge: 0.04, queueAge: 0.01, ceiling: 12_000_000, at: 5 + Double(step))
+    }
+    #expect(policy.maximumCaptureWidth == nil)
+    #expect(policy.bitRate == 12_000_000)
+}
+
+@Test("A jittery first preview cannot starve a healthy Best connection")
+func firstPreviewJitterDoesNotLowerRate() {
+    var policy = HostAdaptiveRatePolicy()
+    policy.observeInitialRoundTrip(0.02)
+    policy.acknowledged(deliveryAge: 0.09, queueAge: 0, ceiling: 12_000_000, at: 1, deliveredBytes: 20_000)
+    #expect(policy.bitRate == 12_000_000)
 }
 
 @Test("Best starts at selected quality and complex IDRs do not invent network congestion")

@@ -48,12 +48,34 @@ struct RemoteClipboardInputTests {
     @Test
     func onlyPlainCommandVPastesFromIOS() {
         let view = PasteInputFixture()
+        view.hasPasteboardText = { true }
         #expect(view.routesThroughSystemPaste(keyCode: .keyboardV, modifiers: .command))
         #expect(view.routesThroughSystemPaste(keyCode: .keyboardV, modifiers: [.command, .alphaShift]))
         #expect(!view.routesThroughSystemPaste(keyCode: .keyboardV, modifiers: [.command, .shift]))
         #expect(!view.routesThroughSystemPaste(keyCode: .keyboardV, modifiers: .control))
         #expect(!view.routesThroughSystemPaste(keyCode: .keyboardC, modifiers: .command))
         view.isAvailable = false
+        #expect(!view.routesThroughSystemPaste(keyCode: .keyboardV, modifiers: .command))
+    }
+
+    @Test
+    func macClipboardWinsAfterARemoteCopyUntilIOSClipboardChanges() {
+        let view = OwnershipFixture()
+        var changeCount = 5
+        view.pasteboardChangeCount = { changeCount }
+        view.hasPasteboardText = { true }
+        view.readPasteboardText = { "from iOS" }
+        #expect(view.routesThroughSystemPaste(keyCode: .keyboardV, modifiers: .command))
+        // Cmd-C on the Mac: the next Cmd-V is forwarded to the Mac untouched.
+        view.noteRemoteClipboardChange()
+        #expect(!view.routesThroughSystemPaste(keyCode: .keyboardV, modifiers: .command))
+        #expect(!view.canPerformAction(#selector(view.paste(_:)), withSender: nil))
+        #expect(view.keyCommands?.contains { $0.action == #selector(view.paste(_:)) } != true)
+        // A new iOS copy is pushed once, then the Mac owns the clipboard again.
+        changeCount = 6
+        #expect(view.routesThroughSystemPaste(keyCode: .keyboardV, modifiers: .command))
+        view.paste(nil)
+        #expect(view.pastedTexts == ["from iOS"])
         #expect(!view.routesThroughSystemPaste(keyCode: .keyboardV, modifiers: .command))
     }
 
@@ -82,5 +104,13 @@ private final class PasteInputFixture: RemoteClipboardInputView {
     var isAvailable = true
     var pastedTexts: [String] = []
     override var acceptsRemotePaste: Bool { isAvailable }
+    override func sendPasteText(_ text: String) { pastedTexts.append(text) }
+}
+
+@MainActor
+private final class OwnershipFixture: RemoteClipboardInputView {
+    var pastedTexts: [String] = []
+    override var acceptsRemotePaste: Bool { true }
+    override var tracksRemoteClipboardOwnership: Bool { true }
     override func sendPasteText(_ text: String) { pastedTexts.append(text) }
 }

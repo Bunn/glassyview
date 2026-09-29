@@ -41,6 +41,53 @@
         }
       }
     },
+    "%@ — %@" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ — %2$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — %@"
+          }
+        }
+      }
+    },
     "%@ (%lld FPS)" : {
       "localizations" : {
         "de" : {
@@ -165,52 +212,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当前的 RevenueCat 产品中不提供 %@。"
-          }
-        }
-      }
-    },
-    "%@ — %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ — %@"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ — %2$@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ — %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ — %@"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ — %@"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ — %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ — %@"
           }
         }
       }
@@ -501,47 +502,6 @@
         }
       }
     },
-    "1080p · 30 FPS · ~5 Mbps" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1080p · 30 FPS · ~5 Mbit/s"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1080p · 30 FPS · ~5 Mbps"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1080p · 30 FPS · ~5 Mbps"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1080p · 30 FPS · ~5 Mbps"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1080p · 30 FPS · ~5 Mbps"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1080p · 30 FPS · ~5 Mbps"
-          }
-        }
-      }
-    },
     "12-symbol code" : {
       "localizations" : {
         "de" : {
@@ -623,6 +583,93 @@
         }
       }
     },
+    "1080p · 30 FPS · ~5 Mbps" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p · 30 FPS · ~5 Mbit/s"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p · 30 FPS · ~5 Mbps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p · 30 FPS · ~5 Mbps"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p · 30 FPS · ~5 Mbps"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p · 30 FPS · ~5 Mbps"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1080p · 30 FPS · ~5 Mbps"
+          }
+        }
+      }
+    },
+    "5900" : {
+
+    },
+    "51515" : {
+
+    },
+    "a beautiful way to feel right at your Mac." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "so schön, als säßest du direkt an deinem Mac."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "una forma preciosa de sentirte frente a tu Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まるでMacの前にいるような、美しい体験。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "een prachtige manier om je dicht bij je Mac te voelen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "um jeito bonito de se sentir bem na frente do seu Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一种让你仿佛坐在 Mac 前的美好体验。"
+          }
+        }
+      }
+    },
     "A fast connection is already active." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -663,6 +710,9 @@
           }
         }
       }
+    },
+    "A few details. Then you’re in." : {
+
     },
     "A good session starts with the Mac advertising Screen Sharing and being reachable from your current network." : {
       "extractionState" : "manual",
@@ -1069,6 +1119,9 @@
         }
       }
     },
+    "Add & Connect" : {
+
+    },
     "Add ${host}" : {
       "localizations" : {
         "de" : {
@@ -1105,6 +1158,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加 ${host}"
+          }
+        }
+      }
+    },
+    "Add a host, discover one nearby, or connect manually." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fügen Sie einen Host hinzu, entdecken Sie einen in der Nähe oder stellen Sie manuell eine Verbindung her."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agregue un host, descubra uno cercano o conéctese manualmente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホストを追加するか、近くのホストを検出するか、手動で接続します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voeg een host toe, ontdek er een in de buurt of maak handmatig verbinding."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione um host, descubra um próximo ou conecte-se manualmente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加主机、发现附近的主机或手动连接。"
           }
         }
       }
@@ -1150,6 +1244,7 @@
       }
     },
     "Add Host" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -1185,6 +1280,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加主机"
+          }
+        }
+      }
+    },
+    "Add Mac" : {
+
+    },
+    "Add or pick a host" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host hinzufügen oder auswählen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agregar o elegir un host"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホストを追加または選択します"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voeg een host toe of kies een host"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione ou escolha um host"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加或选择主机"
           }
         }
       }
@@ -1229,87 +1368,6 @@
         }
       }
     },
-    "Add a host, discover one nearby, or connect manually." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fügen Sie einen Host hinzu, entdecken Sie einen in der Nähe oder stellen Sie manuell eine Verbindung her."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agregue un host, descubra uno cercano o conéctese manualmente."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ホストを追加するか、近くのホストを検出するか、手動で接続します。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Voeg een host toe, ontdek er een in de buurt of maak handmatig verbinding."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicione um host, descubra um próximo ou conecte-se manualmente."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加主机、发现附近的主机或手动连接。"
-          }
-        }
-      }
-    },
-    "Add or pick a host" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Host hinzufügen oder auswählen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agregar o elegir un host"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ホストを追加または選択します"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Voeg een host toe of kies een host"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicione ou escolha um host"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加或选择主机"
-          }
-        }
-      }
-    },
     "Add the Mac manually using its Tailscale IP address or full .ts.net name." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1350,6 +1408,9 @@
           }
         }
       }
+    },
+    "Add your Mac to keep your desktop within reach." : {
+
     },
     "Address is still resolving." : {
       "extractionState" : "manual",
@@ -1432,6 +1493,15 @@
           }
         }
       }
+    },
+    "Allow camera access in Settings, or choose Enter a code instead below." : {
+
+    },
+    "Allow the VPN connection" : {
+
+    },
+    "Already paired before installing Tailscale? Scan a fresh code from the same Mac to add its Tailscale address." : {
+
     },
     "Annual access to Glassy Desk Pro." : {
       "extractionState" : "manual",
@@ -1556,6 +1626,9 @@
         }
       }
     },
+    "At a café, at work, or on mobile data? Tailscale is a separate VPN app that gives your devices a private connection across different networks." : {
+
+    },
     "Attempt %lld of %lld" : {
       "localizations" : {
         "de" : {
@@ -1603,6 +1676,7 @@
       }
     },
     "Authentication" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -1681,6 +1755,9 @@
           }
         }
       }
+    },
+    "Back" : {
+
     },
     "Back to My Macs" : {
       "localizations" : {
@@ -1846,6 +1923,7 @@
       }
     },
     "Before pairing, confirm Tailscale is connected and the selected peer is your Mac. Glassy Desk also requires a Tailscale IP or full .ts.net name and an active VPN route. Later connections use a random Keychain credential." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2007,6 +2085,15 @@
           }
         }
       }
+    },
+    "Camera Access Needed" : {
+
+    },
+    "Camera scanner for the Glassy Desk pairing QR code" : {
+
+    },
+    "Camera Unavailable" : {
+
     },
     "Can I connect when away from home?" : {
       "extractionState" : "manual",
@@ -2251,6 +2338,9 @@
         }
       }
     },
+    "Check that both devices are online in Tailscale and that your Mac is awake. Another VPN can conflict with Tailscale. If you use a managed Tailscale network, its administrator may need to allow the connection." : {
+
+    },
     "Check that Screen Sharing or Remote Management is enabled on the Mac, both devices are on the same network or VPN, Local Network permission is allowed for Glassy Desk, and the Mac is awake. Some networks block Bonjour discovery, so adding the host manually can still work." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2333,6 +2423,9 @@
         }
       }
     },
+    "Check Your Mac" : {
+
+    },
     "Checking" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2374,47 +2467,8 @@
         }
       }
     },
-    "Choose Fast Connection with Glassy Desk for Mac, or Standard VNC." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wählen Sie Schnellverbindung mit Glassy Desk für Mac oder Standard-VNC."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elige Conexión rápida con Glassy Desk para Mac o VNC estándar."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mac用Glassy Deskの高速接続、または標準VNCを選択します。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kies Snelle verbinding met Glassy Desk voor Mac of Standaard VNC."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escolha Conexão rápida com Glassy Desk para Mac ou VNC padrão."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择通过 Mac 版 Glassy Desk 使用快速连接，或选择标准 VNC。"
-          }
-        }
-      }
-    },
     "Choose a Mac" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2494,6 +2548,9 @@
         }
       }
     },
+    "Choose a nearby Mac or enter its address, then pair with Glassy Desk." : {
+
+    },
     "Choose a saved Tailscale 100.64–100.127 address, Tailscale IPv6 address, or full .ts.net name. Use the one-time code for Nearby or other routes." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2535,7 +2592,51 @@
         }
       }
     },
+    "Choose Fast Connection with Glassy Desk for Mac, or Standard VNC." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wählen Sie Schnellverbindung mit Glassy Desk für Mac oder Standard-VNC."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige Conexión rápida con Glassy Desk para Mac o VNC estándar."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac用Glassy Deskの高速接続、または標準VNCを選択します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kies Snelle verbinding met Glassy Desk voor Mac of Standaard VNC."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha Conexão rápida com Glassy Desk para Mac ou VNC padrão."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择通过 Mac 版 Glassy Desk 使用快速连接，或选择标准 VNC。"
+          }
+        }
+      }
+    },
+    "Choose Pair Manually → Enter an address. Copy the Mac’s 100.x.x.x address or full .ts.net name from Tailscale, then enter the current code from Add Device on the Mac. You’ll need access to that code through someone at the Mac or another trusted connection. Setting up before you leave is easiest." : {
+
+    },
     "Choose the Mac displaying the pairing code. Nearby discovery works only on the local network." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2938,6 +3039,12 @@
         }
       }
     },
+    "Code expired. Scan the new code on your Mac." : {
+
+    },
+    "Code on Your Mac" : {
+
+    },
     "Collapse session controls" : {
       "localizations" : {
         "de" : {
@@ -3260,87 +3367,6 @@
         }
       }
     },
-    "Connect Tailscale on this iPad, confirm the selected peer is your Mac, and save its 100.64–100.127 address, Tailscale IPv6 address, or full .ts.net name. Otherwise, use the one-time code." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verbinden Sie Tailscale mit diesem iPad, bestätigen Sie, dass der ausgewählte Peer Ihr Mac ist, und speichern Sie dessen Adresse 100.64–100.127, die Tailscale IPv6-Adresse oder den vollständigen .ts.net-Namen. Andernfalls verwenden Sie den Einmalcode."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conecte Tailscale en este iPad, confirme que el par seleccionado sea su Mac y guarde su dirección 100.64–100.127, la dirección Tailscale IPv6 o el nombre completo de .ts.net. De lo contrario, utilice el código de un solo uso."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "この iPad で Tailscale に接続し、選択したピアが Mac であることを確認し、その 100.64 ～ 100.127 アドレス、Tailscale IPv6 アドレス、または完全な .ts.net 名を保存します。それ以外の場合は、ワンタイム コードを使用します。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sluit Tailscale aan op deze iPad, bevestig dat de geselecteerde peer uw Mac is en sla het adres 100.64–100.127, het Tailscale IPv6-adres of de volledige .ts.net-naam op. Gebruik anders de eenmalige code."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conecte Tailscale neste iPad, confirme se o par selecionado é o seu Mac e salve seu endereço 100.64–100.127, endereço Tailscale IPv6 ou nome .ts.net completo. Caso contrário, use o código único."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将 Tailscale 连接到此 iPad 上，确认所选对等点是您的 Mac，并保存其 100.64–100.127 地址、Tailscale IPv6 地址或完整的 .ts.net 名称。否则，请使用一次性代码。"
-          }
-        }
-      }
-    },
-    "Connect Without Saving" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verbinden ohne zu speichern"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conectar sin guardar"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存せずに接続する"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verbinden zonder op te slaan"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conectar sem salvar"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "连接而不保存"
-          }
-        }
-      }
-    },
     "Connect an external display first." : {
       "localizations" : {
         "de" : {
@@ -3418,6 +3444,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "连接并工作"
+          }
+        }
+      }
+    },
+    "Connect away from home" : {
+
+    },
+    "Connect Away from Home" : {
+
+    },
+    "Connect Tailscale on this iPad, confirm the selected peer is your Mac, and save its 100.64–100.127 address, Tailscale IPv6 address, or full .ts.net name. Otherwise, use the one-time code." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbinden Sie Tailscale mit diesem iPad, bestätigen Sie, dass der ausgewählte Peer Ihr Mac ist, und speichern Sie dessen Adresse 100.64–100.127, die Tailscale IPv6-Adresse oder den vollständigen .ts.net-Namen. Andernfalls verwenden Sie den Einmalcode."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecte Tailscale en este iPad, confirme que el par seleccionado sea su Mac y guarde su dirección 100.64–100.127, la dirección Tailscale IPv6 o el nombre completo de .ts.net. De lo contrario, utilice el código de un solo uso."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この iPad で Tailscale に接続し、選択したピアが Mac であることを確認し、その 100.64 ～ 100.127 アドレス、Tailscale IPv6 アドレス、または完全な .ts.net 名を保存します。それ以外の場合は、ワンタイム コードを使用します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sluit Tailscale aan op deze iPad, bevestig dat de geselecteerde peer uw Mac is en sla het adres 100.64–100.127, het Tailscale IPv6-adres of de volledige .ts.net-naam op. Gebruik anders de eenmalige code."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecte Tailscale neste iPad, confirme se o par selecionado é o seu Mac e salve seu endereço 100.64–100.127, endereço Tailscale IPv6 ou nome .ts.net completo. Caso contrário, use o código único."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 Tailscale 连接到此 iPad 上，确认所选对等点是您的 Mac，并保存其 100.64–100.127 地址、Tailscale IPv6 地址或完整的 .ts.net 名称。否则，请使用一次性代码。"
           }
         }
       }
@@ -3502,6 +3575,58 @@
         }
       }
     },
+    "Connect with a Glassy Desk code or password" : {
+
+    },
+    "Connect with Standard VNC" : {
+
+    },
+    "Connect with your Mac login." : {
+
+    },
+    "Connect without a camera." : {
+
+    },
+    "Connect Without Saving" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbinden ohne zu speichern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar sin guardar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存せずに接続する"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbinden zonder op te slaan"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar sem salvar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接而不保存"
+          }
+        }
+      }
+    },
     "Connected %@" : {
       "localizations" : {
         "de" : {
@@ -3541,6 +3666,9 @@
           }
         }
       }
+    },
+    "Connecting through %@." : {
+
     },
     "Connecting to %@." : {
       "localizations" : {
@@ -3663,6 +3791,7 @@
       }
     },
     "Connection Address" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -3741,6 +3870,12 @@
           }
         }
       }
+    },
+    "Connection options" : {
+
+    },
+    "Connection port" : {
+
     },
     "Connection Port" : {
       "localizations" : {
@@ -4026,6 +4161,7 @@
       }
     },
     "Correct the address or TCP port before selecting a Mac." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4146,6 +4282,9 @@
         }
       }
     },
+    "Could Not Forget Mac" : {
+
+    },
     "Could not reach Glassy Desk. Check that Tailscale and Glassy Desk are running, then try again." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4186,6 +4325,15 @@
           }
         }
       }
+    },
+    "Could not reach Glassy Desk. Keep the Mac awake and connect both devices to the same local network or a VPN such as Tailscale or WireGuard, then try again." : {
+
+    },
+    "Couldn't Paste" : {
+
+    },
+    "Couldn’t Update Saved Mac" : {
+
     },
     "Ctrl" : {
       "extractionState" : "manual",
@@ -4634,6 +4782,7 @@
       }
     },
     "Direct uses the saved Tailscale or network address. Nearby Macs are discovered only on the local network." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4713,7 +4862,7 @@
         }
       }
     },
-    "Disconnect Remote Session" : {
+    "Disconnect remote session" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4753,7 +4902,7 @@
         }
       }
     },
-    "Disconnect remote session" : {
+    "Disconnect Remote Session" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5158,6 +5307,7 @@
       }
     },
     "Download Glassy Desk for Mac" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -5196,6 +5346,9 @@
           }
         }
       }
+    },
+    "Download the app and follow its permission prompts." : {
+
     },
     "Duration %@" : {
       "localizations" : {
@@ -5277,46 +5430,6 @@
         }
       }
     },
-    "Edit Machine" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Computer bearbeiten"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Editar equipo"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コンピュータを編集"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Computer bewerken"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Editar computador"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "编辑计算机"
-          }
-        }
-      }
-    },
     "Edit a saved Mac and enter the MAC address of its network interface. Also enable Wake for network access in macOS System Settings. If the Mac is unreachable, tapping its card sends a wake packet and waits up to a minute before connecting. Wake-on-LAN normally requires the devices to be on the same local network or a VPN that forwards broadcasts." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5354,6 +5467,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑已保存的 Mac 并输入其网络接口的 MAC 地址。还要在 macOS 系统设置中启用网络访问唤醒。如果 Mac 无法访问，则点击其卡会发送唤醒数据包，并在连接前等待一分钟。 Wake-on-LAN 通常要求设备位于同一本地网络或转发广播的 VPN 上。"
+          }
+        }
+      }
+    },
+    "Edit Machine" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Computer bearbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar equipo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コンピュータを編集"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Computer bewerken"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar computador"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑计算机"
           }
         }
       }
@@ -5397,6 +5550,52 @@
           }
         }
       }
+    },
+    "Enter a code instead" : {
+
+    },
+    "Enter a host name, IPv4 address, or bracketed IPv6 address." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geben Sie einen Hostnamen, eine IPv4-Adresse oder eine IPv6-Adresse in Klammern ein."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduzca un nombre de host, una dirección IPv4 o una dirección IPv6 entre corchetes."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホスト名、IPv4 アドレス、または括弧で囲まれた IPv6 アドレスを入力します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voer een hostnaam, een IPv4-adres of een IPv6-adres tussen haakjes in."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insira um nome de host, endereço IPv4 ou endereço IPv6 entre colchetes."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入主机名、IPv4 地址或括号中的 IPv6 地址。"
+          }
+        }
+      }
+    },
+    "Enter a port from 1 to 65535." : {
+
     },
     "Enter a TCP port from 1 through 65535." : {
       "localizations" : {
@@ -5479,45 +5678,8 @@
         }
       }
     },
-    "Enter a host name, IPv4 address, or bracketed IPv6 address." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geben Sie einen Hostnamen, eine IPv4-Adresse oder eine IPv6-Adresse in Klammern ein."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Introduzca un nombre de host, una dirección IPv4 o una dirección IPv6 entre corchetes."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ホスト名、IPv4 アドレス、または括弧で囲まれた IPv6 アドレスを入力します。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Voer een hostnaam, een IPv4-adres of een IPv6-adres tussen haakjes in."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Insira um nome de host, endereço IPv4 ou endereço IPv6 entre colchetes."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "输入主机名、IPv4 地址或括号中的 IPv6 地址。"
-          }
-        }
-      }
+    "Enter a valid host name or IP address." : {
+
     },
     "Enter a valid Tailscale name or IP address." : {
       "extractionState" : "manual",
@@ -5560,6 +5722,9 @@
         }
       }
     },
+    "Enter an address" : {
+
+    },
     "Enter six hexadecimal pairs, such as A1:B2:C3:D4:E5:F6." : {
       "localizations" : {
         "de" : {
@@ -5600,42 +5765,87 @@
         }
       }
     },
-    "Enter the Mac's host name or IP address and its Screen Sharing port." : {
+    "Enter the code displayed by Glassy Desk. It changes every minute and remains the recommended default for first-time pairing." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geben Sie den Hostnamen oder die IP-Adresse des Mac und seinen Screen-Sharing-Port ein."
+            "value" : "Geben Sie den von Glassy Desk angezeigten Code ein. Sie ändert sich jede Minute und bleibt die empfohlene Standardeinstellung für die erstmalige Kopplung."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ingrese el nombre de host o la dirección IP de la Mac y su puerto para compartir pantalla."
+            "value" : "Ingrese el código mostrado por Glassy Desk. Cambia cada minuto y sigue siendo el valor predeterminado recomendado para el emparejamiento por primera vez."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mac のホスト名または IP アドレスとその画面共有ポートを入力します。"
+            "value" : "Glassy Desk で表示されたコードを入力します。これは 1 分ごとに変更され、初回ペアリングの推奨デフォルトのままになります。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voer de hostnaam of het IP-adres van de Mac en de schermdelingspoort in."
+            "value" : "Voer de code in die wordt weergegeven door Glassy Desk. Het verandert elke minuut en blijft de aanbevolen standaardwaarde voor de eerste keer koppelen."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Digite o nome do host ou endereço IP do Mac e sua porta de compartilhamento de tela."
+            "value" : "Insira o código exibido por Glassy Desk. Ele muda a cada minuto e continua sendo o padrão recomendado para o primeiro emparelhamento."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "输入 Mac 的主机名或 IP 地址及其屏幕共享端口。"
+            "value" : "输入 Glassy Desk 显示的代码。它每分钟都会发生变化，并且仍然是首次配对时建议的默认值。"
+          }
+        }
+      }
+    },
+    "Enter the code shown on this Mac" : {
+
+    },
+    "Enter the current twelve-symbol code, or choose Password if Glassy Desk has a reusable pairing password configured." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geben Sie den aktuellen zwölfstelligen Code ein oder wählen Sie „Passwort“, wenn für Glassy Desk ein wiederverwendbares Pairing-Passwort konfiguriert ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingrese el código actual de doce símbolos o elija Contraseña si Glassy Desk tiene configurada una contraseña de emparejamiento reutilizable."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在の 12 記号コードを入力するか、Glassy Desk に再利用可能なペアリング パスワードが設定されている場合は [パスワード] を選択します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voer de huidige code van twaalf symbolen in, of kies Wachtwoord als voor Glassy Desk een herbruikbaar koppelingswachtwoord is geconfigureerd."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insira o código atual de doze símbolos ou escolha Senha se Glassy Desk tiver uma senha de emparelhamento reutilizável configurada."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入当前的十二符号代码，或者如果 Glassy Desk 配置了可重复使用的配对密码，则选择密码。"
           }
         }
       }
@@ -5681,83 +5891,42 @@
         }
       }
     },
-    "Enter the code displayed by Glassy Desk. It changes every minute and remains the recommended default for first-time pairing." : {
+    "Enter the Mac's host name or IP address and its Screen Sharing port." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geben Sie den von Glassy Desk angezeigten Code ein. Sie ändert sich jede Minute und bleibt die empfohlene Standardeinstellung für die erstmalige Kopplung."
+            "value" : "Geben Sie den Hostnamen oder die IP-Adresse des Mac und seinen Screen-Sharing-Port ein."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ingrese el código mostrado por Glassy Desk. Cambia cada minuto y sigue siendo el valor predeterminado recomendado para el emparejamiento por primera vez."
+            "value" : "Ingrese el nombre de host o la dirección IP de la Mac y su puerto para compartir pantalla."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Glassy Desk で表示されたコードを入力します。これは 1 分ごとに変更され、初回ペアリングの推奨デフォルトのままになります。"
+            "value" : "Mac のホスト名または IP アドレスとその画面共有ポートを入力します。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Voer de code in die wordt weergegeven door Glassy Desk. Het verandert elke minuut en blijft de aanbevolen standaardwaarde voor de eerste keer koppelen."
+            "value" : "Voer de hostnaam of het IP-adres van de Mac en de schermdelingspoort in."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Insira o código exibido por Glassy Desk. Ele muda a cada minuto e continua sendo o padrão recomendado para o primeiro emparelhamento."
+            "value" : "Digite o nome do host ou endereço IP do Mac e sua porta de compartilhamento de tela."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "输入 Glassy Desk 显示的代码。它每分钟都会发生变化，并且仍然是首次配对时建议的默认值。"
-          }
-        }
-      }
-    },
-    "Enter the current twelve-symbol code, or choose Password if Glassy Desk has a reusable pairing password configured." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geben Sie den aktuellen zwölfstelligen Code ein oder wählen Sie „Passwort“, wenn für Glassy Desk ein wiederverwendbares Pairing-Passwort konfiguriert ist."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ingrese el código actual de doce símbolos o elija Contraseña si Glassy Desk tiene configurada una contraseña de emparejamiento reutilizable."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現在の 12 記号コードを入力するか、Glassy Desk に再利用可能なペアリング パスワードが設定されている場合は [パスワード] を選択します。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Voer de huidige code van twaalf symbolen in, of kies Wachtwoord als voor Glassy Desk een herbruikbaar koppelingswachtwoord is geconfigureerd."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Insira o código atual de doze símbolos ou escolha Senha se Glassy Desk tiver uma senha de emparelhamento reutilizável configurada."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "输入当前的十二符号代码，或者如果 Glassy Desk 配置了可重复使用的配对密码，则选择密码。"
+            "value" : "输入 Mac 的主机名或 IP 地址及其屏幕共享端口。"
           }
         }
       }
@@ -5804,6 +5973,7 @@
       }
     },
     "Enter the remote Mac's Tailscale MagicDNS name or 100.x address. Leave the address empty to choose a nearby Mac instead." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -6207,129 +6377,6 @@
         }
       }
     },
-    "F10" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F10"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F10"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F10"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F10"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F10"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F10"
-          }
-        }
-      }
-    },
-    "F11" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F11"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F11"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F11"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F11"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F11"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F11"
-          }
-        }
-      }
-    },
-    "F12" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F12"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F12"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F12"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F12"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F12"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "F12"
-          }
-        }
-      }
-    },
     "F2" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6658,6 +6705,129 @@
         }
       }
     },
+    "F10" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F10"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F10"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F10"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F10"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F10"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F10"
+          }
+        }
+      }
+    },
+    "F11" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F11"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F11"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F11"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F11"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F11"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F11"
+          }
+        }
+      }
+    },
+    "F12" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F12"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F12"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F12"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F12"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F12"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F12"
+          }
+        }
+      }
+    },
     "FAQ" : {
       "localizations" : {
         "de" : {
@@ -6738,7 +6908,7 @@
         }
       }
     },
-    "Fast Connection Available" : {
+    "Fast Connection available" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -6778,7 +6948,7 @@
         }
       }
     },
-    "Fast Connection available" : {
+    "Fast Connection Available" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -6939,6 +7109,9 @@
         }
       }
     },
+    "Fast Connection supports Macs running Glassy Desk for Mac on macOS 14 or later, with Apple silicon or Intel. Standard VNC uses macOS Screen Sharing. Display choices depend on the connection and the Mac’s setup." : {
+
+    },
     "Faster, smoother control with an encrypted connection. Requires Glassy Desk for Mac, then a QR code or manual pairing." : {
       "localizations" : {
         "de" : {
@@ -7061,6 +7234,7 @@
       }
     },
     "Fix the Connection Address" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -7140,48 +7314,11 @@
         }
       }
     },
-    "For VNC, use the Mac's hostname or IP address and normally port 5900. For Fast Connection, use its Tailscale MagicDNS name or 100.x address and port 51515." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verwenden Sie für VNC den Hostnamen oder die IP-Adresse des Mac und normalerweise Port 5900. Verwenden Sie für Schnellverbindung seinen Tailscale MagicDNS-Namen oder die 100.x-Adresse und Port 51515."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Para VNC, use el nombre de host o la dirección IP de Mac y normalmente el puerto 5900. Para Conexión rápida, use su nombre Tailscale MagicDNS o la dirección 100.x y el puerto 51515."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "VNC の場合は、Mac のホスト名または IP アドレスと通常はポート 5900 を使用します。 高速接続 の場合は、Tailscale MagicDNS 名または 100.x アドレスとポート 51515 を使用します。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Voor VNC gebruikt u de hostnaam of het IP-adres van de Mac en normaal gesproken poort 5900. Voor Snelle verbinding gebruikt u de Tailscale MagicDNS-naam of het 100.x-adres en poort 51515."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Para VNC, use o nome de host ou endereço IP do Mac e normalmente a porta 5900. Para Conexão rápida, use seu nome Tailscale MagicDNS ou endereço 100.x e porta 51515."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "对于 VNC，使用 Mac 的主机名或 IP 地址，通常使用端口 5900。对于 快速连接，使用其 Tailscale MagicDNS 名称或 100.x 地址和端口 51515。"
-          }
-        }
-      }
+    "Follow Tailscale’s permission prompts, including the Mac’s network extension if requested. Turn Tailscale on and check that both devices show as connected." : {
+
     },
     "For remote access, use the Mac's Tailscale MagicDNS name or 100.x address. Connect both devices to the same tailnet; no public port forwarding is needed." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -7221,7 +7358,11 @@
         }
       }
     },
+    "For Standard VNC or Fast Connection, edit a saved Mac and enter the MAC address of its network interface. Also enable Wake for network access in macOS System Settings. If the Mac is unreachable, tapping its card sends a wake packet and waits up to a minute before connecting. Both devices normally need to be on the same local network; Tailscale does not forward wake broadcasts. Fast Connection also requires Glassy Desk for Mac to be running in a logged-in session." : {
+
+    },
     "For the easiest secure connection outside your local network, use Tailscale on the iPad and the remote Mac." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -7257,6 +7398,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "为了在本地网络之外实现最简单的安全连接，请在 iPad 和远程 Mac 上使用 Tailscale。"
+          }
+        }
+      }
+    },
+    "For VNC, use the Mac's hostname or IP address and normally port 5900. For Fast Connection, scan its QR code to choose an address automatically, or enter a LAN or VPN address and port 51515." : {
+
+    },
+    "For VNC, use the Mac's hostname or IP address and normally port 5900. For Fast Connection, use its Tailscale MagicDNS name or 100.x address and port 51515." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwenden Sie für VNC den Hostnamen oder die IP-Adresse des Mac und normalerweise Port 5900. Verwenden Sie für Schnellverbindung seinen Tailscale MagicDNS-Namen oder die 100.x-Adresse und Port 51515."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para VNC, use el nombre de host o la dirección IP de Mac y normalmente el puerto 5900. Para Conexión rápida, use su nombre Tailscale MagicDNS o la dirección 100.x y el puerto 51515."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VNC の場合は、Mac のホスト名または IP アドレスと通常はポート 5900 を使用します。 高速接続 の場合は、Tailscale MagicDNS 名または 100.x アドレスとポート 51515 を使用します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voor VNC gebruikt u de hostnaam of het IP-adres van de Mac en normaal gesproken poort 5900. Voor Snelle verbinding gebruikt u de Tailscale MagicDNS-naam of het 100.x-adres en poort 51515."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para VNC, use o nome de host ou endereço IP do Mac e normalmente a porta 5900. Para Conexão rápida, use seu nome Tailscale MagicDNS ou endereço 100.x e porta 51515."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对于 VNC，使用 Mac 的主机名或 IP 地址，通常使用端口 5900。对于 快速连接，使用其 Tailscale MagicDNS 名称或 100.x 地址和端口 51515。"
           }
         }
       }
@@ -7338,46 +7523,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "免费"
-          }
-        }
-      }
-    },
-    "Free Session Timer" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kostenloser Sitzungs-Timer"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Temporizador de sesión libre"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "無料セッション タイマー"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Timer voor gratis sessie"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Temporizador de sessão gratuita"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "免费会话计时器"
           }
         }
       }
@@ -7502,7 +7647,48 @@
         }
       }
     },
+    "Free Session Timer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kostenloser Sitzungs-Timer"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temporizador de sesión libre"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無料セッション タイマー"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timer voor gratis sessie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temporizador de sessão gratuita"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费会话计时器"
+          }
+        }
+      }
+    },
     "Free sessions are timed. Upgrade to Pro to keep this session active." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -7543,6 +7729,7 @@
       }
     },
     "Free sessions last one minute, with a 30-second break before the next. Purchase Pro for sessions without time limits." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -7662,6 +7849,9 @@
         }
       }
     },
+    "Get Glassy Desk for Mac" : {
+
+    },
     "Get Started" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7702,6 +7892,9 @@
           }
         }
       }
+    },
+    "Get Tailscale" : {
+
     },
     "Getting Connected" : {
       "localizations" : {
@@ -7819,86 +8012,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Glassy Desk"
-          }
-        }
-      }
-    },
-    "Glassy Desk Pro" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glassy Desk Pro"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glassy Desk Pro"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glassy Desk プロ"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glassy Desk Pro"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glassy Desk Pro"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glassy Desk 专业版"
-          }
-        }
-      }
-    },
-    "Glassy Desk Section" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glassy Desk Abschnitt"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sección Glassy Desk"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glassy Desk セクション"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glassy Desk Sectie"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seção Glassy Desk"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glassy Desk 部分"
           }
         }
       }
@@ -8393,6 +8506,46 @@
         }
       }
     },
+    "Glassy Desk Pro" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk Pro"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk Pro"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk プロ"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk Pro"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk Pro"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk 专业版"
+          }
+        }
+      }
+    },
     "Glassy Desk protocol version %u is not supported." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8475,6 +8628,46 @@
         }
       }
     },
+    "Glassy Desk Section" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk Abschnitt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sección Glassy Desk"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk セクション"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk Sectie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seção Glassy Desk"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk 部分"
+          }
+        }
+      }
+    },
     "Glassy Desk sent an invalid message: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8517,6 +8710,7 @@
       }
     },
     "Glassy Desk uses TCP port %u by default. A port included in the address takes precedence." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -8555,6 +8749,9 @@
           }
         }
       }
+    },
+    "Good to Know" : {
+
     },
     "Held" : {
       "localizations" : {
@@ -8958,6 +9155,47 @@
         }
       }
     },
+    "How do I use Wake-on-LAN?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wie verwende ich Wake-on-LAN?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Cómo uso Wake-on-LAN?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wake-on-LAN はどのように使用すればよいですか?"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoe gebruik ik Wake-on-LAN?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Como uso Wake-on-LAN?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何使用Wake-on-LAN？"
+          }
+        }
+      }
+    },
     "How Glassy Desk Works" : {
       "localizations" : {
         "de" : {
@@ -8998,43 +9236,49 @@
         }
       }
     },
-    "How do I use Wake-on-LAN?" : {
+    "In Glassy Desk on your Mac, choose Add Device and point your camera at the code." : {
+
+    },
+    "In Tailscale, select your Mac and copy its 100.x.x.x address or full .ts.net name. Enter it as the Mac Address in Standard VNC, with your usual Screen Sharing login and port." : {
+
+    },
+    "Install and open Tailscale on both this device and the remote Mac." : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wie verwende ich Wake-on-LAN?"
+            "value" : "Installieren und öffnen Sie Tailscale sowohl auf diesem Gerät als auch auf dem Remote-Mac."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¿Cómo uso Wake-on-LAN?"
+            "value" : "Instale y abra Tailscale tanto en este dispositivo como en la Mac remota."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wake-on-LAN はどのように使用すればよいですか?"
+            "value" : "このデバイスとリモート Mac の両方に Tailscale をインストールして開きます。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hoe gebruik ik Wake-on-LAN?"
+            "value" : "Installeer en open Tailscale op zowel dit apparaat als de externe Mac."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Como uso Wake-on-LAN?"
+            "value" : "Instale e abra Tailscale neste dispositivo e no Mac remoto."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "如何使用Wake-on-LAN？"
+            "value" : "在此设备和远程 Mac 上安装并打开 Tailscale。"
           }
         }
       }
@@ -9079,6 +9323,9 @@
         }
       }
     },
+    "Install on both devices" : {
+
+    },
     "Install Tailscale" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9120,46 +9367,8 @@
         }
       }
     },
-    "Install and open Tailscale on both this device and the remote Mac." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Installieren und öffnen Sie Tailscale sowohl auf diesem Gerät als auch auf dem Remote-Mac."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Instale y abra Tailscale tanto en este dispositivo como en la Mac remota."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このデバイスとリモート Mac の両方に Tailscale をインストールして開きます。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Installeer en open Tailscale op zowel dit apparaat als de externe Mac."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Instale e abra Tailscale neste dispositivo e no Mac remoto."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在此设备和远程 Mac 上安装并打开 Tailscale。"
-          }
-        }
-      }
+    "Install Tailscale on your Mac and this iPhone or iPad. Sign in with the same account on both." : {
+
     },
     "Interrupted" : {
       "extractionState" : "manual",
@@ -9407,6 +9616,9 @@
         }
       }
     },
+    "Keep its pairing code on the screen." : {
+
+    },
     "Keep regular hosts close" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9488,6 +9700,15 @@
           }
         }
       }
+    },
+    "Keep your Mac awake and online, with Glassy Desk open and Allow connections enabled. Leave Tailscale connected on both devices, then open your saved Mac as usual." : {
+
+    },
+    "Keep your Mac awake, online, and Screen Sharing enabled. Leave Tailscale connected on both devices, then open your saved Mac in Glassy Desk." : {
+
+    },
+    "Leave your Mac ready" : {
+
     },
     "Leaves the zoomed view fixed as the cursor moves." : {
       "extractionState" : "manual",
@@ -9692,6 +9913,12 @@
         }
       }
     },
+    "Let’s try that again" : {
+
+    },
+    "License notices are unavailable in this build." : {
+
+    },
     "Lifetime" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9773,6 +10000,53 @@
         }
       }
     },
+    "Mac" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impermeable"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マック"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "苹果"
+          }
+        }
+      }
+    },
+    "Mac address" : {
+
+    },
+    "Mac Address" : {
+
+    },
     "MAC Address (optional)" : {
       "localizations" : {
         "de" : {
@@ -9809,46 +10083,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "MAC 地址（可选）"
-          }
-        }
-      }
-    },
-    "Mac" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mac"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impermeable"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "マック"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mac"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mac"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "苹果"
           }
         }
       }
@@ -9892,6 +10126,15 @@
           }
         }
       }
+    },
+    "Mac Login" : {
+
+    },
+    "Mac password" : {
+
+    },
+    "Mac username" : {
+
     },
     "Machine" : {
       "localizations" : {
@@ -10137,6 +10380,12 @@
         }
       }
     },
+    "Make sure this is the Mac you want to view and control." : {
+
+    },
+    "Make the fast connection." : {
+
+    },
     "Manage Subscription" : {
       "localizations" : {
         "de" : {
@@ -10176,6 +10425,9 @@
           }
         }
       }
+    },
+    "Manage Subscriptions" : {
+
     },
     "Missing from the current offering." : {
       "extractionState" : "manual",
@@ -10461,6 +10713,9 @@
         }
       }
     },
+    "Much faster, smoother control than standard VNC." : {
+
+    },
     "Name" : {
       "localizations" : {
         "de" : {
@@ -10622,6 +10877,53 @@
         }
       }
     },
+    "Nearby discovery only finds Macs on the current local network. Tailscale reaches the remote Mac without exposing a public port on your router." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Nearby Discovery findet nur Macs im aktuellen lokalen Netzwerk. Tailscale erreicht den Remote-Mac, ohne einen öffentlichen Port auf Ihrem Router freizugeben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El descubrimiento cercano solo encuentra Mac en la red local actual. Tailscale llega a la Mac remota sin exponer un puerto público en su enrutador."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの検出では、現在のローカル ネットワーク上の Mac のみが検索されます。 Tailscale は、ルーターのパブリック ポートを公開せずにリモート Mac に到達します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Met detectie in de buurt worden alleen Macs op het huidige lokale netwerk gevonden. Tailscale bereikt de externe Mac zonder een openbare poort op uw router bloot te leggen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A descoberta próxima encontra apenas Macs na rede local atual. Tailscale alcança o Mac remoto sem expor uma porta pública no seu roteador."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "附近发现仅查找当前本地网络上的 Mac。 Tailscale 无需暴露路由器上的公共端口即可到达远程 Mac。"
+          }
+        }
+      }
+    },
+    "Nearby discovery only shows Macs on your local network. From elsewhere, connect Tailscale on both devices and use your saved Mac or its Tailscale address. Open Connect away from home in Settings for the full guide." : {
+
+    },
+    "Nearby discovery works on your local network. Away from home, choose your saved Mac or enter its Tailscale address manually." : {
+
+    },
     "Nearby Macs" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10659,46 +10961,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "附近的 Mac"
-          }
-        }
-      }
-    },
-    "Nearby discovery only finds Macs on the current local network. Tailscale reaches the remote Mac without exposing a public port on your router." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Nearby Discovery findet nur Macs im aktuellen lokalen Netzwerk. Tailscale erreicht den Remote-Mac, ohne einen öffentlichen Port auf Ihrem Router freizugeben."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El descubrimiento cercano solo encuentra Mac en la red local actual. Tailscale llega a la Mac remota sin exponer un puerto público en su enrutador."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "近くの検出では、現在のローカル ネットワーク上の Mac のみが検索されます。 Tailscale は、ルーターのパブリック ポートを公開せずにリモート Mac に到達します。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Met detectie in de buurt worden alleen Macs op het huidige lokale netwerk gevonden. Tailscale bereikt de externe Mac zonder een openbare poort op uw router bloot te leggen."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A descoberta próxima encontra apenas Macs na rede local atual. Tailscale alcança o Mac remoto sem expor uma porta pública no seu roteador."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "附近发现仅查找当前本地网络上的 Mac。 Tailscale 无需暴露路由器上的公共端口即可到达远程 Mac。"
           }
         }
       }
@@ -10823,7 +11085,11 @@
         }
       }
     },
+    "No active Glassy Desk Pro purchase was found. Check that you’re using the Apple Account used for your purchase." : {
+
+    },
     "No Connection Route" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -10864,6 +11130,7 @@
       }
     },
     "No Hosts" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -10902,6 +11169,9 @@
           }
         }
       }
+    },
+    "No nearby Macs yet" : {
+
     },
     "No Recent Sessions" : {
       "localizations" : {
@@ -10942,6 +11212,9 @@
           }
         }
       }
+    },
+    "No. Fast Connection uses Glassy Desk’s own streaming connection through the Mac companion. Standard VNC uses the classic VNC/RFB Screen Sharing service." : {
+
     },
     "No. Third-party clients use the classic VNC/RFB Screen Sharing path exposed by macOS." : {
       "extractionState" : "manual",
@@ -11105,46 +11378,6 @@
         }
       }
     },
-    "OK" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aceptar"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Oké"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OK"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "好的"
-          }
-        }
-      }
-    },
     "Off" : {
       "localizations" : {
         "de" : {
@@ -11181,6 +11414,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关闭"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aceptar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oké"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好的"
           }
         }
       }
@@ -11266,6 +11539,18 @@
         }
       }
     },
+    "On your Mac, open Glassy Desk → Add Device → Enter Code." : {
+
+    },
+    "On your Mac, open Glassy Desk and allow Screen Recording and Direct Screen Access." : {
+
+    },
+    "On your Mac, turn on Screen Sharing in System Settings → General → Sharing." : {
+
+    },
+    "One last step." : {
+
+    },
     "One scan.\nAnd you’re in." : {
       "localizations" : {
         "de" : {
@@ -11302,47 +11587,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "轻轻一扫。\n即刻连接。"
-          }
-        }
-      }
-    },
-    "One-Time Code" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Einmaliger Code"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Código de un solo uso"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ワンタイム コード"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eenmalige code"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Código único"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一次性代码"
           }
         }
       }
@@ -11384,6 +11628,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一次性访问Glassy Desk Pro。"
+          }
+        }
+      }
+    },
+    "One-Time Code" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einmaliger Code"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Código de un solo uso"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ワンタイム コード"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eenmalige code"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Código único"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一次性代码"
           }
         }
       }
@@ -11467,6 +11752,9 @@
           }
         }
       }
+    },
+    "Open Add Device on your Mac" : {
+
     },
     "Open Glassy Desk" : {
       "localizations" : {
@@ -11589,6 +11877,7 @@
       }
     },
     "Open Glassy Desk on the Mac. For remote access, enter its Tailscale name or 100.x address. For nearby access, keep both devices on the same local network." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -11627,6 +11916,9 @@
           }
         }
       }
+    },
+    "Open Glassy Desk on your Mac and join the same Wi-Fi network." : {
+
     },
     "Open Glassy Desk to a selected section." : {
       "localizations" : {
@@ -11750,6 +12042,12 @@
         }
       }
     },
+    "Open Settings" : {
+
+    },
+    "Open Source Licenses" : {
+
+    },
     "Opening %@." : {
       "localizations" : {
         "de" : {
@@ -11871,6 +12169,9 @@
         }
       }
     },
+    "Opens the Mac download and setup guide on the Glassy Desk website." : {
+
+    },
     "Opt" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11911,6 +12212,9 @@
           }
         }
       }
+    },
+    "Options" : {
+
     },
     "Other VNC servers may work" : {
       "extractionState" : "manual",
@@ -12039,86 +12343,6 @@
         }
       }
     },
-    "Pair Fast Connection" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paar Schnellverbindung"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Par Conexión rápida"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高速接続 ペア"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Koppel Snelle verbinding"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Par Conexão rápida"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配对 快速连接"
-          }
-        }
-      }
-    },
-    "Pair Using" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paar mit"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Emparejar usando"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "を使用したペアリング"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Koppelen met"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Emparelhar usando"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "配对使用"
-          }
-        }
-      }
-    },
     "Pair a Different Mac" : {
       "localizations" : {
         "de" : {
@@ -12158,6 +12382,97 @@
           }
         }
       }
+    },
+    "Pair Before You Go" : {
+
+    },
+    "Pair Fast Connection" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paar Schnellverbindung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par Conexión rápida"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高速接続 ペア"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Koppel Snelle verbinding"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par Conexão rápida"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配对 快速连接"
+          }
+        }
+      }
+    },
+    "Pair Manually" : {
+
+    },
+    "Pair Using" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paar mit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emparejar usando"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "を使用したペアリング"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Koppelen met"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emparelhar usando"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配对使用"
+          }
+        }
+      }
+    },
+    "Pair Your Mac" : {
+
     },
     "Paired Mac" : {
       "localizations" : {
@@ -12199,6 +12514,9 @@
         }
       }
     },
+    "Pairing manually from another network" : {
+
+    },
     "Pairing password" : {
       "localizations" : {
         "de" : {
@@ -12238,6 +12556,12 @@
           }
         }
       }
+    },
+    "Pairing Password" : {
+
+    },
+    "Pairing passwords need a Tailscale IP address or full .ts.net name. Use a one-time code for other networks." : {
+
     },
     "Pan View with Two Fingers" : {
       "extractionState" : "manual",
@@ -12361,6 +12685,15 @@
         }
       }
     },
+    "Paste to Mac" : {
+
+    },
+    "Pastes copied text into the active app on your Mac." : {
+
+    },
+    "Point. Scan. Almost there." : {
+
+    },
     "Port" : {
       "localizations" : {
         "de" : {
@@ -12401,7 +12734,9 @@
         }
       }
     },
-    "Port %lld is invalid. Use a value from 1 to 65535." : {},
+    "Port %lld is invalid. Use a value from 1 to 65535." : {
+
+    },
     "Port %u is invalid. Use a value from 1 to 65535." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12483,6 +12818,9 @@
           }
         }
       }
+    },
+    "Preparing Camera…" : {
+
     },
     "Present Paywall" : {
       "localizations" : {
@@ -12604,6 +12942,9 @@
           }
         }
       }
+    },
+    "Privacy Policy" : {
+
     },
     "Pro Active" : {
       "extractionState" : "stale",
@@ -12807,6 +13148,12 @@
         }
       }
     },
+    "Purchases are temporarily unavailable. Please try again later." : {
+
+    },
+    "Purchases Unavailable" : {
+
+    },
     "Reachability" : {
       "localizations" : {
         "de" : {
@@ -12887,6 +13234,9 @@
           }
         }
       }
+    },
+    "Read the full setup guide" : {
+
     },
     "Ready" : {
       "localizations" : {
@@ -13049,7 +13399,11 @@
         }
       }
     },
+    "Recommended" : {
+
+    },
     "Recommended Setup" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -13370,6 +13724,46 @@
         }
       }
     },
+    "Refresh nearby computers" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Computer in der Nähe aktualisieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar computadoras cercanas"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くのコンピューターを更新します"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vernieuw computers in de buurt"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualizar computadores próximos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刷新附近的计算机"
+          }
+        }
+      }
+    },
     "Refresh Nearby Computers" : {
       "localizations" : {
         "de" : {
@@ -13491,46 +13885,6 @@
         }
       }
     },
-    "Refresh nearby computers" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Computer in der Nähe aktualisieren"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Actualizar computadoras cercanas"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "近くのコンピューターを更新します"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vernieuw computers in de buurt"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atualizar computadores próximos"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刷新附近的计算机"
-          }
-        }
-      }
-    },
     "Refreshing nearby computers." : {
       "localizations" : {
         "de" : {
@@ -13572,6 +13926,7 @@
       }
     },
     "Remote Connection Info" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -13612,6 +13967,7 @@
       }
     },
     "Remote Connections" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -14176,46 +14532,6 @@
         }
       }
     },
-    "RevenueCat Not Configured" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "RevenueCat Nicht konfiguriert"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "RevenueCat No configurado"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "RevenueCat が構成されていません"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "RevenueCat Niet geconfigureerd"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "RevenueCat não configurado"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "RevenueCat 未配置"
-          }
-        }
-      }
-    },
     "RevenueCat is not configured. Set the RevenueCatAPIKey Info.plist value before using purchases." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14253,6 +14569,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "RevenueCat 未配置。在使用购买之前设置 RevenueCatAPIKey Info.plist 值。"
+          }
+        }
+      }
+    },
+    "RevenueCat Not Configured" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RevenueCat Nicht konfiguriert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RevenueCat No configurado"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RevenueCat が構成されていません"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RevenueCat Niet geconfigureerd"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RevenueCat não configurado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RevenueCat 未配置"
           }
         }
       }
@@ -14662,46 +15019,6 @@
         }
       }
     },
-    "Saved Computer" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Computer gespeichert"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Computadora guardada"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存されたコンピュータ"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opgeslagen computer"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Computador salvo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已保存的计算机"
-          }
-        }
-      }
-    },
     "Saved and discovered screen sharing targets" : {
       "localizations" : {
         "de" : {
@@ -14779,6 +15096,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已保存并发现屏幕共享目标。"
+          }
+        }
+      }
+    },
+    "Saved Computer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Computer gespeichert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Computadora guardada"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存されたコンピュータ"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opgeslagen computer"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Computador salvo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已保存的计算机"
           }
         }
       }
@@ -14865,6 +15222,24 @@
         }
       }
     },
+    "Scan a different code" : {
+
+    },
+    "Scan Again" : {
+
+    },
+    "Scan Code" : {
+
+    },
+    "Scan Mac’s Code" : {
+
+    },
+    "Scan the Mac’s QR code to save its network addresses automatically. You can also enter a LAN, Tailscale, or WireGuard address here." : {
+
+    },
+    "Scan with Tailscale connected" : {
+
+    },
     "Screen Sharing" : {
       "localizations" : {
         "de" : {
@@ -14944,6 +15319,12 @@
           }
         }
       }
+    },
+    "Screen sharing is stopped. Open Glassy Desk on your Mac to resume sharing." : {
+
+    },
+    "Screen Sharing port" : {
+
     },
     "Screen Sharing.\nBuilt into your Mac." : {
       "localizations" : {
@@ -15146,46 +15527,6 @@
         }
       }
     },
-    "Session Options" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sitzungsoptionen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opciones de sesión"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "セッション オプション"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sessieopties"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opções de sessão"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "会话选项"
-          }
-        }
-      }
-    },
     "Session controls include display selection, zoom, trackpad mode, and frame rate." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15223,6 +15564,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "会话控制包括显示选择、缩放、触控板模式和帧速率。"
+          }
+        }
+      }
+    },
+    "Session Options" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sitzungsoptionen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opciones de sesión"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セッション オプション"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessieopties"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opções de sessão"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会话选项"
           }
         }
       }
@@ -15308,6 +15689,7 @@
       }
     },
     "Set REVENUECAT_API_KEY for this build configuration before opening subscription screens." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -15346,6 +15728,12 @@
           }
         }
       }
+    },
+    "Set up a connection to your Mac." : {
+
+    },
+    "Set up a standard VNC connection using your Mac login." : {
+
     },
     "Set Up Fast Connection" : {
       "localizations" : {
@@ -15386,6 +15774,12 @@
           }
         }
       }
+    },
+    "Set up Glassy Desk once.\nYour Mac will be ready whenever you are." : {
+
+    },
+    "Set Up Tailscale" : {
+
     },
     "Settings" : {
       "localizations" : {
@@ -15428,6 +15822,7 @@
       }
     },
     "Share Anonymous Analytics" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -15466,6 +15861,9 @@
           }
         }
       }
+    },
+    "Share Optional Analytics" : {
+
     },
     "Shift" : {
       "extractionState" : "manual",
@@ -15628,46 +16026,6 @@
         }
       }
     },
-    "Shows Pro plans for sessions without time limits." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zeigt Pro-Angebote für Sitzungen ohne Zeitlimit."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Muestra los planes Pro para sesiones sin límite de tiempo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "時間制限のないセッションを利用できるProプランを表示します。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toont Pro-abonnementen voor sessies zonder tijdslimiet."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostra os planos Pro para sessões sem limite de tempo."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "查看会话无时间限制的 Pro 方案。"
-          }
-        }
-      }
-    },
     "Shows available session controls." : {
       "localizations" : {
         "de" : {
@@ -15744,6 +16102,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示空闲会话计时器详细信息。"
+          }
+        }
+      }
+    },
+    "Shows Pro plans for sessions without time limits." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt Pro-Angebote für Sitzungen ohne Zeitlimit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra los planes Pro para sesiones sin límite de tiempo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間制限のないセッションを利用できるProプランを表示します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toont Pro-abonnementen voor sessies zonder tijdslimiet."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra os planos Pro para sessões sem limite de tempo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看会话无时间限制的 Pro 方案。"
           }
         }
       }
@@ -16152,6 +16550,9 @@
         }
       }
     },
+    "Still can’t connect?" : {
+
+    },
     "Subscription Error" : {
       "localizations" : {
         "de" : {
@@ -16233,46 +16634,6 @@
         }
       }
     },
-    "TCP port" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "TCP-Port"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Puerto TCP"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "TCPポート"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "TCP-poort"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Porta TCP"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "TCP端口"
-          }
-        }
-      }
-    },
     "Tab" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16313,6 +16674,9 @@
           }
         }
       }
+    },
+    "Tailscale handles the private network. You don’t need router port forwarding or an exit node for this setup." : {
+
     },
     "Tap a nearby Mac, or choose New Machine and enter a hostname, IP address, and port. Screen Sharing usually uses port 5900." : {
       "extractionState" : "manual",
@@ -16396,6 +16760,50 @@
         }
       }
     },
+    "TCP port" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TCP-Port"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puerto TCP"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TCPポート"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TCP-poort"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Porta TCP"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TCP端口"
+          }
+        }
+      }
+    },
+    "Terms of Use" : {
+
+    },
     "Test Automatic Reconnect" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -16437,87 +16845,8 @@
         }
       }
     },
-    "The Mac must be awake and allowed through any firewall before Glassy Desk can connect." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Der Mac muss aktiv sein und jede Firewall passieren dürfen, bevor Glassy Desk eine Verbindung herstellen kann."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La Mac debe estar activa y permitida a través de cualquier firewall antes de que Glassy Desk pueda conectarse."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glassy Desk が接続するには、Mac が起動しており、ファイアウォールの通過が許可されている必要があります。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "De Mac moet wakker zijn en door een firewall worden toegelaten voordat Glassy Desk verbinding kan maken."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O Mac deve estar ativado e com permissão para passar por qualquer firewall antes que Glassy Desk possa se conectar."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mac 必须处于唤醒状态并允许通过任何防火墙，Glassy Desk 才能连接。"
-          }
-        }
-      }
-    },
-    "The Wake-on-LAN packet could not be sent on this network." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Wake-on-LAN-Paket konnte in diesem Netzwerk nicht gesendet werden."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El paquete Wake-on-LAN no se pudo enviar en esta red."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wake-on-LAN パケットをこのネットワーク上で送信できませんでした。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Het Wake-on-LAN-pakket kon niet via dit netwerk worden verzonden."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O pacote Wake-on-LAN não pôde ser enviado nesta rede."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wake-on-LAN 数据包无法在此网络上发送。"
-          }
-        }
-      }
+    "The code refreshes every minute. You only need to pair once." : {
+
     },
     "The connection was interrupted." : {
       "extractionState" : "manual",
@@ -16679,6 +17008,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "主机拒绝协议消息。"
+          }
+        }
+      }
+    },
+    "The local pairing credentials could not be removed from Keychain. The saved Mac has been kept. Unlock your device and try again." : {
+
+    },
+    "The Mac must be awake and allowed through any firewall before Glassy Desk can connect." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Mac muss aktiv sein und jede Firewall passieren dürfen, bevor Glassy Desk eine Verbindung herstellen kann."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La Mac debe estar activa y permitida a través de cualquier firewall antes de que Glassy Desk pueda conectarse."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk が接続するには、Mac が起動しており、ファイアウォールの通過が許可されている必要があります。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De Mac moet wakker zijn en door een firewall worden toegelaten voordat Glassy Desk verbinding kan maken."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Mac deve estar ativado e com permissão para passar por qualquer firewall antes que Glassy Desk possa se conectar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac 必须处于唤醒状态并允许通过任何防火墙，Glassy Desk 才能连接。"
           }
         }
       }
@@ -17051,6 +17424,50 @@
         }
       }
     },
+    "The Wake-on-LAN packet could not be sent on this network." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Wake-on-LAN-Paket konnte in diesem Netzwerk nicht gesendet werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El paquete Wake-on-LAN no se pudo enviar en esta red."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wake-on-LAN パケットをこのネットワーク上で送信できませんでした。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het Wake-on-LAN-pakket kon niet via dit netwerk worden verzonden."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O pacote Wake-on-LAN não pôde ser enviado nesta rede."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wake-on-LAN 数据包无法在此网络上发送。"
+          }
+        }
+      }
+    },
+    "There’s your Mac." : {
+
+    },
     "This is not the Mac paired with this saved machine." : {
       "localizations" : {
         "de" : {
@@ -17090,6 +17507,12 @@
           }
         }
       }
+    },
+    "This isn’t a valid Glassy Desk pairing QR code. Scan the code displayed in Glassy Desk on your Mac." : {
+
+    },
+    "This Mac uses a newer pairing format. Update Glassy Desk on your iPhone or iPad, then scan the QR code again." : {
+
     },
     "This network did not allow a Wake-on-LAN broadcast." : {
       "extractionState" : "manual",
@@ -17132,6 +17555,9 @@
         }
       }
     },
+    "This pairing code has expired. Scan the current QR code on your Mac." : {
+
+    },
     "This permanently removes all connection history." : {
       "localizations" : {
         "de" : {
@@ -17172,6 +17598,12 @@
         }
       }
     },
+    "This QR code belongs to a different Mac. Close this setup and choose Add Mac to add it separately." : {
+
+    },
+    "This QR code uses a different Mac address. To add it without changing your saved Mac, close this setup and choose Add Mac." : {
+
+    },
     "This removes %@ from your saved machines." : {
       "localizations" : {
         "de" : {
@@ -17211,6 +17643,9 @@
           }
         }
       }
+    },
+    "This text is too large to paste at once. Copy a smaller selection (up to 1 MB) and try again." : {
+
     },
     "This version of Glassy Desk does not support secure keyboard and pointer input. Update Glassy Desk and try again." : {
       "extractionState" : "manual",
@@ -17618,6 +18053,9 @@
         }
       }
     },
+    "Two ways to connect." : {
+
+    },
     "Two-finger swipes move the zoomed view." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17740,6 +18178,9 @@
           }
         }
       }
+    },
+    "Unlock this device and try again. The saved Mac has been kept because its credentials could not be removed." : {
+
     },
     "Unreachable" : {
       "extractionState" : "manual",
@@ -17985,47 +18426,6 @@
         }
       }
     },
-    "Use Macs that expose macOS Screen Sharing or Remote Management over VNC/RFB." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verwenden Sie Macs, die macOS Screen Sharing oder Remote Management über VNC/RFB ermöglichen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utilice Mac que expongan macOS Screen Sharing o Remote Management sobre VNC/RFB."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "VNC/RFB 経由で macOS 画面共有またはリモート管理を公開する Mac を使用します。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gebruik Macs waarop macOS scherm delen of extern beheer via VNC/RFB beschikbaar is."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Use Macs que expõem o compartilhamento de tela macOS ou o gerenciamento remoto sobre VNC/RFB."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用通过 macOS 公开 macOS 屏幕共享或远程管理的 Mac。"
-          }
-        }
-      }
-    },
     "Use a 15 through 128 character password without control characters or line breaks." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18148,6 +18548,12 @@
         }
       }
     },
+    "Use a one-time code" : {
+
+    },
+    "Use a pairing password" : {
+
+    },
     "Use a password no larger than %lld UTF-8 bytes." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18230,6 +18636,9 @@
         }
       }
     },
+    "Use an account allowed to share this Mac’s screen. A VNC password may not need a username." : {
+
+    },
     "Use as Controller" : {
       "localizations" : {
         "de" : {
@@ -18307,6 +18716,47 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请至少使用 %lld 个字符。"
+          }
+        }
+      }
+    },
+    "Use Macs that expose macOS Screen Sharing or Remote Management over VNC/RFB." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwenden Sie Macs, die macOS Screen Sharing oder Remote Management über VNC/RFB ermöglichen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utilice Mac que expongan macOS Screen Sharing o Remote Management sobre VNC/RFB."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VNC/RFB 経由で macOS 画面共有またはリモート管理を公開する Mac を使用します。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gebruik Macs waarop macOS scherm delen of extern beheer via VNC/RFB beschikbaar is."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Macs que expõem o compartilhamento de tela macOS ou o gerenciamento remoto sobre VNC/RFB."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用通过 macOS 公开 macOS 屏幕共享或远程管理的 Mac。"
           }
         }
       }
@@ -18433,6 +18883,9 @@
         }
       }
     },
+    "Use Tailscale on a different Wi-Fi or mobile network." : {
+
+    },
     "Use the Mac's hostname or IP address and normally port 5900 for VNC." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18473,6 +18926,12 @@
           }
         }
       }
+    },
+    "Use the pairing password you set in Glassy Desk on your Mac." : {
+
+    },
+    "Use the password set in Glassy Desk. Keep Tailscale connected and confirm this address belongs to your Mac." : {
+
     },
     "Use the username and password for a Mac account that is allowed to share the screen. If the server uses legacy password-only VNC authentication, leave the username blank and enter the VNC password." : {
       "extractionState" : "manual",
@@ -18556,6 +19015,12 @@
         }
       }
     },
+    "Use your Mac’s local address or an address reachable through your VPN." : {
+
+    },
+    "Use your Mac’s Tailscale address" : {
+
+    },
     "Username" : {
       "localizations" : {
         "de" : {
@@ -18635,6 +19100,58 @@
           }
         }
       }
+    },
+    "Version %@ (%@)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version %@ (%@)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$@ (%2$@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versión %@ (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バージョン %@ (%@)"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versie %@ (%@)"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versão %@ (%@)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %@ (%@)"
+          }
+        }
+      }
+    },
+    "View only: another connected device controls this Mac. Control becomes available when that device disconnects." : {
+
+    },
+    "View only: enable Accessibility for Glassy Desk on your Mac to use the keyboard and pointer." : {
+
     },
     "VNC" : {
       "extractionState" : "manual",
@@ -18757,51 +19274,8 @@
         }
       }
     },
-    "Version %@ (%@)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Version %@ (%@)"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Version %1$@ (%2$@)"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Versión %@ (%@)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "バージョン %@ (%@)"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Versie %@ (%@)"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Versão %@ (%@)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "版本 %@ (%@)"
-          }
-        }
-      }
+    "Waiting for the Mac display. If the Mac is asleep or locked, wake or unlock it. Sharing resumes when the display is available." : {
+
     },
     "Waiting for the network to become available." : {
       "localizations" : {
@@ -19003,6 +19477,9 @@
           }
         }
       }
+    },
+    "Wake this Mac before connecting with Standard VNC or Fast Connection. Enable “Wake for network access” on the Mac. Both devices must be on the same local network; Tailscale does not forward wake broadcasts." : {
+
     },
     "Wakes this Mac if needed, then connects." : {
       "extractionState" : "manual",
@@ -19210,6 +19687,7 @@
       }
     },
     "When this Mac is unreachable, Glassy Desk can wake it and connect automatically. Enable “Wake for network access” in macOS System Settings." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -19290,6 +19768,47 @@
         }
       }
     },
+    "Which credentials should I enter?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Welche Anmeldeinformationen soll ich eingeben?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Qué credenciales debo ingresar?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "どの認証情報を入力する必要がありますか?"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Welke inloggegevens moet ik invoeren?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quais credenciais devo inserir?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我应该输入哪些凭据？"
+          }
+        }
+      }
+    },
     "Which Macs are supported?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19331,46 +19850,8 @@
         }
       }
     },
-    "Which credentials should I enter?" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Welche Anmeldeinformationen soll ich eingeben?"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Qué credenciales debo ingresar?"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "どの認証情報を入力する必要がありますか?"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Welke inloggegevens moet ik invoeren?"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quais credenciais devo inserir?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "我应该输入哪些凭据？"
-          }
-        }
-      }
+    "While you’re at your Mac, open Glassy Desk → Add Device. On this device, choose Add Mac → Set Up Fast Connection → Scan Mac’s Code. Confirm the Mac to save its local and Tailscale addresses." : {
+
     },
     "Why can I not see my Mac nearby?" : {
       "extractionState" : "manual",
@@ -19452,6 +19933,12 @@
           }
         }
       }
+    },
+    "Why isn’t my Mac in Nearby Macs?" : {
+
+    },
+    "Wi-Fi and VPN routes included" : {
+
     },
     "Will Renew" : {
       "extractionState" : "stale",
@@ -19576,6 +20063,9 @@
         }
       }
     },
+    "Yes. Set up Tailscale on the Mac and your iPhone or iPad, then pair while you’re at your Mac with Tailscale connected. Keep the Mac awake and online. Open Connect away from home in Settings for the full guide, including manual pairing." : {
+
+    },
     "Yes. The easiest current setup is Tailscale on the iPad and Mac, signed into the same tailnet. Save the Mac's Tailscale address for Fast Connection; no public port forwarding is needed. Glassy Desk does not include a cloud relay service." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19658,7 +20148,17 @@
         }
       }
     },
+    "You can still connect by entering the pairing code shown on your Mac." : {
+
+    },
+    "You’ll confirm your Mac before connecting." : {
+
+    },
+    "You’re connected." : {
+
+    },
     "Your analytics are private. No identifiable information is ever sent." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -19738,6 +20238,9 @@
         }
       }
     },
+    "Your Glassy Desk Pro access has been restored." : {
+
+    },
     "Your iPhone or iPad and Mac need to be on the same local network, or connected through a VPN that can reach the Mac." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19778,6 +20281,24 @@
           }
         }
       }
+    },
+    "Your Mac" : {
+
+    },
+    "Your Mac could not start screen capture. Open Glassy Desk on the Mac to check its display and permissions." : {
+
+    },
+    "Your Mac is coming right up." : {
+
+    },
+    "Your Mac.\nYour way." : {
+
+    },
+    "Your Mac. Wherever you are." : {
+
+    },
+    "Your Macs Belong Here" : {
+
     },
     "Your next free session is ready." : {
       "localizations" : {
@@ -19977,46 +20498,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "缩小"
-          }
-        }
-      }
-    },
-    "a beautiful way to feel right at your Mac." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "so schön, als säßest du direkt an deinem Mac."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "una forma preciosa de sentirte frente a tu Mac."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "まるでMacの前にいるような、美しい体験。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "een prachtige manier om je dicht bij je Mac te voelen."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "um jeito bonito de se sentir bem na frente do seu Mac."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一种让你仿佛坐在 Mac 前的美好体验。"
           }
         }
       }

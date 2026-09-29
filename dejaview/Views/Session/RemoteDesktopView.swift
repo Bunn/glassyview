@@ -139,6 +139,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             acceptsHardwareKeyboardInput && session?.supportsClipboardPaste == true
         }
 
+        override var tracksRemoteClipboardOwnership: Bool { true }
+
         override func sendPasteText(_ text: String) {
             session?.pasteText(text)
         }
@@ -1789,6 +1791,13 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             let location = touch.location(in: self)
 
+            // A hardware trackpad or mouse click is already a physical button
+            // press: send it at once and let motion drag, with no hold delay.
+            pointerTouchActive = touch.type == .indirectPointer
+            if pointerTouchActive, event?.buttonMask.contains(.secondary) == true {
+                return
+            }
+
             switch effectiveTouchMode {
             case .trackpad:
                 relativePointer.begin(
@@ -1806,7 +1815,11 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
                 multiTouchActive = false
                 pendingPressPoint = point
-                schedulePendingPress()
+                if pointerTouchActive {
+                    firePendingPressIfNeeded()
+                } else {
+                    schedulePendingPress()
+                }
             }
         }
 
@@ -1831,6 +1844,13 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                     // here would paste the Mac's old clipboard as well.
                     unhandledPresses.insert(press)
                     continue
+                }
+
+                if key.modifierFlags.intersection([.command, .control, .alternate, .shift]) == .command,
+                   key.keyCode == .keyboardC || key.keyCode == .keyboardX {
+                    // The Mac clipboard now owns the latest copy; a following
+                    // Cmd-V must paste it rather than an older iOS clipboard.
+                    noteRemoteClipboardChange()
                 }
 
                 if let keyCode = HardwareKeyboardKeyMapper.keyCode(for: key.keyCode) {
@@ -1973,8 +1993,11 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             if activeTouchCount(event) == 0 { multiTouchActive = false }
         }
 
+        private var pointerTouchActive = false
+
         private var effectiveTouchMode: RemoteTouchMode {
-            touchModeOverride ?? session?.touchMode ?? .direct
+            if pointerTouchActive { return .direct }
+            return touchModeOverride ?? session?.touchMode ?? .direct
         }
 
         private func enterMultiTouch() {

@@ -95,6 +95,7 @@ final class H264Encoder: @unchecked Sendable {
     private var sessionWidth = 0
     private var sessionHeight = 0
     private var forceNextKeyFrame = true
+    private lazy var sharpenedBaseRate = configuration.averageBitRate
     private var latestFrame: CapturedScreenFrame?
     private var lastSubmittedTimestamp: CMTime = .invalid
     private var recoveryWorkItem: DispatchWorkItem?
@@ -188,10 +189,17 @@ final class H264Encoder: @unchecked Sendable {
                     }
                     let dimensionsChanged = configuration.maximumWidth != updated.maximumWidth
                         || configuration.maximumHeight != updated.maximumHeight
+                    // A static desktop sends no new frames, so raising the rate
+                    // alone never sharpens content encoded at a starved rate.
+                    // Compared against the lowest rate since the last sharpening
+                    // so gradual ramps still accumulate into one refresh.
+                    sharpenedBaseRate = min(sharpenedBaseRate, updated.averageBitRate)
+                    let rateRaised = updated.averageBitRate >= sharpenedBaseRate * 3
+                    if rateRaised { sharpenedBaseRate = updated.averageBitRate }
                     configuration = updated
                     // Rate/cadence updates preserve the existing dependency
                     // chain. Only dimensions require idle-buffer recovery.
-                    if dimensionsChanged { requestKeyFrame() }
+                    if dimensionsChanged || rateRaised { requestKeyFrame() }
                     continuation.resume()
                 } catch { continuation.resume(throwing: error) }
             }
