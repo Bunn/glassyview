@@ -24,7 +24,8 @@ func mediaDeliveryWindowRequiresReceiverProgress() throws {
 func adaptiveRateCongestionAndRecovery() {
     var policy = HostAdaptiveRatePolicy()
     policy.acknowledged(deliveryAge: 0.05, queueAge: 0, ceiling: 12_000_000, at: -1)
-    for time in [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0] {
+    // Lateness must persist across acknowledgements before the rate drops.
+    for time in stride(from: -0.75, through: 4.5, by: 0.25) {
         policy.acknowledged(deliveryAge: 0.8, queueAge: 0.2, ceiling: 12_000_000, at: time)
     }
     #expect(policy.bitRate == HostAdaptiveRatePolicy.minimumBitRate)
@@ -247,27 +248,34 @@ func largePreviewRemainsTemporary() {
     #expect(policy.bitRate == 12_000_000)
 }
 
-@Test("A 200 ms internet path keeps Balanced instead of treating latency as congestion")
+@Test("A jittery 200 ms internet path keeps Balanced; only sustained lateness backs off")
 func distantHostRoundTripIsNotCongestion() throws {
     var policy = HostAdaptiveRatePolicy()
     // Authentication feedback overestimates the path; acknowledgements refine it.
     policy.observeInitialRoundTrip(0.6)
-    policy.acknowledged(deliveryAge: 0.5, queueAge: 0, ceiling: 5_000_000, at: 0, deliveredBytes: 8_000)
+    // A 45 KB preview spends extra round trips in TCP slow start.
+    policy.acknowledged(deliveryAge: 1.6, queueAge: 0, ceiling: 5_000_000, at: 0, deliveredBytes: 45_000)
     #expect(policy.bitRate == 5_000_000)
-    // 30 fps deltas acknowledged one RTT plus batching later, with jitter.
+    // 30 fps deltas acknowledged one RTT plus batching later, with jitter
+    // and a retransmission stall every few seconds.
     for step in 0..<300 {
-        let jitter = step % 7 == 0 ? 0.08 : 0
-        policy.acknowledged(deliveryAge: 0.25 + jitter, queueAge: 0.01, ceiling: 5_000_000,
-                            at: 1 + Double(step) / 30, deliveredBytes: 20_000)
+        let time = 1 + Double(step) / 30
+        let age = step % 90 == 45 ? 0.9 : (step % 7 == 0 ? 0.33 : 0.25)
+        let bytes = step % 30 == 0 ? 60_000 : 2_000
+        policy.acknowledged(deliveryAge: age, queueAge: 0.01, ceiling: 5_000_000, at: time, deliveredBytes: bytes)
     }
     #expect(policy.bitRate == 5_000_000)
     #expect(policy.roundTripTime > 0.18 && policy.roundTripTime < 0.25)
+    #expect(policy.stallAgeBudget(bytes: 2_000) >= 1)
     // Credit must span the RTT: 5 Mbps over ~450 ms holds far more than 200 ms.
     var window = HostMediaDeliveryWindow()
     for sequence in 1...12 { window.sent(sequence: UInt64(sequence), bytes: 20_000, at: 0) }
     #expect(window.hasCredit(bitRate: policy.bitRate, window: policy.creditWindow))
     #expect(!window.hasCredit(bitRate: policy.bitRate))
-    // Real queueing well beyond the measured path still backs off.
-    policy.acknowledged(deliveryAge: 0.9, queueAge: 0.01, ceiling: 5_000_000, at: 20, deliveredBytes: 20_000)
+    // Queueing that persists well beyond the measured path backs off.
+    for step in 0..<20 {
+        policy.acknowledged(deliveryAge: 0.9, queueAge: 0.01, ceiling: 5_000_000,
+                            at: 20 + Double(step) / 30, deliveredBytes: 20_000)
+    }
     #expect(policy.bitRate < 5_000_000)
 }

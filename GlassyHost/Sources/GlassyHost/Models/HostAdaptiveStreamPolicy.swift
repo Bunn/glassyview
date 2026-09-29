@@ -59,6 +59,7 @@ struct HostAdaptiveRatePolicy: Sendable {
     private var lastReceiverCongestion: TimeInterval = -.infinity
     private var initialRoundTripTime: TimeInterval = 0
     private var roundTripSamples: [(time: TimeInterval, value: TimeInterval)] = []
+    private var lateSince: TimeInterval?
 
     /// Windowed minimum of acknowledged path latency. Budgets are relative to
     /// it so a distant host's round trip is not mistaken for congestion.
@@ -126,18 +127,25 @@ struct HostAdaptiveRatePolicy: Sendable {
     }
 
     private mutating func observeRoundTrip(deliveryAge: TimeInterval, bytes: Int, at now: TimeInterval) {
-        // Remove serialization and the receiver's 30 ms feedback batching. A
-        // nonpositive remainder means the link outpaced the rate: no RTT data.
-        let sample = deliveryAge - 0.03 - Double(bytes * 8) / Double(bitRate)
         roundTripSamples.removeAll { now - $0.time > 10 }
-        guard sample > 0 else { return }
-        roundTripSamples.append((now, sample))
+        // Only frames that fit TCP's initial window measure latency alone. The
+        // target bitrate is not the link rate, so subtracting serialization
+        // from larger frames produced near-zero RTTs on a slow stream.
+        guard bytes <= 4_096 else { return }
+        roundTripSamples.append((now, max(0, deliveryAge - 0.03)))
     }
 
     /// A single large IDR may serialize longer than a delta frame while still
     /// exceeding the selected bitrate. Compare byte delivery, not age alone.
     func congestionAgeBudget(bytes: Int) -> TimeInterval {
         max(0.35, roundTripTime * 1.5 + 0.03 + Double(bytes * 8) / Double(bitRate) * 1.5)
+    }
+
+    /// A frame this old with no acknowledgement is an outage, not jitter.
+    /// Single TCP retransmissions on a lossy path stall for about one RTO plus
+    /// RTT; sustained shortage is detected from acknowledgements instead.
+    func stallAgeBudget(bytes: Int) -> TimeInterval {
+        max(1.0, roundTripTime * 3 + 0.03 + Double(bytes * 8) / Double(bitRate) * 2)
     }
 
     mutating func selectQuality(ceiling: Int) {
@@ -178,7 +186,12 @@ struct HostAdaptiveRatePolicy: Sendable {
                 // Allow the client's bounded 30 ms feedback batching when
                 // estimating serialization instead of mistaking RTT for a
                 // throughput limit (or a tiny preview for proof of capacity).
-                let serializationAge = max(0.001, deliveryAge - initialRoundTripTime - 0.03)
+                // TCP slow start needs about one extra round trip per doubling
+                // beyond its ~14.6 KB initial window. On a distant host that,
+                // not link capacity, dominates a preview's delivery time.
+                let slowStartRounds = deliveredBytes > 14_600
+                    ? ceil(log2(Double(deliveredBytes) / 14_600 + 1)) : 0
+                let serializationAge = max(0.001, deliveryAge - initialRoundTripTime * (1 + slowStartRounds) - 0.03)
                 let measured = Int(Double(deliveredBytes * 8) / serializationAge * 0.8)
                 // Sub-100 ms samples are dominated by scheduling, Wi-Fi jitter
                 // and feedback batching; a small preview cannot establish a
@@ -209,8 +222,15 @@ struct HostAdaptiveRatePolicy: Sendable {
         }
         if deliveryAge > congestionAgeBudget(bytes: deliveredBytes) || queueAge > 0.12 {
             rateHeadroomSince = nil
-            return congested(at: now)
+            // A retransmission or Wi-Fi burst delays one batch, then the
+            // backlog clears. Only lateness that persists across acknowledgements
+            // shows the rate exceeds capacity; reacting to each spike pinned
+            // jittery internet paths at the floor.
+            if lateSince == nil { lateSince = now }
+            guard let lateSince, now - lateSince >= max(0.5, roundTripTime * 2) else { return resolutionChanged }
+            return congested(at: now) || resolutionChanged
         }
+        lateSince = nil
         let timelyAge = max(0.20, roundTripTime * 1.25 + 0.03 + Double(deliveredBytes * 8) / Double(bitRate))
         // One jittery acknowledgement is not congestion, so it pauses growth
         // without discarding the accumulated stable time. Resetting on every

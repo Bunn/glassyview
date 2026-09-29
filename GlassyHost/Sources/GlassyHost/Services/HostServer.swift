@@ -527,7 +527,7 @@ private extension HostServer {
                 let now = ProcessInfo.processInfo.systemUptime
                 for client in authenticatedClients where client.supportsAdaptiveStream {
                     let oldestAge = client.deliveryWindow.oldestAge(at: now)
-                    if oldestAge > client.ratePolicy.congestionAgeBudget(bytes: client.deliveryWindow.frames.first?.bytes ?? 0),
+                    if oldestAge > client.ratePolicy.stallAgeBudget(bytes: client.deliveryWindow.frames.first?.bytes ?? 0),
                        client.ratePolicy.congested(at: now) {
                         Self.logger.info("Receiver stalled oldestUnacknowledged=\(Int(oldestAge * 1_000))ms rtt=\(Int(client.ratePolicy.roundTripTime * 1_000))ms")
                     }
