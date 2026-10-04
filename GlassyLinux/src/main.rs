@@ -82,7 +82,7 @@ struct ViewArgs {
     /// Send Ctrl as ⌘ Command (and Super as Control).
     #[arg(long, global = true)]
     ctrl_as_cmd: bool,
-    /// Do not capture system shortcuts (Super, Alt+Tab) while the window is focused.
+    /// Do not capture system shortcuts (Super, Alt+Tab) while the window is fullscreen.
     #[arg(long, global = true)]
     no_keyboard_grab: bool,
     /// Show the Linux pointer over the video (the Mac cursor is part of the stream).

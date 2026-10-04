@@ -1,6 +1,11 @@
 //! SDL window: renders the newest decoded picture, forwards keyboard, pointer,
 //! scroll and clipboard input, and reconnects automatically after transient
 //! network failures using the saved resume credential.
+//!
+//! The keyboard is captured only while the window is fullscreen. Windowed,
+//! Super combinations stay with the compositor (Omarchy's Super+F fullscreens
+//! the window); fullscreen, every key goes to the Mac except Super+F, which
+//! leaves fullscreen and hands the keyboard back.
 
 use crate::decoder::{self, Layout, PictureSlot};
 use crate::keymap;
@@ -125,7 +130,7 @@ pub fn run(
     let mut title = String::new();
     let mut first_picture = true;
 
-    eprintln!("glassy-desk: connected to {host_name}. Hotkeys: Ctrl+Alt+Shift + G (keyboard capture), F (fullscreen), V (paste clipboard), 1/2/3 (quality), C (cursor), Q (quit)");
+    eprintln!("glassy-desk: connected to {host_name}. Super+F toggles fullscreen (captures the keyboard). Hotkeys: Ctrl+Alt+Shift + G (fullscreen keyboard capture), F (fullscreen), V (paste clipboard), 1/2/3 (quality), C (cursor), Q (quit)");
 
     'main: loop {
         let sender = match &link {
@@ -202,13 +207,7 @@ pub fn run(
                     break 'main;
                 }
                 SdlEvent::Window { win_event, .. } => match win_event {
-                    WindowEvent::FocusGained => {
-                        focused = true;
-                        if options.grab_keyboard {
-                            canvas.window_mut().set_keyboard_grab(true);
-                            keyboard_grabbed = true;
-                        }
-                    }
+                    WindowEvent::FocusGained => focused = true,
                     WindowEvent::FocusLost => {
                         focused = false;
                         if let Some(sender) = &sender {
@@ -222,6 +221,18 @@ pub fn run(
                     _ => {}
                 },
                 SdlEvent::KeyDown { keycode: Some(keycode), keymod, repeat, .. } => {
+                    // Windowed, the compositor owns Super+F and fullscreens the
+                    // window. Captured, it reaches us and leaves fullscreen.
+                    if keycode == Keycode::F && keymod.intersects(Mod::LGUIMOD | Mod::RGUIMOD) && keyboard_grabbed {
+                        swallowed_keys.insert(keycode.into_i32());
+                        if !repeat {
+                            if let Some(sender) = &sender {
+                                release_all(sender, &mut pressed_keys, &mut buttons);
+                            }
+                            let _ = canvas.window_mut().set_fullscreen(FullscreenType::Off);
+                        }
+                        continue;
+                    }
                     let hotkey_modifiers = keymod.intersects(Mod::LCTRLMOD | Mod::RCTRLMOD)
                         && keymod.intersects(Mod::LALTMOD | Mod::RALTMOD)
                         && keymod.intersects(Mod::LSHIFTMOD | Mod::RSHIFTMOD);
@@ -231,11 +242,7 @@ pub fn run(
                             continue;
                         }
                         match keycode {
-                            Keycode::G => {
-                                options.grab_keyboard = !options.grab_keyboard;
-                                canvas.window_mut().set_keyboard_grab(options.grab_keyboard);
-                                keyboard_grabbed = options.grab_keyboard;
-                            }
+                            Keycode::G => options.grab_keyboard = !options.grab_keyboard,
                             Keycode::F => {
                                 let window = canvas.window_mut();
                                 let next = if window.fullscreen_state() == FullscreenType::Off {
@@ -383,6 +390,18 @@ pub fn run(
             canvas.present();
         }
 
+        // Fullscreen can change underneath us (the compositor's Super+F), so
+        // follow the window state rather than our own requests.
+        let fullscreen = canvas.window().fullscreen_state() != FullscreenType::Off;
+        let capture = focused && fullscreen && options.grab_keyboard;
+        if capture != keyboard_grabbed {
+            if let Some(sender) = &sender {
+                release_all(sender, &mut pressed_keys, &mut buttons);
+            }
+            canvas.window_mut().set_keyboard_grab(capture);
+            keyboard_grabbed = capture;
+        }
+
         let next_title = window_title(&host_name, &link, status, keyboard_grabbed);
         if next_title != title {
             let _ = canvas.window_mut().set_title(&next_title);
@@ -408,7 +427,7 @@ fn window_title(host: &str, link: &Link, status: Option<wire::HostStatus>, grabb
                 title.push_str(" · ");
                 title.push_str(message);
             } else if grabbed {
-                title.push_str(" · Keyboard captured (Ctrl+Alt+Shift+G releases)");
+                title.push_str(" · Keyboard captured (Super+F exits fullscreen)");
             }
         }
     }

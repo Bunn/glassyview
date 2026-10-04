@@ -50,11 +50,13 @@ When it's started from the app launcher, pickers and prompts use Omarchy's own m
 | Ctrl | ⌃ Control (`--ctrl-as-cmd` swaps Ctrl and Super) |
 | Left / right click, wheel, touchpad scroll | same |
 
-The window captures system shortcuts while focused (Wayland keyboard-shortcuts-inhibit), so Super+Tab, Super+Space and similar go to the Mac. Local hotkeys all use **Ctrl+Alt+Shift**:
+Press **Super+F** (Omarchy's fullscreen binding) to make the stream fullscreen. While fullscreen, the window captures every shortcut (Wayland keyboard-shortcuts-inhibit), so Super+Tab, Super+Space and similar go to the Mac. Only Super+F stays local: it leaves fullscreen and gives the keyboard back. In a normal window, Hyprland and Omarchy handle Super combinations first, and only keys they don't bind reach the Mac.
+
+The other local hotkeys all use **Ctrl+Alt+Shift**:
 
 | Hotkey | Action |
 | --- | --- |
-| Ctrl+Alt+Shift+G | Release or recapture the keyboard (use this to reach Hyprland bindings) |
+| Ctrl+Alt+Shift+G | Turn fullscreen keyboard capture off or on |
 | Ctrl+Alt+Shift+F | Toggle fullscreen |
 | Ctrl+Alt+Shift+V | Paste the Linux clipboard into the Mac's active app |
 | Ctrl+Alt+Shift+1 / 2 / 3 | Data Saver / Balanced / Best quality (remembered per Mac) |
