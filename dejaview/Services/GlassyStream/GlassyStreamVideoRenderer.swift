@@ -257,7 +257,7 @@ final class GlassyStreamVideoWorker: @unchecked Sendable {
             synchronizeRecoveryDeadline()
             return false
 
-        case .authenticated, .cursorPosition, .pong:
+        case .authenticated, .cursorPosition, .pong, .fileTransfer:
             return false
         }
     }

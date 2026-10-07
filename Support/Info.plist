@@ -22,6 +22,10 @@
 		<string>_glassydesk._tcp</string>
 		<string>_rfb._tcp</string>
 	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>RevenueCatAPIKey</key>

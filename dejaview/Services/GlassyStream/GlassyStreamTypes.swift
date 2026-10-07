@@ -29,6 +29,7 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
     let supportsStreamQuality: Bool
     let supportsCursorPositionUpdates: Bool
     let supportsClipboardPaste: Bool
+    let supportsFileTransfer: Bool
     /// The selected route becomes trusted only after encrypted authentication.
     let connectedAddress: GlassyStreamDirectAddress?
 
@@ -36,6 +37,7 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
          resumedSession: Bool, supportsStreamQuality: Bool,
          supportsCursorPositionUpdates: Bool,
          supportsClipboardPaste: Bool = false,
+         supportsFileTransfer: Bool = false,
          connectedAddress: GlassyStreamDirectAddress? = nil) {
         self.hostIdentifier = hostIdentifier
         self.hostName = hostName
@@ -44,6 +46,7 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
         self.supportsStreamQuality = supportsStreamQuality
         self.supportsCursorPositionUpdates = supportsCursorPositionUpdates
         self.supportsClipboardPaste = supportsClipboardPaste
+        self.supportsFileTransfer = supportsFileTransfer
         self.connectedAddress = connectedAddress
     }
 }
@@ -57,6 +60,8 @@ enum GlassyStreamEvent: Equatable, Sendable {
     case hostStreamStatus(GlassyStreamHostStatus)
     case cursorPosition(GlassyStreamCursorPosition)
     case pong(Data)
+    /// Delivered in receive order on the media queue; never dropped.
+    case fileTransfer(FileTransferWire.Message)
 }
 
 struct GlassyStreamHostStatus: Equatable, Sendable {

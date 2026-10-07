@@ -51,6 +51,8 @@ private enum ReleasedPeerCompatibilityProbe {
                     case .cursorPosition(let position): $0.cursor = position
                     case .pong(let payload): $0.pongs.append(payload)
                     case .videoDiscontinuity: break
+                    // Events newer than the released client, such as file transfer.
+                    default: break
                     }
                 }
             }, onCompletion: { result in

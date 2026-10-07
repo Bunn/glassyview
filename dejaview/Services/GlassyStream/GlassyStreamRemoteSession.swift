@@ -23,7 +23,17 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         canSendInput && controller.authentication?.supportsClipboardPaste == true
     }
 
+    /// The connected Mac accepts files and this device controls it.
+    var supportsFileTransfer: Bool {
+        canSendInput
+            && controller.authentication?.supportsFileTransfer == true
+            && controller.hostStatus?.ownsInput != false
+    }
+
     let controller: GlassyStreamSessionController
+    let fileTransfers: FileTransferCenter
+
+    var fileTransferCenter: FileTransferCenter? { fileTransfers }
 
     private let framebufferUpdateSubject = CurrentValueSubject<RemoteFramebufferUpdate, Never>(.empty)
     private let cursorSubject = CurrentValueSubject<RemoteCursor?, Never>(nil)
@@ -77,6 +87,10 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 
     init(controller: GlassyStreamSessionController = GlassyStreamSessionController()) {
         self.controller = controller
+        let fileTransfers = FileTransferCenter(send: controller.sendFileTransfer)
+        self.fileTransfers = fileTransfers
+        let engine = fileTransfers.engine
+        controller.fileTransferSink = { message in engine.receive(message) }
 
         controller.onStateChanged = { [weak self] state, error in
             self?.controllerStateChanged(state, error: error)
@@ -712,6 +726,9 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         _ state: GlassyStreamSessionState,
         error: GlassyStreamSessionError?
     ) {
+        if state != .connected {
+            fileTransfers.connectionEnded()
+        }
         switch state {
         case .idle:
             if isSuspendedForBackground {

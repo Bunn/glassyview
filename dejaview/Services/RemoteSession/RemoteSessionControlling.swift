@@ -30,6 +30,11 @@ protocol RemoteSessionControlling: ObservableObject, RemoteSessionInputControlli
     var clipboardPasteError: String? { get }
     func clearClipboardPasteError()
 
+    /// Transfers for this session, when its transport supports files.
+    var fileTransferCenter: FileTransferCenter? { get }
+    /// The connected Mac currently accepts files from this device.
+    var supportsFileTransfer: Bool { get }
+
     /// Current framebuffer updates. Deliberately NOT part of
     /// `objectWillChange`: frames arrive at display rate, and invalidating
     /// SwiftUI for each one causes constant re-layout (which, among other
@@ -89,4 +94,7 @@ extension RemoteSessionInputControlling {
 extension RemoteSessionControlling {
     var clipboardPasteError: String? { nil }
     func clearClipboardPasteError() {}
+    // Standard VNC has no file transfer.
+    var fileTransferCenter: FileTransferCenter? { nil }
+    var supportsFileTransfer: Bool { false }
 }

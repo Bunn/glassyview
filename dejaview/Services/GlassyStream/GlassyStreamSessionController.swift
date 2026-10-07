@@ -120,6 +120,16 @@ final class GlassyStreamSessionController {
     @ObservationIgnored
     var onCursorPositionChanged: (@MainActor @Sendable (GlassyStreamCursorPosition) -> Void)?
 
+    /// Receives file-transfer messages synchronously, in connection order, on
+    /// the media queue. Hopping through the main actor could reorder them.
+    @ObservationIgnored
+    var fileTransferSink: (@Sendable (FileTransferWire.Message) -> Void)?
+
+    /// Sends file-transfer messages in call order from any thread. Messages
+    /// are dropped unless the current connection negotiated file transfer.
+    @ObservationIgnored
+    nonisolated let sendFileTransfer: @Sendable (FileTransferWire.Message) -> Void
+
     init(
         client: GlassyStreamClient = GlassyStreamClient(),
         renderer: GlassyStreamVideoRenderer = GlassyStreamVideoRenderer(),
@@ -128,6 +138,7 @@ final class GlassyStreamSessionController {
         self.client = client
         self.renderer = renderer
         self.videoReadinessTimeout = videoReadinessTimeout
+        sendFileTransfer = { [client] message in client.sendFileTransfer(message) }
     }
 
     /// Opens an encrypted Glassy Stream connection and waits for authentication.
@@ -179,12 +190,17 @@ final class GlassyStreamSessionController {
                 )
 
                 let consumeMedia = renderer.makeMediaConsumer()
+                let fileTransferSink = fileTransferSink
                 client.connect(
                     configuration: configuration,
                     callbackQueue: renderer.mediaQueue,
                     callbacks: GlassyStreamClientCallbacks(
                         onEvent: { [weak self] event in
                             if consumeMedia(event) { return }
+                            if case let .fileTransfer(message) = event {
+                                fileTransferSink?(message)
+                                return
+                            }
                             Task { @MainActor [weak self] in
                                 self?.receive(event, generation: generation)
                             }
@@ -251,7 +267,7 @@ final class GlassyStreamSessionController {
                   authentication?.supportsCursorPositionUpdates == true else { return }
             onCursorPositionChanged?(position)
 
-        case .pong:
+        case .pong, .fileTransfer:
             break
         }
     }

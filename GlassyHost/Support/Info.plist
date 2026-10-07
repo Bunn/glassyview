@@ -28,6 +28,8 @@
 	<string>https://glassydesk-host.pages.dev/glassy-host/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>4Rre8LBS6LmX3rAR/I8srcEJbkEQJTnxZ96v6WuFifI=</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Glassy Desk asks Finder for the files you selected so it can send them to your iPhone or iPad.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_glassydesk._tcp</string>

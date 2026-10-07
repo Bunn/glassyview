@@ -86,6 +86,8 @@ def main():
         client + "GlassyStreamPairingPassword.swift",
         client + "GlassyStreamResumeCredentialStore.swift",
         "dejaview/Infrastructure/AppLog.swift",
+        # Identical in both apps; compile one copy. Outside both peers' historical prefixes.
+        "dejaview/Services/FileTransfer/FileTransferWire.swift",
         "script/performance/ReleasedPeerCompatibilityProbe.swift" if released else (
             "script/performance/StreamCompatibilityProbe.swift" if args.compatibility else "script/performance/StreamAuditProbe.swift"
         ),

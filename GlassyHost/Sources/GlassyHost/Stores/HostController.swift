@@ -64,6 +64,24 @@ final class HostController {
     private let loginItemService = LoginItemService()
     private let remoteInputService = RemoteInputService()
     private let remoteSessionPower = HostRemoteSessionPowerService()
+    @ObservationIgnored
+    private lazy var fileTransfers = HostFileTransferService(send: { [hostServer] message, clientID in
+        hostServer.sendFileTransfer(message, to: clientID)
+    })
+
+    /// Files from paired devices are saved in Downloads; devices can also
+    /// ask for the files selected in Finder.
+    var allowsFileTransfers: Bool {
+        get {
+            access(keyPath: \.allowsFileTransfers)
+            return fileTransfers.allowsTransfers
+        }
+        set {
+            withMutation(keyPath: \.allowsFileTransfers) {
+                fileTransfers.allowsTransfers = newValue
+            }
+        }
+    }
 
     @ObservationIgnored
     private var permissionFlowController: PermissionFlowController?
@@ -296,6 +314,13 @@ final class HostController {
         }
         hostServer.setAuthenticatedClientReplacementHandler { [remoteInputService] in
             remoteInputService.releasePressedInput()
+        }
+        let fileTransfers = fileTransfers
+        hostServer.setFileTransferHandler { clientID, message, isInputOwner in
+            fileTransfers.handle(message, from: clientID, isInputOwner: isInputOwner)
+        }
+        hostServer.setClientEndedHandler { clientID in
+            fileTransfers.clientEnded(clientID)
         }
         do {
             let store = pairingSecretStore

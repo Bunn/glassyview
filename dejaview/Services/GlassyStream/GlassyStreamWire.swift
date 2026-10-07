@@ -29,6 +29,8 @@ enum GlassyStreamWire {
         static let pairingPassword = Capabilities(rawValue: 1 << 5)
         static let clipboardPaste = Capabilities(rawValue: 1 << 6)
         static let adaptiveStream = Capabilities(rawValue: 1 << 7)
+        /// Messages 0x30–0x35. See `FileTransferWire`.
+        static let fileTransfer = Capabilities(rawValue: 1 << 8)
     }
 
     enum MessageKind: UInt8, Sendable {
@@ -51,6 +53,16 @@ enum GlassyStreamWire {
         case keyInput = 0x22
         case textInput = 0x23
         case clipboardPaste = 0x24
+        case fileTransferOffer = 0x30
+        case fileTransferChunk = 0x31
+        case fileTransferAcknowledge = 0x32
+        case fileTransferComplete = 0x33
+        case fileTransferResult = 0x34
+        case fileTransferRequest = 0x35
+
+        init(_ kind: FileTransferWire.Kind) {
+            self.init(rawValue: kind.rawValue)!
+        }
     }
 
     struct Flags: OptionSet, Sendable {

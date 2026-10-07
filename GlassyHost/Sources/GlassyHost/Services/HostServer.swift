@@ -25,6 +25,10 @@ final class HostServer: @unchecked Sendable {
     typealias AdaptiveBitRateHandler = @Sendable (Int?) -> Void
     typealias AuthenticatedClientReplacementHandler = @Sendable () -> Void
     typealias PairedDevicesHandler = @Sendable ([HostPairedDevice]) -> Void
+    /// Connection identifier, decoded message, and whether that connection
+    /// currently owns input.
+    typealias FileTransferHandler = @Sendable (UUID, FileTransferWire.Message, Bool) -> Void
+    typealias ClientEndedHandler = @Sendable (UUID) -> Void
 
     struct PairingCode: Equatable, Sendable {
         let value: String
@@ -158,6 +162,24 @@ final class HostServer: @unchecked Sendable {
 
     func setAdaptiveBitRateHandler(_ handler: AdaptiveBitRateHandler?) {
         core.setAdaptiveBitRateHandler(handler)
+    }
+
+    /// Installs the sink for authenticated file-transfer messages. Delivery is
+    /// serialized in receive order.
+    func setFileTransferHandler(_ handler: FileTransferHandler?) {
+        core.setFileTransferHandler(handler)
+    }
+
+    /// Called after an authenticated connection closes for any reason.
+    func setClientEndedHandler(_ handler: ClientEndedHandler?) {
+        core.setClientEndedHandler(handler)
+    }
+
+    /// Queues a file-transfer message for one authenticated connection.
+    /// File data shares the connection with video in send order; small
+    /// acknowledgements and results move ahead of pending media.
+    func sendFileTransfer(_ message: FileTransferWire.Message, to clientID: UUID) {
+        core.sendFileTransfer(message, to: clientID)
     }
 
     func setAdaptiveResolutionHandler(_ handler: AdaptiveBitRateHandler?) {
@@ -324,6 +346,8 @@ private extension HostServer {
         private var publishedAdaptiveBitRate: Int?
         private var publishedAdaptiveMaximumWidth: Int?
         private var adaptiveResolutionHandler: AdaptiveBitRateHandler = { _ in }
+        private var fileTransferHandler: FileTransferHandler?
+        private var clientEndedHandler: ClientEndedHandler?
         private var mediaMaintenanceWorkItem: DispatchWorkItem?
         private var streamState: HostProtocol.StreamState = .stopped
         private var accessibilityGranted = false
@@ -473,6 +497,33 @@ private extension HostServer {
                 guard let self else { return }
                 adaptiveBitRateHandler = handler ?? { _ in }
                 publishAdaptiveBitRateIfNeeded(force: true)
+            }
+        }
+
+        func setFileTransferHandler(_ handler: FileTransferHandler?) {
+            queue.async { [weak self] in self?.fileTransferHandler = handler }
+        }
+
+        func setClientEndedHandler(_ handler: ClientEndedHandler?) {
+            queue.async { [weak self] in self?.clientEndedHandler = handler }
+        }
+
+        func sendFileTransfer(_ message: FileTransferWire.Message, to clientID: UUID) {
+            queue.async { [weak self] in
+                guard let self, let client = clients[clientID], client.isAuthenticated else { return }
+                let payload: Data
+                do {
+                    payload = try FileTransferWire.encode(message)
+                } catch {
+                    Self.logger.error("Rejected outgoing file transfer message: \(error.localizedDescription, privacy: .public)")
+                    return
+                }
+                let policy: SendPolicy = switch message {
+                case .acknowledge, .result: .control
+                case .offer, .chunk, .complete, .request: .bulk
+                }
+                _ = enqueueEncrypted(payload, kind: HostProtocol.MessageKind(message.kind),
+                                     flags: [], policy: policy, for: client)
             }
         }
 
@@ -851,6 +902,7 @@ private extension HostServer {
                 client.connection.stateUpdateHandler = nil
                 client.connection.cancel()
                 client.isClosed = true
+                if client.isAuthenticated { clientEndedHandler?(client.id) }
             }
             if hadAuthenticatedClients {
                 authenticatedClientReplacementHandler?()
@@ -1375,6 +1427,15 @@ private extension HostServer {
                         for: client
                     )
                 }
+            case .fileTransferOffer, .fileTransferChunk, .fileTransferAcknowledge,
+                 .fileTransferComplete, .fileTransferResult, .fileTransferRequest:
+                let message: FileTransferWire.Message
+                do {
+                    message = try FileTransferWire.decode(kind: frame.kind.rawValue, payload: plaintext)
+                } catch {
+                    throw HostProtocol.ProtocolError.malformedPayload(error.localizedDescription)
+                }
+                fileTransferHandler?(client.id, message, inputOwnerID == client.id)
             case .pointerInput, .scrollInput, .keyInput, .textInput, .clipboardPaste:
                 let input = try HostProtocol.decodeRemoteInput(
                     kind: frame.kind,
@@ -1410,7 +1471,7 @@ private extension HostServer {
                                                        encrypted: true, policy: policy, encodedWidth: encodedWidth), for: client)
             } catch {
                 Self.logger.error("Could not queue packet: \(error.localizedDescription, privacy: .public)")
-                if policy == .control || policy == .codecConfiguration { remove(client) }
+                if policy == .control || policy == .codecConfiguration || policy == .bulk { remove(client) }
                 return false
             }
         }
@@ -1576,6 +1637,7 @@ private extension HostServer {
                 authenticatedClientReplacementHandler?()
                 for remaining in authenticatedClients { sendStreamStatus(to: remaining) }
             }
+            if client.isAuthenticated { clientEndedHandler?(client.id) }
             client.isClosed = true
             client.authenticationTimeout?.cancel()
             client.mediaNegotiationTimeout?.cancel()
@@ -1643,6 +1705,9 @@ private extension HostServer.Core {
         case keyFrame
         case deltaFrame
         case cursorPosition
+        /// File data: kept in send order, never dropped, bounded by the
+        /// transfer window rather than by media age.
+        case bulk
 
         var isVideoFrame: Bool { self == .keyFrame || self == .deltaFrame }
     }
@@ -1834,7 +1899,7 @@ private extension HostServer.Core {
                 case .codecConfiguration, .keyFrame, .deltaFrame, .cursorPosition:
                     pendingByteCount -= packet.byteCount
                     return true
-                case .control:
+                case .control, .bulk:
                     return false
                 }
             }

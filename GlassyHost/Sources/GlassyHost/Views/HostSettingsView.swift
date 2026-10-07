@@ -14,7 +14,7 @@ struct HostSettingsView: View {
             general.tabItem { Label("General", systemImage: "gearshape") }
             security.tabItem { Label("Security", systemImage: "lock.shield") }
         }
-        .frame(width: 540, height: 460)
+        .frame(width: 540, height: 520)
         .onChange(of: isDockIconHidden) { _, isHidden in
             HostDockIconPreference.apply(isHidden: isHidden)
         }
@@ -94,6 +94,13 @@ struct HostSettingsView: View {
                 Text("Optional password")
             } footer: {
                 Text("QR codes are the easiest way to pair nearby. A reusable password is available for remote pairing over Tailscale.")
+            }
+            Section {
+                Toggle("Allow file transfers", isOn: $controller.allowsFileTransfers)
+            } header: {
+                Text("Files")
+            } footer: {
+                Text("Files sent from a paired iPhone or iPad are saved in Downloads. A device can also get the files selected in Finder; the first time, macOS asks to let Glassy Desk control Finder.")
             }
             Section {
                 Button("Reset All Device Access…", role: .destructive) { isResetPresented = true }

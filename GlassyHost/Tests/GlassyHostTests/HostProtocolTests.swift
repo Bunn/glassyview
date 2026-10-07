@@ -142,14 +142,15 @@ func protocolWireValues() throws {
     #expect(HostProtocol.Capabilities.streamQualityControl.rawValue == 0x0000_0008)
     #expect(HostProtocol.Capabilities.cursorPositionTelemetry.rawValue == 0x0000_0010)
     #expect(HostProtocol.Capabilities.pairingPassword.rawValue == 0x0000_0020)
-    #expect(HostProtocol.advertisedCapabilities.rawValue == 0x0000_00DF)
+    #expect(HostProtocol.Capabilities.fileTransfer.rawValue == 0x0000_0100)
+    #expect(HostProtocol.advertisedCapabilities.rawValue == 0x0000_01DF)
     #expect(
         HostProtocol.advertisedCapabilities(pairingPasswordEnabled: true).rawValue
-            == 0x0000_00FF
+            == 0x0000_01FF
     )
     #expect(
         HostProtocol.advertisedCapabilities(pairingPasswordEnabled: false).rawValue
-            == 0x0000_00DF
+            == 0x0000_01DF
     )
     #expect(HostProtocol.AuthenticationMethod.pairingCode.rawValue == 1)
     #expect(HostProtocol.AuthenticationMethod.resumeSecret.rawValue == 2)
@@ -166,6 +167,8 @@ func protocolWireValues() throws {
     #expect(HostProtocol.MessageKind.keyInput.rawValue == 0x22)
     #expect(HostProtocol.MessageKind.textInput.rawValue == 0x23)
     #expect(HostProtocol.MessageKind.clipboardPaste.rawValue == 0x24)
+    #expect(HostProtocol.MessageKind.fileTransferOffer.rawValue == 0x30)
+    #expect(HostProtocol.MessageKind.fileTransferRequest.rawValue == 0x35)
 
     try HostProtocol.decodeKeyFrameRequest(Data())
     #expect(throws: HostProtocol.ProtocolError.self) {

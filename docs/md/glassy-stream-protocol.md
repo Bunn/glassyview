@@ -147,6 +147,12 @@ Capture retirement cancels recovery work and releases the retained buffer and
 transfer session. VideoToolbox emits new SPS/PPS before the corresponding
 new-size keyframe; host configuration handling removes obsolete queued video.
 
+## File transfer: messages 0x30–0x35
+
+Capability bit 8 (`0x00000100`, `fileTransfer`) negotiates encrypted, flow-controlled
+file transfer in both directions. See [file transfer](file-transfer.md) for the
+message layouts, statuses, and host behavior.
+
 ## Input ownership
 
 The first authenticated viewer owns keyboard, pointer, scroll and clipboard
