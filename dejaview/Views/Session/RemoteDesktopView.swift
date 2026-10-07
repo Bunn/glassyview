@@ -1829,16 +1829,20 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                 return
             }
 
-            beginSingleTouch(at: touch.location(in: self), timestamp: touch.timestamp)
+            beginSingleTouch(at: touch.location(in: self), timestamp: touch.timestamp,
+                             isIndirectPointer: touch.type == .indirectPointer,
+                             isSecondaryButton: event?.buttonMask.contains(.secondary) == true)
         }
 
-        private func beginSingleTouch(at location: CGPoint, timestamp: TimeInterval) {
+        private func beginSingleTouch(at location: CGPoint, timestamp: TimeInterval,
+                                      isIndirectPointer: Bool = false,
+                                      isSecondaryButton: Bool = false) {
             guard let session else { return }
 
             // A hardware trackpad or mouse click is already a physical button
             // press: send it at once and let motion drag, with no hold delay.
-            pointerTouchActive = touch.type == .indirectPointer
-            if pointerTouchActive, event?.buttonMask.contains(.secondary) == true {
+            pointerTouchActive = isIndirectPointer
+            if pointerTouchActive, isSecondaryButton {
                 return
             }
 
