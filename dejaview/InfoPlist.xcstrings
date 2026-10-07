@@ -73,6 +73,18 @@
         }
       }
     },
+    "NSFaceIDUsageDescription" : {
+      "comment" : "Privacy - Face ID Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Glassy Desk uses Face ID to keep your Macs private when you turn on the app lock."
+          }
+        }
+      }
+    },
     "NSLocalNetworkUsageDescription" : {
       "comment" : "Privacy description for local network access",
       "extractionState" : "extracted_with_value",

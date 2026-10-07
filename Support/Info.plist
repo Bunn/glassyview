@@ -17,6 +17,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Glassy Desk uses the camera to scan the pairing QR code displayed by Glassy Desk on your Mac.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Glassy Desk uses Face ID to keep your Macs private when you turn on the app lock.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_glassydesk._tcp</string>
