@@ -54,6 +54,7 @@ struct ContentView<Session: RemoteSessionControlling,
     @State private var glassyConnectionFailureMessage = ""
     @State private var isGlassyConnectionFailurePresented = false
     @State private var glassyConnectionFailureMachine: SavedMachine?
+    @State private var pictureInPictureSuspensionTask: Task<Void, Never>?
 
     private let appleScreenSharingHelpURL = URL(string: "https://support.apple.com/guide/mac-help/turn-screen-sharing-on-or-off-mh11848/mac")!
     private let reachabilityRefreshInterval: Duration = .seconds(30)
@@ -241,6 +242,10 @@ struct ContentView<Session: RemoteSessionControlling,
 
             guard newPhase == .active else { return }
 
+            pictureInPictureSuspensionTask?.cancel()
+            pictureInPictureSuspensionTask = nil
+            // Returning to the app shows the session full size again.
+            RemotePictureInPictureCoordinator.shared.stop()
             handlePendingIntentRequest()
 
             let resumedGlassySession = glassySession.resumeAfterBackground()
@@ -258,12 +263,18 @@ struct ContentView<Session: RemoteSessionControlling,
                 await refreshMachineList(reason: "sceneBecameActive", marksMachinesChecking: false)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: RemotePictureInPictureCoordinator.didStopNotification)) { _ in
+            // Closing the floating window while the app is in the background
+            // ends the only reason to keep the connection open.
+            guard UIApplication.shared.applicationState == .background else { return }
+            suspendGlassyForBackground(allowsPictureInPictureGrace: false)
+        }
         .task(id: machineReachabilitySignature) {
             await monitorSavedMachineReachability()
         }
     }
 
-    private func suspendGlassyForBackground() {
+    private func suspendGlassyForBackground(allowsPictureInPictureGrace: Bool = true) {
         let isAddingGlassyConnection = addMachineRequest != nil
             && (glassySession.status == .connecting || preparedGlassySession != nil)
         let hasActiveGlassyWork = glassyConnectTask != nil
@@ -272,6 +283,11 @@ struct ContentView<Session: RemoteSessionControlling,
             || preparedGlassySession != nil
             || sessionMachine?.connectionMode == .glassyStream
         guard hasActiveGlassyWork else { return }
+
+        if sessionMachine?.connectionMode == .glassyStream,
+           deferSuspensionForPictureInPicture(allowsGrace: allowsPictureInPictureGrace) {
+            return
+        }
 
         if sessionMachine?.connectionMode == .glassyStream,
            glassySession.suspendForBackground() {
@@ -286,6 +302,37 @@ struct ContentView<Session: RemoteSessionControlling,
         if isAddingGlassyConnection { addMachineRequest = nil }
         preparedGlassySession = nil
         glassySession.disconnect()
+    }
+
+    /// Keeps a presented Fast Connection open while it plays in Picture in
+    /// Picture. AVKit may open the window just after the scene reaches the
+    /// background, so an expected automatic start gets a short grace period.
+    private func deferSuspensionForPictureInPicture(allowsGrace: Bool) -> Bool {
+        let pictureInPicture = RemotePictureInPictureCoordinator.shared
+        if pictureInPicture.keepsSessionAlive {
+            AppLog.ui.info("Keeping the Glassy Stream open for Picture in Picture")
+            return true
+        }
+        guard allowsGrace, pictureInPicture.mayStartAutomatically else { return false }
+        guard pictureInPictureSuspensionTask == nil else { return true }
+
+        // Hold a background assertion so the grace period cannot be frozen
+        // mid-way and finish only after the person returns.
+        let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Picture in Picture grace")
+        pictureInPictureSuspensionTask = Task { @MainActor in
+            defer {
+                if backgroundTask != .invalid {
+                    UIApplication.shared.endBackgroundTask(backgroundTask)
+                }
+            }
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            pictureInPictureSuspensionTask = nil
+            guard UIApplication.shared.applicationState == .background,
+                  !RemotePictureInPictureCoordinator.shared.keepsSessionAlive else { return }
+            suspendGlassyForBackground(allowsPictureInPictureGrace: false)
+        }
+        return true
     }
 
     // MARK: - Detail

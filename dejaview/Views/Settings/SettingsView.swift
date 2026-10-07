@@ -7,6 +7,9 @@ struct SettingsView: View {
     @AppStorage(AnalyticsPreference.collectionEnabledKey)
     private var analyticsEnabled = AnalyticsPreference.defaultCollectionEnabled
 
+    @AppStorage(RemotePictureInPictureCoordinator.startsAutomaticallyKey)
+    private var startsPictureInPictureAutomatically = RemotePictureInPictureCoordinator.defaultStartsAutomatically
+
     @State private var isPaywallPresented = false
 
     var body: some View {
@@ -63,6 +66,18 @@ struct SettingsView: View {
                 }
             }
 
+            if RemotePictureInPictureCoordinator.shared.isSupported {
+                Section {
+                    Toggle(isOn: $startsPictureInPictureAutomatically) {
+                        Label("Picture in Picture When Leaving", systemImage: "pip")
+                    }
+                } header: {
+                    Text("Sessions")
+                } footer: {
+                    Text("Keep watching your Mac in a floating window when you switch apps during a session. Control resumes when you return to Glassy Desk.")
+                }
+            }
+
             Section("FAQ") {
                 NavigationLink {
                     FAQView()
@@ -110,6 +125,9 @@ struct SettingsView: View {
             if hasProAccess {
                 isPaywallPresented = false
             }
+        }
+        .onChange(of: startsPictureInPictureAutomatically) { _, startsAutomatically in
+            RemotePictureInPictureCoordinator.shared.setStartsAutomatically(startsAutomatically)
         }
     }
 

@@ -30,6 +30,11 @@ final class GlassyStreamDisplayView: UIView {
 
     private weak var attachedRenderer: GlassyStreamVideoRenderer?
 
+    /// The decoded video layer, also used as the Picture in Picture source.
+    var sampleBufferLayer: AVSampleBufferDisplayLayer {
+        videoLayer
+    }
+
     private var videoLayer: AVSampleBufferDisplayLayer {
         guard let videoLayer = layer as? AVSampleBufferDisplayLayer else {
             preconditionFailure("GlassyStreamDisplayView requires AVSampleBufferDisplayLayer")

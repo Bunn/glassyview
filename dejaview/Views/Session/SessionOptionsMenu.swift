@@ -19,8 +19,16 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
     var includesZoomSteps = false
     var usesTrackpadController = false
 
+    private var pictureInPicture: RemotePictureInPictureCoordinator { .shared }
+
     var body: some View {
         Menu {
+            if pictureInPicture.isSupported {
+                Button("Picture in Picture", systemImage: "pip.enter", action: pictureInPicture.start)
+                    .disabled(!pictureInPicture.isPossible)
+                    .accessibilityHint("Keeps watching your Mac in a floating window while you use other apps.")
+            }
+
             if usesTrackpadController, session.supportsClipboardPaste {
                 PasteButton(payloadType: String.self) { strings in
                     session.pasteText(strings.joined(separator: "\n"))

@@ -1,3 +1,4 @@
+import AVFoundation
 import Combine
 import OSLog
 import SwiftUI
@@ -47,6 +48,9 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
     var allowsZoom: Bool = true
     var touchModeOverride: RemoteTouchMode?
     var glassyStreamRenderer: GlassyStreamVideoRenderer?
+    /// The primary session view offers its content to Picture in Picture.
+    /// External-display mirrors and controller previews do not.
+    var providesPictureInPicture = false
 
     func makeUIView(context: Context) -> ScreenView {
         let view = ScreenView()
@@ -63,6 +67,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         view.setKeyboardAvoidanceActive(keyboardAvoidanceActive)
         view.setTouchModeOverride(touchModeOverride)
         view.setGlassyStreamRenderer(glassyStreamRenderer)
+        view.setProvidesPictureInPicture(providesPictureInPicture)
         view.onZoomScaleChanged = context.coordinator.setZoomScale(_:)
         view.setVisibleFramebufferFrame(selectedFramebufferFrame)
         view.setPreferredFrameRate(session.preferredFrameRate)
@@ -108,6 +113,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         uiView.setKeyboardAvoidanceActive(keyboardAvoidanceActive)
         uiView.setTouchModeOverride(touchModeOverride)
         uiView.setGlassyStreamRenderer(glassyStreamRenderer)
+        uiView.setProvidesPictureInPicture(providesPictureInPicture)
     }
 
     static func dismantleUIView(_ uiView: ScreenView, coordinator: Coordinator) {
@@ -154,6 +160,11 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         private var selectedFramebufferFrame: CGRect?
         private let framebufferView = FramebufferImageView()
         private var glassyStreamView: GlassyStreamDisplayView?
+        private var providesPictureInPicture = false
+        var pictureInPictureCoordinator = RemotePictureInPictureCoordinator.shared
+        private var pictureInPictureSourceView: FramebufferPictureInPictureSourceView?
+        private var pictureInPictureFeeder: FramebufferPictureInPictureFeeder?
+        private weak var registeredPictureInPictureLayer: AVSampleBufferDisplayLayer?
         private let cursorLayer = CALayer()
         private let fallbackCursorLayer = CALayer()
         private var remoteCursor: RemoteCursor?
@@ -231,6 +242,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
         private final class FramebufferImageView: UIView {
             private var image: CGImage?
+            var currentImage: CGImage? { image }
             private var fullImageSize: CGSize = .zero
             private var visibleFramebufferFrame: CGRect = .zero
 
@@ -615,6 +627,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             super.didMoveToWindow()
 
             updateFramebufferViewFrame()
+            updatePictureInPictureRegistration()
 
             registerKeyWindowObservers()
 
@@ -688,14 +701,74 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             zoomScaleReconciliationTask = nil
             pendingZeroCursorFollowTask?.cancel()
             pendingZeroCursorFollowTask = nil
+            setProvidesPictureInPicture(false)
             setGlassyStreamRenderer(nil)
+        }
+
+        func setProvidesPictureInPicture(_ provides: Bool) {
+            guard providesPictureInPicture != provides else { return }
+            providesPictureInPicture = provides
+            updatePictureInPictureRegistration()
+        }
+
+        /// Registers the layer that currently shows this session: the decoded
+        /// Fast Connection layer, or a covered framebuffer mirror for VNC.
+        private func updatePictureInPictureRegistration() {
+            let coordinator = pictureInPictureCoordinator
+            let isEligible = providesPictureInPicture && window != nil && coordinator.isSupported
+            let usesFramebufferMirror = isEligible && glassyStreamView == nil
+
+            if usesFramebufferMirror, pictureInPictureSourceView == nil {
+                let sourceView = FramebufferPictureInPictureSourceView()
+                insertSubview(sourceView, belowSubview: framebufferView)
+                sourceView.frame = framebufferView.frame
+                pictureInPictureSourceView = sourceView
+                pictureInPictureFeeder = FramebufferPictureInPictureFeeder(layer: sourceView.sampleBufferLayer)
+                feedPictureInPicture(framebufferView.currentImage)
+            }
+
+            let desiredLayer: AVSampleBufferDisplayLayer? = if !isEligible {
+                nil
+            } else if let glassyStreamView {
+                glassyStreamView.sampleBufferLayer
+            } else {
+                pictureInPictureSourceView?.sampleBufferLayer
+            }
+
+            if let registeredPictureInPictureLayer, registeredPictureInPictureLayer !== desiredLayer {
+                coordinator.unregister(registeredPictureInPictureLayer)
+                self.registeredPictureInPictureLayer = nil
+            }
+            if !usesFramebufferMirror, let pictureInPictureSourceView {
+                pictureInPictureFeeder?.flush()
+                pictureInPictureFeeder = nil
+                pictureInPictureSourceView.removeFromSuperview()
+                self.pictureInPictureSourceView = nil
+            }
+            if let desiredLayer, registeredPictureInPictureLayer !== desiredLayer {
+                coordinator.register(desiredLayer)
+                registeredPictureInPictureLayer = desiredLayer
+            }
+        }
+
+        private func feedPictureInPicture(_ image: CGImage?) {
+            guard let pictureInPictureFeeder, let image else { return }
+            pictureInPictureFeeder.submit(image,
+                                          crop: visibleFramebufferFrame,
+                                          isPictureInPictureActive: pictureInPictureCoordinator.isActive)
         }
 
         func setGlassyStreamRenderer(_ renderer: GlassyStreamVideoRenderer?) {
             guard let renderer else {
-                glassyStreamView?.detachRenderer()
-                glassyStreamView?.removeFromSuperview()
-                glassyStreamView = nil
+                guard let glassyStreamView else { return }
+                if registeredPictureInPictureLayer === glassyStreamView.sampleBufferLayer {
+                    pictureInPictureCoordinator.unregister(glassyStreamView.sampleBufferLayer)
+                    registeredPictureInPictureLayer = nil
+                }
+                glassyStreamView.detachRenderer()
+                glassyStreamView.removeFromSuperview()
+                self.glassyStreamView = nil
+                updatePictureInPictureRegistration()
                 return
             }
 
@@ -711,6 +784,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             videoView.attach(renderer)
             videoView.frame = framebufferView.frame
+            updatePictureInPictureRegistration()
         }
 
         func display(framebufferUpdate update: RemoteFramebufferUpdate) {
@@ -792,6 +866,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             framebufferView.setFramebuffer(image: update.image,
                                            imageSize: fullImageSize,
                                            visibleFrame: visibleFramebufferFrame)
+            feedPictureInPicture(update.image)
 
             let imageSizeChanged = imageSize != previousImageSize
 
@@ -1277,6 +1352,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                   bounds.width > 0, bounds.height > 0 else {
                 framebufferView.frame = .zero
                 glassyStreamView?.frame = .zero
+                pictureInPictureSourceView?.frame = .zero
                 updateCursorLayerFrame()
                 return
             }
@@ -1295,6 +1371,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             UIView.performWithoutAnimation {
                 framebufferView.frame = contentFrame
                 glassyStreamView?.frame = contentFrame
+                pictureInPictureSourceView?.frame = contentFrame
             }
 
             updateCursorLayerFrame()
@@ -1442,6 +1519,17 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
         func debugEndSingleTouch(at point: CGPoint, timestamp: TimeInterval) {
             endSingleTouch(at: point, timestamp: timestamp, remainingTouchCount: 0)
+        }
+
+        var debugPictureInPictureSourceLayer: AVSampleBufferDisplayLayer? {
+            pictureInPictureSourceView?.sampleBufferLayer
+        }
+
+        var debugPictureInPictureSourceIsBelowFramebuffer: Bool {
+            guard let pictureInPictureSourceView,
+                  let sourceIndex = subviews.firstIndex(of: pictureInPictureSourceView),
+                  let framebufferIndex = subviews.firstIndex(of: framebufferView) else { return false }
+            return sourceIndex < framebufferIndex && pictureInPictureSourceView.frame == framebufferView.frame
         }
 
         var debugCursorIsVisible: Bool {
