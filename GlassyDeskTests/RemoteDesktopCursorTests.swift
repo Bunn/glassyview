@@ -7,6 +7,59 @@ import UIKit
 @MainActor
 struct RemoteDesktopCursorTests {
     @Test
+    func touchModeChangeCancelsPendingClickAndReleasesDirectPressExactlyOnce() async throws {
+        let (view, _, session) = try makeView(touchMode: .direct)
+        let point = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        view.debugBeginSingleTouch(at: point, timestamp: 1)
+        view.setTouchModeOverride(.trackpad)
+        try await Task.sleep(for: .milliseconds(100))
+        view.debugEndSingleTouch(at: point, timestamp: 1.1)
+        #expect(session.buttonEvents.isEmpty)
+
+        view.setTouchModeOverride(nil)
+        view.debugBeginSingleTouch(at: point, timestamp: 2)
+        // Reapplying an unchanged mode must let the ordinary press complete.
+        view.setTouchModeOverride(nil)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(session.buttonEvents.map(\.isPressed) == [true])
+        view.setTouchModeOverride(.trackpad)
+        #expect(session.buttonEvents.map(\.isPressed) == [true, false])
+        view.debugEndSingleTouch(at: point, timestamp: 2.2)
+        #expect(session.buttonEvents.map(\.isPressed) == [true, false])
+
+        // The next touch uses the new mode normally, without a stale press.
+        view.debugBeginSingleTouch(at: point, timestamp: 3)
+        view.debugEndSingleTouch(at: point, timestamp: 3.1)
+        #expect(session.buttonEvents.map(\.isPressed) == [true, false, true, false])
+    }
+
+    @Test
+    func leavingTrackpadModeReleasesItsDragWithoutCancellingUnchangedRouting() async throws {
+        let (view, _, session) = try makeView(touchMode: .direct)
+        let point = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        view.setTouchModeOverride(.trackpad)
+        view.debugBeginSingleTouch(at: point, timestamp: 1)
+        try await Task.sleep(for: .milliseconds(600))
+        #expect(session.buttonEvents.map(\.isPressed) == [true])
+
+        // Removing the override while the session itself uses trackpad mode
+        // keeps the same effective mode and must preserve the active drag.
+        session.touchMode = .trackpad
+        view.setTouchModeOverride(nil)
+        #expect(session.buttonEvents.map(\.isPressed) == [true])
+        session.touchMode = .direct
+        view.setTouchModeOverride(nil)
+        #expect(session.buttonEvents.map(\.isPressed) == [true, false])
+        #expect(session.buttonEvents.last?.point == session.cursorLocation)
+        view.debugEndSingleTouch(at: point, timestamp: 1.7)
+        #expect(session.buttonEvents.map(\.isPressed) == [true, false])
+
+        view.debugBeginSingleTouch(at: point, timestamp: 2)
+        view.debugEndSingleTouch(at: point, timestamp: 2.1)
+        #expect(session.buttonEvents.map(\.isPressed) == [true, false, true, false])
+    }
+
+    @Test
     func keyboardViewportResizePreservesApparentScale() throws {
         let initialFrame = CGRect(x: 0, y: 0, width: 1_024, height: 1_366)
         let (view, _, session) = try makeView(
@@ -376,17 +429,29 @@ struct RemoteDesktopCursorTests {
     }
 
     private final class TestSession: RemoteSessionInputControlling {
+        struct ButtonEvent {
+            let isPressed: Bool
+            let point: CGPoint
+        }
+
         var touchMode: RemoteTouchMode
         var cursorLocation: CGPoint
         private(set) var scrollCallCount = 0
+        private(set) var buttonEvents: [ButtonEvent] = []
 
         init(touchMode: RemoteTouchMode, cursorLocation: CGPoint) {
             self.touchMode = touchMode
             self.cursorLocation = cursorLocation
         }
 
-        func leftButtonDown(at point: CGPoint) {}
-        func leftButtonUp(at point: CGPoint) {}
+        func leftButtonDown(at point: CGPoint) {
+            cursorLocation = point
+            buttonEvents.append(ButtonEvent(isPressed: true, point: point))
+        }
+        func leftButtonUp(at point: CGPoint) {
+            cursorLocation = point
+            buttonEvents.append(ButtonEvent(isPressed: false, point: point))
+        }
         func moveCursor(by delta: CGPoint, dragging: Bool) {}
         func moveCursor(to point: CGPoint, dragging: Bool) {}
         func clickAtCursor() {}

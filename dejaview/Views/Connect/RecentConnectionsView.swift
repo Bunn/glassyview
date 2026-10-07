@@ -1,11 +1,20 @@
 import SwiftUI
 
 struct RecentConnectionsView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let entries: [ConnectionHistoryEntry]
+    let availableWidth: CGFloat
     let isSearching: Bool
     let canReconnectDirectly: (ConnectionHistoryEntry) -> Bool
     let connect: (ConnectionHistoryEntry) -> Void
     let delete: (ConnectionHistoryEntry) -> Void
+
+    private var columns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible(), alignment: .top)]
+        }
+        return [GridItem(.adaptive(minimum: min(320, max(1, availableWidth))), spacing: 16, alignment: .top)]
+    }
 
     var body: some View {
         if entries.isEmpty {
@@ -21,7 +30,7 @@ struct RecentConnectionsView: View {
             }
         } else {
             GlassEffectContainer(spacing: 16) {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 16, alignment: .top)],
+                LazyVGrid(columns: columns,
                           alignment: .leading,
                           spacing: 16) {
                     ForEach(entries) { entry in

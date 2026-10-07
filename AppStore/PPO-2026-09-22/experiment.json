@@ -1,0 +1,110 @@
+{
+  "appId": "6787767486",
+  "versionAtCreation": "2.2",
+  "experimentId": "2ab59e38-3caf-446a-b5b3-fddd0c12ed13",
+  "reviewSubmissionId": "3695520a-fd71-4e30-bb23-a46fbb73434a",
+  "name": "Short Headlines - Dark vs Light - Sep 2026",
+  "state": "WAITING_FOR_REVIEW",
+  "submittedAt": "2026-09-22T20:25:35.947Z",
+  "locale": "en-US",
+  "displayTypeChanged": "APP_IPHONE_67",
+  "dimensions": [
+    1320,
+    2868
+  ],
+  "trafficPercent": {
+    "original": 34,
+    "dark": 33,
+    "light": 33
+  },
+  "imageGeneration": "built-in image_gen",
+  "exportNormalization": "sips resize to App Store dimensions; no content edits outside image_gen",
+  "changedPositions": [
+    1,
+    2,
+    3
+  ],
+  "unchangedPositions": [
+    4,
+    5
+  ],
+  "ipad": "Inherited original screenshots unchanged; evaluate results for iPhone",
+  "treatments": [
+    {
+      "variant": "dark",
+      "id": "e0fd9f43-c977-4535-ab59-82c8ed3b63be",
+      "localizationId": "e7ea4adf-5054-4425-af9c-619f5e90d2a1",
+      "screenshotSetId": "9a8e8fa0-10ec-4978-9eea-c4c487aa1a2d",
+      "assets": [
+        {
+          "file": "dark/en-US/iphone/01-your-mac.png",
+          "assetId": "6620e3d7-cd43-474b-9179-77696b9b17e8",
+          "state": "COMPLETE",
+          "sha256": "a6931c48cee5f721b2b8c7854c62a9b9e8df2feb9b30af429b17518be25a15e2"
+        },
+        {
+          "file": "dark/en-US/iphone/02-fast-connection.png",
+          "assetId": "275a1e10-6b9a-47d3-b848-828d0831290c",
+          "state": "COMPLETE",
+          "sha256": "988065723afc05afaa828b9460a2237e802fc6a0c67411d18047400ca64d5bf8"
+        },
+        {
+          "file": "dark/en-US/iphone/03-standard-vnc.png",
+          "assetId": "0f868d19-141c-4d43-965c-9b48032a1198",
+          "state": "COMPLETE",
+          "sha256": "d25f80f5b5e2a74a56d4f3f898cc5aaf8074713c740cb22d5ce58b811a711098"
+        },
+        {
+          "file": "dark/en-US/iphone/04-external-display.png",
+          "assetId": "8a87675c-af5b-45cd-87fb-b2a0c36fcb9c",
+          "state": "COMPLETE",
+          "sha256": "ed6797914bccc114baf775ff3e4f46f5d222a9c8e90e05f49dee26e48aa7efee"
+        },
+        {
+          "file": "dark/en-US/iphone/05-keyboard-shortcuts.png",
+          "assetId": "e2f76515-b137-4b21-a32a-35e416f43004",
+          "state": "COMPLETE",
+          "sha256": "bdbd51424a8b1490b399f34adc02c39239c21c021df5f10a4b3ac495877534f6"
+        }
+      ]
+    },
+    {
+      "variant": "light",
+      "id": "5b838815-0864-4dd7-adfa-8087b5f7b9e3",
+      "localizationId": "1bde8c22-e103-4747-b147-8259a5b35626",
+      "screenshotSetId": "98ca5b0b-8e30-4ab4-b8cd-cd9163aa1802",
+      "assets": [
+        {
+          "file": "light/en-US/iphone/01-your-mac.png",
+          "assetId": "8dfa9452-94ea-480c-a610-e0c182ad17cb",
+          "state": "COMPLETE",
+          "sha256": "ecde2537b90137bf8b0f2e99d1b31b3da2088d82bb982ac16146961ee91f56f8"
+        },
+        {
+          "file": "light/en-US/iphone/02-fast-connection.png",
+          "assetId": "fd903edd-24b6-4e41-b756-11a4a79ba3b9",
+          "state": "COMPLETE",
+          "sha256": "7dcaf0e29575b39afbaa2ff32d471859ea33d7d203410ee9f4b4df2c3ce9bf80"
+        },
+        {
+          "file": "light/en-US/iphone/03-standard-vnc.png",
+          "assetId": "213e9061-5361-45df-a75b-a0bbf1b652d7",
+          "state": "COMPLETE",
+          "sha256": "632fbdfa956aaf9bfa4df0928129e8fb6d0795cf7aff2523a7d4ac2d85eaf286"
+        },
+        {
+          "file": "light/en-US/iphone/04-external-display.png",
+          "assetId": "5c1b926a-0736-41ef-a373-7668ad2f1d11",
+          "state": "COMPLETE",
+          "sha256": "ed6797914bccc114baf775ff3e4f46f5d222a9c8e90e05f49dee26e48aa7efee"
+        },
+        {
+          "file": "light/en-US/iphone/05-keyboard-shortcuts.png",
+          "assetId": "5a9951a0-f7f4-444c-901f-1f85406bac2e",
+          "state": "COMPLETE",
+          "sha256": "bdbd51424a8b1490b399f34adc02c39239c21c021df5f10a4b3ac495877534f6"
+        }
+      ]
+    }
+  ]
+}

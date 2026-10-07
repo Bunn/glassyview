@@ -23,7 +23,6 @@ struct AddMachineWelcomeView: View {
 
                     if !dynamicTypeSize.isAccessibilitySize {
                         MacPairingIllustration()
-                            .scaleEffect(0.52)
                             .frame(width: 146, height: 146)
                     }
                 }

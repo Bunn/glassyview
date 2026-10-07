@@ -8,6 +8,23 @@ struct MacPairingIllustration: View {
     @State private var hasAppeared = false
 
     var body: some View {
+        GeometryReader { geometry in
+            artwork
+                .frame(width: 280, height: 248)
+                .scaleEffect(min(geometry.size.width / 280, geometry.size.height / 248))
+                .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .aspectRatio(280.0 / 248, contentMode: .fit)
+        .frame(maxWidth: 280, maxHeight: 248)
+        .accessibilityHidden(true)
+        .task {
+            withAnimation(reduceMotion ? nil : .spring(response: 0.7, dampingFraction: 0.7)) {
+                hasAppeared = true
+            }
+        }
+    }
+
+    private var artwork: some View {
         ZStack {
             Circle()
                 .fill(Color.accentColor.opacity(0.07))
@@ -70,13 +87,6 @@ struct MacPairingIllustration: View {
                 .background(isRecognized ? Color(.systemBackground) : .clear, in: .circle)
                 .offset(x: 101, y: -75)
                 .scaleEffect(hasAppeared ? 1 : 0.4)
-        }
-        .frame(width: 280, height: 248)
-        .accessibilityHidden(true)
-        .task {
-            withAnimation(reduceMotion ? nil : .spring(response: 0.7, dampingFraction: 0.7)) {
-                hasAppeared = true
-            }
         }
     }
 

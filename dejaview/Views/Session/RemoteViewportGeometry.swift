@@ -20,6 +20,72 @@ enum RemoteViewportGeometry {
         case remoteScroll
     }
 
+    /// Clamps the presentation without replacing the user's content anchor.
+    /// Keeping the anchor separately lets a fold/rotation temporarily fit one
+    /// axis, then restore that axis when the viewport becomes narrow again.
+    static func clampedCenter(_ center: CGPoint,
+                              contentSize: CGSize,
+                              viewportSize: CGSize,
+                              effectiveScale: CGFloat) -> CGPoint {
+        guard contentSize.isUsable,
+              viewportSize.isUsable,
+              effectiveScale.isFinite,
+              effectiveScale > 0 else { return center }
+
+        func coordinate(_ value: CGFloat, contentLength: CGFloat, viewportLength: CGFloat) -> CGFloat {
+            guard contentLength * effectiveScale > viewportLength else {
+                return contentLength / 2
+            }
+            let halfVisibleLength = viewportLength / (2 * effectiveScale)
+            let value = value.isFinite ? value : contentLength / 2
+            return min(max(value, halfVisibleLength), contentLength - halfVisibleLength)
+        }
+
+        return CGPoint(x: coordinate(center.x, contentLength: contentSize.width,
+                                     viewportLength: viewportSize.width),
+                       y: coordinate(center.y, contentLength: contentSize.height,
+                                     viewportLength: viewportSize.height))
+    }
+
+    static func contentFrame(contentSize: CGSize,
+                             viewportBounds: CGRect,
+                             effectiveScale: CGFloat,
+                             center: CGPoint) -> CGRect {
+        guard contentSize.isUsable,
+              viewportBounds.size.isUsable,
+              viewportBounds.origin.x.isFinite,
+              viewportBounds.origin.y.isFinite,
+              effectiveScale.isFinite,
+              effectiveScale > 0 else { return .zero }
+
+        let center = clampedCenter(center, contentSize: contentSize,
+                                   viewportSize: viewportBounds.size,
+                                   effectiveScale: effectiveScale)
+        let renderedSize = CGSize(width: contentSize.width * effectiveScale,
+                                  height: contentSize.height * effectiveScale)
+        guard renderedSize.isUsable else { return .zero }
+        return CGRect(x: viewportBounds.midX - center.x * effectiveScale,
+                      y: viewportBounds.midY - center.y * effectiveScale,
+                      width: renderedSize.width, height: renderedSize.height)
+    }
+
+    /// Maps against the frame that is actually displayed, including its local
+    /// origin and a selected remote display's nonzero framebuffer origin.
+    static func framebufferPoint(for point: CGPoint,
+                                 contentFrame: CGRect,
+                                 sourceFrame: CGRect) -> CGPoint? {
+        guard point.x.isFinite, point.y.isFinite,
+              contentFrame.size.isUsable, sourceFrame.size.isUsable,
+              contentFrame.origin.x.isFinite, contentFrame.origin.y.isFinite,
+              sourceFrame.origin.x.isFinite, sourceFrame.origin.y.isFinite else { return nil }
+
+        let x = (point.x - contentFrame.minX) / contentFrame.width
+        let y = (point.y - contentFrame.minY) / contentFrame.height
+        guard (0...1).contains(x), (0...1).contains(y) else { return nil }
+        return CGPoint(x: sourceFrame.minX + x * sourceFrame.width,
+                       y: sourceFrame.minY + y * sourceFrame.height)
+    }
+
     static func pannableAxes(contentSize: CGSize,
                              viewportSize: CGSize,
                              effectiveScale: CGFloat) -> PannableAxes {

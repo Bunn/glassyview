@@ -21,12 +21,7 @@ extension AppDependencies where Session == VNCSession,
 
         return AppDependencies(makeSession: VNCSession.init,
                                makeBrowser: BonjourBrowser.init,
-                               makeStore: {
-                                   MachineStore(
-                                       repository: SwiftDataSavedMachineRepository.shared,
-                                       widgetSnapshotPublisher: widgetSnapshotPublisher
-                                   )
-                               },
+                               makeStore: { MachineStore.live },
                                makeIntentRouter: { intentRouter },
                                wakeOnLANSender: WakeOnLANService(),
                                widgetSnapshotPublisher: widgetSnapshotPublisher)

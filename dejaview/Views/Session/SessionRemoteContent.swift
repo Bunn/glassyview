@@ -1,6 +1,10 @@
 import SwiftUI
 
 struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
+    @Environment(\.remoteContentRespectsContainer) private var respectsContainer
+    @Environment(\.remoteContentOverlayBottomInset) private var overlayBottomInset
+    @Environment(\.remoteContentFittingSize) private var paneFittingSize
+    @State private var fittingViewportSize: CGSize?
     let session: Session
     let reconnectState: RemoteReconnectState?
     @Binding var zoomScale: CGFloat
@@ -10,6 +14,7 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
     var showsTrackpadCursorDot = false
     let acceptsHardwareKeyboardInput: Bool
     var acceptsPointerInput: Bool = true
+    var touchModeOverride: RemoteTouchMode?
     var glassyStream: GlassyStreamSessionController?
 
     var body: some View {
@@ -18,7 +23,7 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                 RemoteDesktopView(session: session,
                                   selectedFramebufferFrame: nil,
                                   zoomScale: $zoomScale,
-                                  fitsContentToWindow: true,
+                                  fittingViewportSize: paneFittingSize ?? fittingViewportSize,
                                   followsCursor: followsCursor,
                                   pansViewportWithTwoFingers: pansViewportWithTwoFingers,
                                   keyboardAvoidanceActive: keyboardAvoidanceActive,
@@ -27,24 +32,25 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                                   showsFramebuffer: false,
                                   showsTrackpadCursorDot: showsTrackpadCursorDot,
                                   allowsZoom: true,
+                                  touchModeOverride: touchModeOverride,
                                   glassyStreamRenderer: glassyStream.renderer)
                     .ignoresSafeArea(.container, edges: ignoredContainerSafeAreaEdges)
 
                 if reconnectState == nil {
                     GlassyStreamStatusOverlay(controller: glassyStream)
-                        .allowsHitTesting(false)
                 }
             } else {
                 RemoteDesktopView(session: session,
                                   selectedFramebufferFrame: session.selectedDisplayFrame,
                                   zoomScale: $zoomScale,
-                                  fitsContentToWindow: true,
+                                  fittingViewportSize: paneFittingSize ?? fittingViewportSize,
                                   followsCursor: followsCursor,
                                   pansViewportWithTwoFingers: pansViewportWithTwoFingers,
                                   keyboardAvoidanceActive: keyboardAvoidanceActive,
                                   acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
                                   acceptsPointerInput: acceptsPointerInput,
-                                  showsTrackpadCursorDot: showsTrackpadCursorDot)
+                                  showsTrackpadCursorDot: showsTrackpadCursorDot,
+                                  touchModeOverride: touchModeOverride)
                     .id(session.displaySelection.id)
                     .ignoresSafeArea(.container, edges: ignoredContainerSafeAreaEdges)
             }
@@ -54,15 +60,35 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                     .ignoresSafeArea()
                     .accessibilityHidden(true)
 
-                SessionReconnectOverlay(state: reconnectState,
-                                        retryNow: session.retryConnect,
-                                        cancel: session.cancelReconnect)
+                SessionStatusContainer {
+                    SessionReconnectOverlay(state: reconnectState,
+                                            retryNow: session.retryConnect,
+                                            cancel: session.cancelReconnect)
+                }
             }
+        }
+        .background {
+            // Measure this pane without the keyboard, never the whole window. The
+            // rendered viewport still avoids the keyboard and retains its zoom.
+            GeometryReader { geometry in
+                // A protected pane must retain its hardware boundaries. Restore
+                // only our own input overlay inset when measuring its full fit;
+                // the unconstrained measurement already ignores that safe area.
+                let fittingSize = CGSize(width: geometry.size.width,
+                                         height: geometry.size.height + (respectsContainer ? overlayBottomInset : 0))
+                Color.clear
+                    .onChange(of: fittingSize, initial: true) { _, size in
+                        fittingViewportSize = size
+                    }
+            }
+            .ignoresSafeArea(.container, edges: respectsContainer ? [] : .all)
+            .ignoresSafeArea(.keyboard)
         }
     }
 
     private var ignoredContainerSafeAreaEdges: Edge.Set {
-        keyboardAvoidanceActive ? [.top, .leading, .trailing] : .all
+        if respectsContainer { return [] }
+        return keyboardAvoidanceActive ? [.top, .leading, .trailing] : .all
     }
 }
 
@@ -71,34 +97,38 @@ private struct GlassyStreamStatusOverlay: View {
 
     var body: some View {
         if let failureMessage {
-            VStack(spacing: 12) {
-                Image(systemName: "bolt.slash.fill")
-                    .font(.system(size: 36))
-                    .foregroundStyle(.orange)
+            SessionStatusContainer {
+                VStack(spacing: 12) {
+                    Image(systemName: "bolt.slash.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.orange)
 
-                Text(controller.error == nil && controller.hostStatus?.message != nil
-                     ? String(localized: "Check Your Mac") : String(localized: "Connection Stopped"))
-                    .font(.headline)
+                    Text(controller.error == nil && controller.hostStatus?.message != nil
+                         ? String(localized: "Check Your Mac") : String(localized: "Connection Stopped"))
+                        .font(.headline)
 
-                Text(failureMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                    Text(failureMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(22)
+                .frame(maxWidth: 420)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+                .padding(12)
             }
-            .padding(22)
-            .frame(maxWidth: 420)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-            .padding(28)
         } else if isWaitingForVideo {
-            VStack(spacing: 12) {
-                ProgressView()
-                    .controlSize(.large)
-                Text("Waiting for your Mac…")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            SessionStatusContainer {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Waiting for your Mac…")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(18)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
             }
-            .padding(18)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
         } else if let message = controller.hostStatus?.message {
             VStack {
                 Text(message)
@@ -109,6 +139,7 @@ private struct GlassyStreamStatusOverlay: View {
                     .padding()
                 Spacer()
             }
+            .allowsHitTesting(false)
         }
     }
 

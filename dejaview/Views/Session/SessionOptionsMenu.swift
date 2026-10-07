@@ -16,9 +16,28 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
     var includesDisplayPicker = false
     var includesResetZoom = false
     var includesZoomModes = false
+    var includesZoomSteps = false
+    var usesTrackpadController = false
 
     var body: some View {
         Menu {
+            if usesTrackpadController, session.supportsClipboardPaste {
+                PasteButton(payloadType: String.self) { strings in
+                    session.pasteText(strings.joined(separator: "\n"))
+                }
+                .labelStyle(.titleAndIcon)
+                .accessibilityLabel("Paste to Mac")
+            }
+            if includesZoomSteps {
+                Button("Zoom In", systemImage: "plus.magnifyingglass") {
+                    zoomScale = min(4, zoomScale + 0.25)
+                }
+                .disabled(zoomScale >= 4)
+                Button("Zoom Out", systemImage: "minus.magnifyingglass") {
+                    zoomScale = max(1, zoomScale - 0.25)
+                }
+                .disabled(zoomScale <= 1)
+            }
             if includesDisplayPicker,
                !usesGlassyStream,
                session.displayOptions.count > 1 {
@@ -43,6 +62,7 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
                        isOn: $followsCursor)
                 Toggle("Pan View with Two Fingers", systemImage: "hand.draw",
                        isOn: $pansViewportWithTwoFingers)
+                    .disabled(usesTrackpadController)
             }
 
             if session.supportedQualities.count > 1 {
@@ -66,10 +86,11 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
 
             Toggle("Trackpad Mode", systemImage: "cursorarrow.motionlines",
                    isOn: trackpadBinding)
+                .disabled(usesTrackpadController)
 
             Toggle("Show Trackpad Dot", systemImage: "circle.fill",
                    isOn: $showsTrackpadCursorDot)
-                .disabled(session.touchMode != .trackpad)
+                .disabled(!usesTrackpadController && session.touchMode != .trackpad)
 
             if !usesGlassyStream {
                 Picker("Frame Rate", selection: frameRateBinding) {
@@ -130,8 +151,9 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
     // tap, and a blind toggle() would cancel itself out.
     private var trackpadBinding: Binding<Bool> {
         Binding {
-            session.touchMode == .trackpad
+            usesTrackpadController || session.touchMode == .trackpad
         } set: { isOn in
+            guard !usesTrackpadController else { return }
             if (session.touchMode == .trackpad) != isOn {
                 session.toggleTouchMode()
             }
