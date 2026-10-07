@@ -4,8 +4,8 @@ Audit date: 20 September 2026. This record distinguishes source review, automate
 
 ## Toolchain and baseline
 
-- Command-local developer directory: `/Applications/Xcode-beta.app/Contents/Developer`.
-- Verified Xcode 27.1, build 27A9269; `iPhoneSimulator27.1.sdk`.
+- Current developer directory (7 October 2026): `/Applications/Xcode.app/Contents/Developer`, Xcode 27.1 build 27A9275, `iPhoneSimulator27.1.sdk`. The September records below used the since-removed `/Applications/Xcode-beta.app` (build 27A9269); their paths are historical.
+- Verified Xcode 27.1, build 27A9269; `iPhoneSimulator27.1.sdk` (September audit).
 - Available Duo runtime: iOS 27.1, build 24A94401. Available iPhone Duo Simulator: `62F41AE8-A352-416C-ADE9-64AEFC73F392`.
 - Existing minimum deployment target is iOS 26.0. The app targets iPhone and iPad; new APIs must remain guarded individually.
 - Source configuration already provides a SwiftUI scene lifecycle, an external-display scene configuration, a generated launch screen, and indirect input support. There is no `UIRequiresFullScreen` opt-out.
@@ -28,7 +28,7 @@ The QR pairing scanner uses the system's `DataScannerViewController` and offers 
 
 - `SessionArrangement` is the single owner of session pane geometry. Its stable `SessionPaneLayout` places the same desktop and controls children using frames from `SessionPaneGeometry`; it does not depend on the beta native overlay arrangement choosing opposite panes. The keyboard-aware outer reader and keyboard-ignoring background reader are consumed in the same layout pass, with no cached geometry state. Global reader origins are converted to local logical coordinates before clipping the panes. A horizontal division places the desktop above the controller; a vertical division places the desktop at logical leading and the controller at logical trailing. Queries and placement share SwiftUI's RTL mirroring.
 - Division frames must cross the local container and leave two positive usable panes. Off-center divisions retain unequal panes; invalid, outside, edge-only, or partial bands do not invent a second pane. Intersecting active bands remain reserved even when they cannot form a split. When several usable divisions are reported, selection favors the greatest usable area in the smaller pane, then total area, with deterministic geometry tie-breaking. Each assigned pane avoids occlusions and all other active divisions within its own bounds and cannot move to the other side. SDK frames already contain their margins.
-- `ReservedRegionContainer` remains the shared protection for other fixed content. It queries active divisions and occlusions in local geometry, filters intersections, and uses `ReservedRegionGeometry` to select a clear rectangle. Session desktop and controls no longer each choose their own largest side of a division.
+- `ReservedRegionContainer` protects other fixed, centered content; onboarding is its current user. It queries active divisions and occlusions in local geometry, filters intersections, and uses `ReservedRegionGeometry` to select a clear rectangle. Scrolling lists, grids and form sheets (hosts, history, pairing, setup) intentionally continue across the fold. Session desktop and controls no longer each choose their own largest side of a division.
 - While a connected local session has separated panes, `SessionView` reuses `ExternalSessionControllerView` in its folded presentation. Its bottom/trailing pane contains a trackpad and software-keyboard responder; the external-display header and “Show Here” action are omitted. The desktop itself also accepts trackpad gestures, so pointer control remains available when the native keyboard covers the separate trackpad. The main desktop does not claim hardware-keyboard focus in this mode. The controller trackpad accepts hardware input while software focus is off, subject to the timer/paywall modal gate. External-display input behavior is unchanged.
 - Folded software input starts hidden on entry and reconnect. The compact toolbar has three 44-point actions: Options, Show/Hide Software Keyboard, and Close. It prefers the controller pane and falls back to the desktop pane when the visible controller cannot fit its 156×56-point padded bounds. Placement is derived from the current pane calculation without retained geometry state. Additional session actions remain in Options, and the free-session timer appears below the toolbar. A 52-point native keyboard accessory presents the existing special-key/modifier strip with the folded software keyboard; those shortcuts are not duplicated in the folded trackpad pane. The default external-display controller has no new accessory.
 - Fold detection uses unobscured local divisions/occlusions from the current layout pass; each assigned frame is intersected with the current visible local rectangle. Keyboard coverage alone therefore does not remove laptop mode. The parent owns folded keyboard focus, releases held modifiers when mode changes or software focus is lost (including UIKit-driven dismissal), and preserves the ordinary input field’s focus intent through reconnects. Restoration waits until the requested flat input field is visible again, including when the device unfolds while disconnected. Native keyboard/accessory placement is system-owned: a responder in the controller pane does **not** establish that the keyboard and its accessory stay entirely within that pane.
@@ -100,7 +100,7 @@ There is no dedicated UI-test target or connected-session fixture in the baselin
 The focused regression set can be repeated with the appropriate local destination ID:
 
 ```sh
-DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 xcodebuild -project dejaview.xcodeproj -scheme GlassyDesk \
   -destination 'platform=iOS Simulator,name=iPhone Duo' \
   -parallel-testing-enabled NO \
@@ -136,7 +136,7 @@ Initial smoke checks on 20 September 2026: Duo outer-display onboarding at norma
 | Localization and accessibility | RTL; long labels; accessibility Dynamic Type; VoiceOver; reduced motion/transparency; increased contrast; light/dark | Physical avoidance and semantic ordering agree; labels/order/focus and contrast remain useful | RTL hosting tests and large-text onboarding passed; physical regions/VoiceOver/appearance checks remain |
 | Ordinary iPhone regression | iOS 26 phone, portrait and both landscapes, keyboard and session overlays | Existing navigation, video framing, gestures and controls remain available | Full automated run and portrait onboarding smoke check recorded above; live session/rotation checks remain |
 | iPad regression | Full screen, rotation, Split View/window resizing, keyboard; both local and external-display VNC mode | Existing scene navigation and external control continue; local resizing does not become display-global | Automated run and full-screen smoke checks recorded above; multitasking/live external-display checks remain |
-| Multiple app scenes | Open a second supported app window; different navigation/editor states | Presentation state remains independent; shared machines/subscriptions synchronize as intended | Not yet recorded |
+| Multiple app scenes | Open a second supported app window; different navigation/editor states; run Connect/Open/Disconnect shortcuts with both open | Presentation state remains independent; shared machines/subscriptions synchronize; one active window handles each navigation/connect request; Disconnect ends every window's session | Routing and shared-store source fixes plus router unit tests (7 October 2026); live two-window check not yet recorded |
 
 ## Beta and hardware limits
 
@@ -238,3 +238,20 @@ The current source passed all 95 selected tests in nine suites on Duo / iOS 27.1
 The same current-source regression set passed all 95 tests in nine suites on each legacy destination: iPhone 17 Pro / iOS 26.1 (`/tmp/glassydesk-iphone26-controls-pane.xcresult`) and iPad Pro 13-inch / iOS 26.1 (`/tmp/glassydesk-ipad26-controls-pane.xcresult`).
 
 Native Xcode beta MCP's `RunProject` rebuilt and launched the final toolbar source successfully, preserving portrait. The host-list screenshot is `/tmp/glassydesk-duo-toolbar-final-portrait.png`; the captured launch console is `/tmp/glassydesk-duo-toolbar-final-launch-console.json`. This bounded launch capture contained no AttributeGraph cycles, constraint conflicts, keyboard coordinate-conversion errors, or KeyboardTrackingCoordinator diagnostics. It is launch evidence only; no new live “mini” connection or real fold/rotation sequence was performed for this placement change.
+
+## Platform review follow-up — 7 October 2026
+
+A holistic review against the `iphone-duo` and `app-resizability` guidance, on Xcode 27.1 (27A9275) with native Xcode MCP, found the configuration preflight, local geometry, reserved-region queries and toolbar semantics in order. Three source issues were corrected:
+
+- **Multiple windows and App Intents.** Every `ContentView` observed the shared `AppIntentRouter`, so the scene that handled a Shortcut or widget request depended on update order. Connect, Open, Refresh Nearby and Reload requests are now claimed atomically by one *active* scene; an inactive scene leaves the request pending until a scene becomes active. Disconnect is a counter that every scene observes, so each window ends its own session and a scene without a session cannot consume the request.
+- **Shared saved machines.** Each window previously built its own `MachineStore`, so an edit in one window did not appear in another until it reloaded. Scenes and the Add Saved Computer intent now share `MachineStore.live`.
+- **Fold-aware onboarding.** `ReservedRegionContainer` had no users. Onboarding's centered pages and footer now sit in the largest rectangle clear of active divisions and occlusions, with the backdrop still filling the screen. Without regions (iOS 26, ordinary iPhone and iPad, flat or closed Duo) the layout is unchanged.
+
+| Check | Evidence | Result |
+| --- | --- | --- |
+| IDE build, Duo destination | Native Xcode MCP `BuildProject` | Succeeded; only the existing `GlassyStreamVideoRenderer` Sendable warnings |
+| Full suite, Duo / iOS 27.1 | `duo-fix.xcresult` (session scratchpad) | 243 of 245 passed, including three new `AppIntentRouterTests`; the two failures are the existing `GlassyStreamVideoPresentationTests` decoder cases |
+| Full suite, iPhone 17 Pro / iOS 26.1 | `ios26-fix.xcresult` (session scratchpad), newly installed iOS 26.1 (23B80) runtime | All 245 passed |
+| Live two-window intents, onboarding in a half-folded pose | — | Not yet recorded. Native Xcode MCP screen capture of the Duo inner display returned black images in this session, so runtime visuals need Simulator/Device Hub observation |
+
+Two `SessionView`s in separate windows still share `ExternalDisplayCoordinator.shared`; external-display controller mode with two concurrent sessions is unvalidated.

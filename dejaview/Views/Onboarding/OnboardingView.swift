@@ -13,6 +13,25 @@ struct OnboardingView: View {
     }
 
     var body: some View {
+        // The centered page and its footer stay clear of an active fold or
+        // camera; only the backdrop spans the whole screen.
+        ReservedRegionContainer {
+            pages
+        }
+        .background {
+            LinearGradient(colors: [Color(red: 0.025, green: 0.10, blue: 0.21),
+                                    Color(red: 0.035, green: 0.055, blue: 0.12),
+                                    Color(red: 0.02, green: 0.045, blue: 0.08)],
+                           startPoint: .topLeading,
+                           endPoint: .bottomTrailing)
+                .ignoresSafeArea()
+        }
+        .preferredColorScheme(.dark)
+        .toolbar(.hidden, for: .navigationBar)
+        .sensoryFeedback(.selection, trigger: selectedPage)
+    }
+
+    private var pages: some View {
         VStack(spacing: 0) {
             header
 
@@ -50,17 +69,6 @@ struct OnboardingView: View {
                                  completionTitle: onComplete == nil ? "Done" : "Let’s Connect",
                                  onPrimaryButtonTapped: advanceOrComplete)
         }
-        .background {
-            LinearGradient(colors: [Color(red: 0.025, green: 0.10, blue: 0.21),
-                                    Color(red: 0.035, green: 0.055, blue: 0.12),
-                                    Color(red: 0.02, green: 0.045, blue: 0.08)],
-                           startPoint: .topLeading,
-                           endPoint: .bottomTrailing)
-                .ignoresSafeArea()
-        }
-        .preferredColorScheme(.dark)
-        .toolbar(.hidden, for: .navigationBar)
-        .sensoryFeedback(.selection, trigger: selectedPage)
     }
 
     private var header: some View {

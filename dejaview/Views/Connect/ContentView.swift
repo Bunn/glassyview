@@ -211,6 +211,9 @@ struct ContentView<Session: RemoteSessionControlling,
             guard let request else { return }
             handleIntentRequest(request)
         }
+        .onChange(of: intentRouter.disconnectGeneration) { _, _ in
+            disconnectFromIntent()
+        }
         .onOpenURL(perform: handleWidgetURL)
         .onChange(of: session.status) { _, status in
             guard sessionMachine?.connectionMode == .vnc else { return }
@@ -237,6 +240,8 @@ struct ContentView<Session: RemoteSessionControlling,
             }
 
             guard newPhase == .active else { return }
+
+            handlePendingIntentRequest()
 
             let resumedGlassySession = glassySession.resumeAfterBackground()
             if resumedGlassySession {
@@ -904,7 +909,11 @@ struct ContentView<Session: RemoteSessionControlling,
         handleIntentRequest(request)
     }
 
+    /// Every window observes the shared router. Only an active scene claims a
+    /// request; an inactive one leaves it pending for the next active scene.
     private func handleIntentRequest(_ request: AppIntentRequest) {
+        guard scenePhase == .active, intentRouter.claim(request) else { return }
+
         switch request.action {
         case .connect(let machineID):
             connectFromIntent(machineID: machineID)
@@ -912,15 +921,11 @@ struct ContentView<Session: RemoteSessionControlling,
             openFromIntent(destination: destination)
         case .refreshNearby:
             refreshNearbyFromIntent()
-        case .disconnect:
-            disconnectFromIntent()
         case .reloadMachines:
             Task {
                 await refreshMachineList(reason: "appIntentReloadMachines", marksMachinesChecking: false)
             }
         }
-
-        intentRouter.clear(request)
     }
 
     private func connectSection(for destination: DejaViewDestination) -> ConnectSection {

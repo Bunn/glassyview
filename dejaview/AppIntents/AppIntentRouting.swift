@@ -4,7 +4,6 @@ enum AppIntentAction: Equatable {
     case connect(machineID: UUID)
     case open(destination: DejaViewDestination)
     case refreshNearby
-    case disconnect
     case reloadMachines
 }
 
@@ -16,6 +15,8 @@ struct AppIntentRequest: Equatable, Identifiable {
 @MainActor
 protocol AppIntentRouting: AnyObject {
     var request: AppIntentRequest? { get }
+    var disconnectGeneration: Int { get }
 
-    func clear(_ handledRequest: AppIntentRequest)
+    /// Returns true for the single scene that takes ownership of the request.
+    func claim(_ pendingRequest: AppIntentRequest) -> Bool
 }

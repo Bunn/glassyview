@@ -6,6 +6,12 @@ import OSLog
 @MainActor
 @Observable
 final class MachineStore: MachineStoring {
+    /// Every window observes one store, so an edit in one scene appears in the others.
+    static let live = MachineStore(
+        repository: SwiftDataSavedMachineRepository.shared,
+        widgetSnapshotPublisher: WidgetSnapshotPublisher()
+    )
+
     private(set) var machines: [SavedMachine] = []
     private(set) var recentConnections: [ConnectionHistoryEntry] = []
 
