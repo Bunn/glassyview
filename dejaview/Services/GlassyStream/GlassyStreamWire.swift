@@ -31,6 +31,8 @@ enum GlassyStreamWire {
         static let adaptiveStream = Capabilities(rawValue: 1 << 7)
         /// Messages 0x30–0x35. See `FileTransferWire`.
         static let fileTransfer = Capabilities(rawValue: 1 << 8)
+        /// Messages 0x25 and 0x26.
+        static let curtainMode = Capabilities(rawValue: 1 << 9)
     }
 
     enum MessageKind: UInt8, Sendable {
@@ -53,6 +55,8 @@ enum GlassyStreamWire {
         case keyInput = 0x22
         case textInput = 0x23
         case clipboardPaste = 0x24
+        case curtainRequest = 0x25
+        case curtainStatus = 0x26
         case fileTransferOffer = 0x30
         case fileTransferChunk = 0x31
         case fileTransferAcknowledge = 0x32
@@ -387,6 +391,19 @@ enum GlassyStreamWire {
         } catch {
             return String(localized: "The host rejected the protocol message.")
         }
+    }
+
+    static func encodeCurtainRequest(enabled: Bool) -> Data {
+        Data([enabled ? 1 : 0, 0, 0, 0])
+    }
+
+    static func decodeCurtainStatus(_ data: Data) throws -> GlassyStreamCurtainStatus {
+        let bytes = [UInt8](data)
+        guard bytes.count == 4, let state = GlassyStreamCurtainStatus.State(rawValue: bytes[0]),
+              bytes[1] & ~1 == 0, bytes[2] == 0, bytes[3] == 0 else {
+            throw violation("invalid curtain status")
+        }
+        return GlassyStreamCurtainStatus(state: state, blocksLocalInput: bytes[1] & 1 != 0)
     }
 
     static func encodeKeyFrameRequest() -> Data {

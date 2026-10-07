@@ -88,6 +88,8 @@ final class GlassyStreamSessionController {
     private(set) var authentication: GlassyStreamAuthentication?
     private(set) var videoDimensions: CGSize?
     private(set) var hostStatus: GlassyStreamHostStatus?
+    /// Nil until this connection has asked about Curtain Mode.
+    private(set) var curtainStatus: GlassyStreamCurtainStatus?
 
     var isConnected: Bool {
         state == .connected
@@ -122,6 +124,9 @@ final class GlassyStreamSessionController {
 
     /// Receives file-transfer messages synchronously, in connection order, on
     /// the media queue. Hopping through the main actor could reorder them.
+    @ObservationIgnored
+    var onCurtainStatusChanged: (@MainActor @Sendable (GlassyStreamCurtainStatus) -> Void)?
+
     @ObservationIgnored
     var fileTransferSink: (@Sendable (FileTransferWire.Message) -> Void)?
 
@@ -161,6 +166,7 @@ final class GlassyStreamSessionController {
         activeGeneration = generation
         authentication = nil
         hostStatus = nil
+        curtainStatus = nil
         videoDimensions = nil
         error = nil
         state = .connecting
@@ -225,6 +231,11 @@ final class GlassyStreamSessionController {
         disconnectCurrentSession(clearError: true)
     }
 
+    func setCurtainMode(_ enabled: Bool) {
+        guard state == .connected, authentication?.supportsCurtainMode == true else { return }
+        client.setCurtainMode(enabled)
+    }
+
     func setStreamQuality(_ quality: RemoteSessionQuality) {
         guard state == .connected,
               authentication?.supportsStreamQuality == true else { return }
@@ -266,6 +277,10 @@ final class GlassyStreamSessionController {
             guard state == .connected,
                   authentication?.supportsCursorPositionUpdates == true else { return }
             onCursorPositionChanged?(position)
+
+        case .curtainStatus(let status):
+            curtainStatus = status
+            onCurtainStatusChanged?(status)
 
         case .pong, .fileTransfer:
             break
@@ -346,6 +361,7 @@ final class GlassyStreamSessionController {
         renderer.reset()
         authentication = nil
         hostStatus = nil
+        curtainStatus = nil
         videoDimensions = nil
         error = sessionError
         state = .failed
@@ -379,6 +395,7 @@ final class GlassyStreamSessionController {
         renderer.reset()
         authentication = nil
         hostStatus = nil
+        curtainStatus = nil
         videoDimensions = nil
         state = .idle
         if clearError {

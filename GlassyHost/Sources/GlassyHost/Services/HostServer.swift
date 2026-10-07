@@ -29,6 +29,9 @@ final class HostServer: @unchecked Sendable {
     /// currently owns input.
     typealias FileTransferHandler = @Sendable (UUID, FileTransferWire.Message, Bool) -> Void
     typealias ClientEndedHandler = @Sendable (UUID) -> Void
+    /// Connection identifier, requested state, and whether that connection
+    /// currently owns input.
+    typealias CurtainRequestHandler = @Sendable (UUID, Bool, Bool) -> Void
 
     struct PairingCode: Equatable, Sendable {
         let value: String
@@ -173,6 +176,21 @@ final class HostServer: @unchecked Sendable {
     /// Called after an authenticated connection closes for any reason.
     func setClientEndedHandler(_ handler: ClientEndedHandler?) {
         core.setClientEndedHandler(handler)
+    }
+
+    func setCurtainRequestHandler(_ handler: CurtainRequestHandler?) {
+        core.setCurtainRequestHandler(handler)
+    }
+
+    /// Publishes Curtain Mode to every connection that has asked about it.
+    /// Older clients never ask, so they never receive this message.
+    func publishCurtainStatus(_ status: HostProtocol.CurtainStatus) {
+        core.publishCurtainStatus(status)
+    }
+
+    /// Tells one connection why its request did not change Curtain Mode.
+    func sendCurtainStatus(_ status: HostProtocol.CurtainStatus, to clientID: UUID) {
+        core.sendCurtainStatus(status, to: clientID)
     }
 
     /// Queues a file-transfer message for one authenticated connection.
@@ -348,6 +366,8 @@ private extension HostServer {
         private var adaptiveResolutionHandler: AdaptiveBitRateHandler = { _ in }
         private var fileTransferHandler: FileTransferHandler?
         private var clientEndedHandler: ClientEndedHandler?
+        private var curtainRequestHandler: CurtainRequestHandler?
+        private var curtainStatus = HostProtocol.CurtainStatus.off
         private var mediaMaintenanceWorkItem: DispatchWorkItem?
         private var streamState: HostProtocol.StreamState = .stopped
         private var accessibilityGranted = false
@@ -506,6 +526,34 @@ private extension HostServer {
 
         func setClientEndedHandler(_ handler: ClientEndedHandler?) {
             queue.async { [weak self] in self?.clientEndedHandler = handler }
+        }
+
+        func setCurtainRequestHandler(_ handler: CurtainRequestHandler?) {
+            queue.async { [weak self] in self?.curtainRequestHandler = handler }
+        }
+
+        func publishCurtainStatus(_ status: HostProtocol.CurtainStatus) {
+            queue.async { [weak self] in
+                guard let self else { return }
+                curtainStatus = status
+                for client in authenticatedClients where client.isSubscribedToCurtain {
+                    sendCurtainStatus(to: client)
+                }
+            }
+        }
+
+        func sendCurtainStatus(_ status: HostProtocol.CurtainStatus, to clientID: UUID) {
+            queue.async { [weak self] in
+                guard let self, let client = clients[clientID], client.isSubscribedToCurtain else { return }
+                sendCurtainStatus(to: client, status: status)
+            }
+        }
+
+        private func sendCurtainStatus(to client: Client, status: HostProtocol.CurtainStatus? = nil) {
+            // Statuses are rare and ordered; never coalesce them, so a
+            // rejection or failure is not replaced by the state that follows.
+            _ = enqueueEncrypted(HostProtocol.encodeCurtainStatus(status ?? curtainStatus), kind: .curtainStatus,
+                                 flags: [], policy: .control, for: client)
         }
 
         func sendFileTransfer(_ message: FileTransferWire.Message, to clientID: UUID) {
@@ -1427,6 +1475,13 @@ private extension HostServer {
                         for: client
                     )
                 }
+            case .curtainRequest:
+                let enabled = try HostProtocol.decodeCurtainRequest(plaintext)
+                if !client.isSubscribedToCurtain {
+                    client.isSubscribedToCurtain = true
+                    sendCurtainStatus(to: client)
+                }
+                curtainRequestHandler?(client.id, enabled, inputOwnerID == client.id)
             case .fileTransferOffer, .fileTransferChunk, .fileTransferAcknowledge,
                  .fileTransferComplete, .fileTransferResult, .fileTransferRequest:
                 let message: FileTransferWire.Message
@@ -1833,6 +1888,8 @@ private extension HostServer.Core {
         var requestedQuality: HostProtocol.StreamQuality = .best
         // Cursor telemetry is opt-in so older clients receive no new messages.
         var isSubscribedToCursorPosition = false
+        // Curtain status is opt-in for the same reason.
+        var isSubscribedToCurtain = false
         var supportsAdaptiveStream = false
         var deliveryWindow = HostMediaDeliveryWindow()
         var ratePolicy = HostAdaptiveRatePolicy()

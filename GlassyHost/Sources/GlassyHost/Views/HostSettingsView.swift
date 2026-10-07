@@ -14,7 +14,7 @@ struct HostSettingsView: View {
             general.tabItem { Label("General", systemImage: "gearshape") }
             security.tabItem { Label("Security", systemImage: "lock.shield") }
         }
-        .frame(width: 540, height: 520)
+        .frame(width: 540, height: 600)
         .onChange(of: isDockIconHidden) { _, isHidden in
             HostDockIconPreference.apply(isHidden: isHidden)
         }
@@ -101,6 +101,13 @@ struct HostSettingsView: View {
                 Text("Files")
             } footer: {
                 Text("Files sent from a paired iPhone or iPad are saved in Downloads. A device can also get the files selected in Finder; the first time, macOS asks to let Glassy Desk control Finder.")
+            }
+            Section {
+                Toggle("Allow Curtain Mode", isOn: $controller.allowsCurtainMode)
+            } header: {
+                Text("Curtain Mode")
+            } footer: {
+                Text("The device controlling this Mac can cover its displays and ignore its keyboard, mouse, and trackpad. The screen returns 15 seconds after that device disconnects. Requires Accessibility.")
             }
             Section {
                 Button("Reset All Device Access…", role: .destructive) { isResetPresented = true }

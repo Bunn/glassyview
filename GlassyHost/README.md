@@ -42,6 +42,8 @@ Connected Glassy Desk devices can request Data Saver (720p/15 FPS/~2 Mbps), Bala
 
 Connected devices can also explicitly paste copied text into the active Mac app. The host receives the text over the authenticated, encrypted session, writes it to the Mac clipboard, then posts Cmd-V using the existing Accessibility permission. Text remains on the Mac clipboard for subsequent pastes. This requires compatible builds on both devices; clipboard contents are never monitored or synchronized in the background. See [clipboard behavior and verification](../docs/md/clipboard-paste.md).
 
+The controlling device can turn on Curtain Mode, which covers every display with a shield that the stream leaves out and ignores the Mac's own keyboard and pointer until that device disconnects. Turn it off in Settings › Security. See [Curtain Mode](../docs/md/curtain-mode.md).
+
 The controlling device can send files, which are saved in Downloads, and can ask for the files selected in Finder. The first Finder request shows macOS's Automation prompt. Turn transfers off in Settings › Security. See [file transfer](../docs/md/file-transfer.md).
 
 ## Sleep, screen saver, and wake

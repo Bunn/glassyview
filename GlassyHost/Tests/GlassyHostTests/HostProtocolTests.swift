@@ -143,14 +143,14 @@ func protocolWireValues() throws {
     #expect(HostProtocol.Capabilities.cursorPositionTelemetry.rawValue == 0x0000_0010)
     #expect(HostProtocol.Capabilities.pairingPassword.rawValue == 0x0000_0020)
     #expect(HostProtocol.Capabilities.fileTransfer.rawValue == 0x0000_0100)
-    #expect(HostProtocol.advertisedCapabilities.rawValue == 0x0000_01DF)
+    #expect(HostProtocol.advertisedCapabilities.rawValue == 0x0000_03DF)
     #expect(
         HostProtocol.advertisedCapabilities(pairingPasswordEnabled: true).rawValue
-            == 0x0000_01FF
+            == 0x0000_03FF
     )
     #expect(
         HostProtocol.advertisedCapabilities(pairingPasswordEnabled: false).rawValue
-            == 0x0000_01DF
+            == 0x0000_03DF
     )
     #expect(HostProtocol.AuthenticationMethod.pairingCode.rawValue == 1)
     #expect(HostProtocol.AuthenticationMethod.resumeSecret.rawValue == 2)

@@ -95,6 +95,41 @@ struct GlassyStreamRouteLoopbackTests {
         }
     }
 
+    @Test(arguments: [false, true])
+    func curtainModeRequiresNegotiatedSupport(supported: Bool) async throws {
+        let hostID = Data(repeating: 0x42, count: 16)
+        let host = try LoopbackPairingHost(hostID: hostID, behavior: "valid",
+                                           extraCapabilities: supported ? 1 << 9 : 0)
+        defer { host.stop() }
+        let endpoint = try await host.start()
+        let client = GlassyStreamClient(credentialStore: RouteTestCredentialStore())
+        defer { client.disconnect() }
+        let events = RouteTestEvents()
+        let authentication = try await authenticate(client, configuration: .init(
+            endpoint: endpoint, savedMachineID: UUID(),
+            bootstrapCredential: .oneTimeCode("ABCDEFGH2345"), expectedHostIdentifier: hostID
+        ), events: events)
+        #expect(authentication.supportsCurtainMode == supported)
+
+        client.setCurtainMode(true)
+        client.setCurtainMode(false)
+        client.sendPing()
+        try await waitForPing(host)
+        #expect(host.curtainRequests == (supported ? [Data([1, 0, 0, 0]), Data([0, 0, 0, 0])] : []))
+
+        try host.sendRaw(kind: .curtainStatus, payload: Data([1, 1, 0, 0]))
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while ContinuousClock.now < deadline {
+            if supported ? !events.curtainStatuses.isEmpty : events.completion != nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        if supported {
+            #expect(events.curtainStatuses == [.init(state: .on, blocksLocalInput: true)])
+        } else {
+            #expect(events.completion?.contains("without advertising support") == true)
+        }
+    }
+
     private func waitForPing(_ host: LoopbackPairingHost) async throws {
         let deadline = ContinuousClock.now.advanced(by: .seconds(3))
         while host.pingCount == 0, ContinuousClock.now < deadline {
@@ -195,6 +230,8 @@ struct GlassyStreamRouteLoopbackTests {
                             result.finish(.success(authentication))
                         } else if case let .fileTransfer(message) = event {
                             events?.append(message)
+                        } else if case let .curtainStatus(status) = event {
+                            events?.append(status)
                         }
                     },
                     onCompletion: { completion in
@@ -243,7 +280,11 @@ private final class RouteTestResult<Value: Sendable>: @unchecked Sendable {
 private final class RouteTestEvents: @unchecked Sendable {
     private let lock = NSLock()
     private var messages: [FileTransferWire.Message] = []
+    private var curtain: [GlassyStreamCurtainStatus] = []
     private var completionMessage: String?
+
+    var curtainStatuses: [GlassyStreamCurtainStatus] { lock.withLock { curtain } }
+    func append(_ status: GlassyStreamCurtainStatus) { lock.withLock { curtain.append(status) } }
 
     var fileTransfers: [FileTransferWire.Message] { lock.withLock { messages } }
     var completion: String? { lock.withLock { completionMessage } }
@@ -261,6 +302,7 @@ private final class LoopbackPairingHost: @unchecked Sendable {
     private let extraCapabilities: UInt32
     private var connections: [NWConnection] = []
     private var receivedFileTransferMessages: [FileTransferWire.Message] = []
+    private var receivedCurtainRequests: [Data] = []
     private var nextServerSequence: UInt64 = 3
     private var buffers: [ObjectIdentifier: Data] = [:]
     private var receivedProofs = 0
@@ -272,6 +314,7 @@ private final class LoopbackPairingHost: @unchecked Sendable {
     var clipboardPayloads: [Data] { queue.sync { receivedClipboardPayloads } }
     var pingCount: Int { queue.sync { receivedPings } }
     var fileTransferMessages: [FileTransferWire.Message] { queue.sync { receivedFileTransferMessages } }
+    var curtainRequests: [Data] { queue.sync { receivedCurtainRequests } }
 
     init(hostID: Data, behavior: String, supportsClipboardPaste: Bool = false,
          extraCapabilities: UInt32 = 0) throws {
@@ -379,6 +422,8 @@ private final class LoopbackPairingHost: @unchecked Sendable {
                         )
                         if frame.kind == .clipboardPaste {
                             receivedClipboardPayloads.append(plaintext)
+                        } else if frame.kind == .curtainRequest {
+                            receivedCurtainRequests.append(plaintext)
                         } else if FileTransferWire.Kind(rawValue: frame.kind.rawValue) != nil {
                             receivedFileTransferMessages.append(
                                 try FileTransferWire.decode(kind: frame.kind.rawValue, payload: plaintext)
@@ -438,15 +483,19 @@ private final class LoopbackPairingHost: @unchecked Sendable {
 
     /// Seals a file-transfer message for the most recently authenticated client.
     func sendToClient(_ message: FileTransferWire.Message) throws {
+        try sendRaw(kind: GlassyStreamWire.MessageKind(message.kind), payload: FileTransferWire.encode(message))
+    }
+
+    /// Seals any message for the most recently authenticated client.
+    func sendRaw(kind: GlassyStreamWire.MessageKind, payload: Data) throws {
         try queue.sync {
             guard let connection = connections.last, let material = materials[ObjectIdentifier(connection)] else {
                 throw GlassyStreamClientError.connectionClosed
             }
-            let kind = GlassyStreamWire.MessageKind(message.kind)
             let sequence = nextServerSequence
             nextServerSequence += 1
             let ciphertext = try GlassyStreamWire.seal(
-                FileTransferWire.encode(message), kind: kind, flags: [], sequence: sequence,
+                payload, kind: kind, flags: [], sequence: sequence,
                 material: material, serverToClient: true
             )
             let packet = try GlassyStreamWire.encode(

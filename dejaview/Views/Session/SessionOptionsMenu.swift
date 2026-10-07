@@ -38,6 +38,10 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
                 .labelStyle(.titleAndIcon)
                 .accessibilityLabel("Paste to Mac")
             }
+            if session.supportsCurtainMode {
+                Toggle("Curtain Mode", systemImage: "eye.slash", isOn: curtainBinding)
+                    .accessibilityHint("Covers your Mac's screen and ignores its own keyboard and mouse while you control it.")
+            }
             if session.supportsFileTransfer, let fileTransfers = session.fileTransferCenter {
                 Section("Files") {
                     Button("Send Files to Mac…", systemImage: "doc.badge.arrow.up", action: sendFiles)
@@ -177,6 +181,14 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
             if (session.touchMode == .trackpad) != isOn {
                 session.toggleTouchMode()
             }
+        }
+    }
+
+    private var curtainBinding: Binding<Bool> {
+        Binding {
+            session.isCurtainModeRequested
+        } set: { requested in
+            session.setCurtainModeRequested(requested)
         }
     }
 

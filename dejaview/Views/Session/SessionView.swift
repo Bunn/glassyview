@@ -68,7 +68,8 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         )
     }
 
-    var body: some View {
+    /// The arrangement, its overlays, and everything it presents.
+    private var presentedSession: some View {
         SessionArrangement(overlayBottomInset: isInputBarVisible ? inputBarHeight : 0,
                            usesDividedLayout: !isExternalControllerActive,
                            onSeparationChange: { isSessionSeparated = $0 }) {
@@ -125,6 +126,14 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         } message: {
             Text(session.clipboardPasteError ?? "")
         }
+        .alert("Curtain Mode", isPresented: Binding(
+            get: { session.curtainModeMessage != nil },
+            set: { if !$0 { session.clearCurtainModeMessage() } }
+        )) {
+            Button("OK") { session.clearCurtainModeMessage() }
+        } message: {
+            Text(session.curtainModeMessage ?? "")
+        }
         .sheet(isPresented: $isSessionPaywallPresented,
                onDismiss: handleSessionPaywallDismissed) {
             RevenueCatPaywallSheet(
@@ -155,6 +164,11 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .onChange(of: selectedPhotos) { _, items in
             sendSelectedPhotos(items)
         }
+    }
+
+    /// Connection lifecycle and free-session enforcement.
+    private var sessionLifecycle: some View {
+        presentedSession
         .onAppear {
             networkPathObserver.start()
             if subscriptionStore.hasProAccess {
@@ -190,6 +204,10 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                 retrySessionIfNeeded()
             }
         }
+    }
+
+    var body: some View {
+        sessionLifecycle
         .onChange(of: session.displays) { _, _ in
             logDisplayControlState(reason: "displayLayoutChanged")
         }
@@ -205,6 +223,9 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
         .onChange(of: session.quality) { _, quality in
             updatePreference(\.quality, to: quality)
+        }
+        .onChange(of: session.isCurtainModeRequested) { _, requested in
+            updatePreference(\.usesCurtainMode, to: requested)
         }
         .onChange(of: streamZoomScale) { _, zoomScale in
             guard !showsInputBar else { return }

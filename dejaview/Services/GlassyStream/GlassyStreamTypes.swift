@@ -30,6 +30,7 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
     let supportsCursorPositionUpdates: Bool
     let supportsClipboardPaste: Bool
     let supportsFileTransfer: Bool
+    let supportsCurtainMode: Bool
     /// The selected route becomes trusted only after encrypted authentication.
     let connectedAddress: GlassyStreamDirectAddress?
 
@@ -38,6 +39,7 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
          supportsCursorPositionUpdates: Bool,
          supportsClipboardPaste: Bool = false,
          supportsFileTransfer: Bool = false,
+         supportsCurtainMode: Bool = false,
          connectedAddress: GlassyStreamDirectAddress? = nil) {
         self.hostIdentifier = hostIdentifier
         self.hostName = hostName
@@ -47,6 +49,7 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
         self.supportsCursorPositionUpdates = supportsCursorPositionUpdates
         self.supportsClipboardPaste = supportsClipboardPaste
         self.supportsFileTransfer = supportsFileTransfer
+        self.supportsCurtainMode = supportsCurtainMode
         self.connectedAddress = connectedAddress
     }
 }
@@ -62,6 +65,22 @@ enum GlassyStreamEvent: Equatable, Sendable {
     case pong(Data)
     /// Delivered in receive order on the media queue; never dropped.
     case fileTransfer(FileTransferWire.Message)
+    case curtainStatus(GlassyStreamCurtainStatus)
+}
+
+/// Curtain Mode on the Mac: its displays covered and, when permitted, its own
+/// keyboard and pointer ignored while this device controls it.
+struct GlassyStreamCurtainStatus: Equatable, Sendable {
+    enum State: UInt8, Sendable {
+        case off = 0
+        case on = 1
+        /// Turned off in the Mac's settings, or this device doesn't control it.
+        case unavailable = 2
+        case failed = 3
+    }
+
+    let state: State
+    let blocksLocalInput: Bool
 }
 
 struct GlassyStreamHostStatus: Equatable, Sendable {

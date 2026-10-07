@@ -20,6 +20,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         let supportsClipboardPaste: Bool
         let supportsAdaptiveStream: Bool
         let supportsFileTransfer: Bool
+        let supportsCurtainMode: Bool
     }
 
     private enum State: Sendable {
@@ -52,6 +53,7 @@ final class GlassyStreamClient: @unchecked Sendable {
     private var supportsClipboardPaste = false
     private var supportsAdaptiveStream = false
     private var supportsFileTransfer = false
+    private var supportsCurtainMode = false
     private var eventDelivery: GlassyStreamEventDelivery?
     private var lastHandledVideoSequence: UInt64 = 0
     private var pendingFeedbackAge: UInt32 = 0
@@ -169,6 +171,22 @@ final class GlassyStreamClient: @unchecked Sendable {
     ) {
         sendAuthenticated(kind: .textInput) {
             try GlassyStreamWire.encodeTextInput(text, modifiers: modifiers)
+        }
+    }
+
+    /// Asks the Mac to turn Curtain Mode on or off. Ignored by hosts without
+    /// the capability. The first request also subscribes to curtain status.
+    func setCurtainMode(_ enabled: Bool) {
+        queue.async { [weak self] in
+            guard let self, supportsCurtainMode,
+                  case let .authenticated(material) = state,
+                  connection != nil else { return }
+            do {
+                try sendEncrypted(GlassyStreamWire.encodeCurtainRequest(enabled: enabled),
+                                  kind: .curtainRequest, flags: [], material: material, generation: generation)
+            } catch {
+                finish(.failure(clientError(error)), generation: generation)
+            }
         }
     }
 
@@ -292,6 +310,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         supportsCursorPositionUpdates = false
         supportsClipboardPaste = false
         supportsFileTransfer = false
+        supportsCurtainMode = false
         selectedEndpoint = nil
         state = .connecting
 
@@ -591,7 +610,8 @@ final class GlassyStreamClient: @unchecked Sendable {
                                   supportsCursorPositionUpdates: capabilities.contains(.cursorPositionUpdates),
                                   supportsClipboardPaste: capabilities.contains(.clipboardPaste),
                                   supportsAdaptiveStream: capabilities.contains(.adaptiveStream),
-                                  supportsFileTransfer: capabilities.contains(.fileTransfer))
+                                  supportsFileTransfer: capabilities.contains(.fileTransfer),
+                                  supportsCurtainMode: capabilities.contains(.curtainMode))
         )
         try sendPlaintext(GlassyStreamWire.encodeClientHello(hello),
                           kind: .clientHello,
@@ -645,6 +665,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         supportsClipboardPaste = pending.supportsClipboardPaste
         supportsAdaptiveStream = pending.supportsAdaptiveStream
         supportsFileTransfer = pending.supportsFileTransfer
+        supportsCurtainMode = pending.supportsCurtainMode
         if supportsAdaptiveStream {
             try sendEncrypted(GlassyStreamWire.encodeStreamFeedback(sequence: 0, queueAgeMilliseconds: 0),
                               kind: .streamFeedback, flags: [], material: pending.material, generation: generation)
@@ -677,6 +698,7 @@ final class GlassyStreamClient: @unchecked Sendable {
                 supportsCursorPositionUpdates: pending.supportsCursorPositionUpdates,
                 supportsClipboardPaste: pending.supportsClipboardPaste,
                 supportsFileTransfer: pending.supportsFileTransfer,
+                supportsCurtainMode: pending.supportsCurtainMode,
                 connectedAddress: connectedAddress
             )
         ))
@@ -735,6 +757,11 @@ final class GlassyStreamClient: @unchecked Sendable {
             deliver(.cursorPosition(
                 try GlassyStreamWire.decodeCursorPosition(plaintext)
             ))
+        case .curtainStatus:
+            guard supportsCurtainMode, !frame.flags.contains(.keyFrame) else {
+                throw GlassyStreamClientError.protocolViolation("host sent curtain status without advertising support")
+            }
+            deliver(.curtainStatus(try GlassyStreamWire.decodeCurtainStatus(plaintext)))
         case .fileTransferOffer, .fileTransferChunk, .fileTransferAcknowledge,
              .fileTransferComplete, .fileTransferResult:
             guard supportsFileTransfer, !frame.flags.contains(.keyFrame) else {
@@ -888,6 +915,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         supportsClipboardPaste = false
         supportsAdaptiveStream = false
         supportsFileTransfer = false
+        supportsCurtainMode = false
         lastHandledVideoSequence = 0
         pendingFeedbackAge = 0
         configuration = nil
