@@ -23,6 +23,10 @@ private let remoteFramebufferRenderingSignposter = OSSignposter(logger: AppLog.p
 /// Three-finger touch drag always pans a zoomed local viewport.
 /// A discrete mouse wheel always scrolls the remote Mac.
 ///
+/// Apple Pencil always points directly, in either mode: it presses where it
+/// touches without delay, ignores a resting palm, moves the cursor while
+/// hovering, and runs the chosen double-tap or squeeze action.
+///
 /// When keep-cursor-visible is enabled, zoomed cursor movement leaves the
 /// viewport still until the remote cursor approaches an edge, then reveals
 /// only the next portion of the desktop.
@@ -143,7 +147,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
     }
 
-    final class ScreenView: RemoteClipboardInputView, UIGestureRecognizerDelegate {
+    final class ScreenView: RemoteClipboardInputView, UIGestureRecognizerDelegate, UIPencilInteractionDelegate {
         weak var session: (any RemoteSessionInputControlling)?
         override var acceptsRemotePaste: Bool {
             acceptsHardwareKeyboardInput && session?.supportsClipboardPaste == true
@@ -549,9 +553,17 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             addGestureRecognizer(pinch)
             pinchGesture = pinch
 
+            // Apple Pencil never takes part in multi-finger gestures, so a
+            // resting palm cannot turn a stroke into a pinch or secondary click.
+            pinch.allowedTouchTypes = [
+                NSNumber(value: UITouch.TouchType.direct.rawValue),
+                NSNumber(value: UITouch.TouchType.indirectPointer.rawValue)
+            ]
+
             let twoFingerTap = UITapGestureRecognizer(target: self,
                                                       action: #selector(handleTwoFingerTap(_:)))
             twoFingerTap.numberOfTouchesRequired = 2
+            twoFingerTap.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
             addGestureRecognizer(twoFingerTap)
 
             let pointerSecondaryTap = UITapGestureRecognizer(target: self,
@@ -597,6 +609,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             pointerWheelScrollPan.delegate = self
             addGestureRecognizer(pointerWheelScrollPan)
             self.pointerWheelScrollPan = pointerWheelScrollPan
+
+            addInteraction(UIPencilInteraction(delegate: self))
         }
 
         required init?(coder: NSCoder) {
@@ -1513,8 +1527,18 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                           accumulator: &pointerWheelScrollAccumulator)
         }
 
-        func debugBeginSingleTouch(at point: CGPoint, timestamp: TimeInterval) {
-            beginSingleTouch(at: point, timestamp: timestamp)
+        func debugBeginSingleTouch(at point: CGPoint, timestamp: TimeInterval, isPencil: Bool = false) {
+            beginSingleTouch(at: point, timestamp: timestamp, isPencil: isPencil)
+        }
+
+        func debugEndPencilTouch(at point: CGPoint, timestamp: TimeInterval) {
+            endPencilTouch(at: point, timestamp: timestamp)
+        }
+
+        var debugPencilTouchActive: Bool { pencilTouchActive }
+
+        func debugPerformPencilShortcut(_ action: PencilShortcutAction, hoverLocation: CGPoint?) {
+            performPencilShortcut(action, at: hoverLocation)
         }
 
         func debugEndSingleTouch(at point: CGPoint, timestamp: TimeInterval) {
@@ -1845,6 +1869,7 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             }
 
             becomeFirstResponderIfAppropriate()
+            lastPencilLocation = gesture.location(in: self)
             session.moveCursor(to: point)
             cursorLocationDidChange()
         }
@@ -1910,6 +1935,19 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
             becomeFirstResponderIfAppropriate()
 
+            if let pencil = touches.first(where: { $0.type == .pencil }) {
+                guard !multiTouchActive, !pencilTouchActive else { return }
+                // Release anything a palm started just before the Pencil landed.
+                enterMultiTouch()
+                multiTouchActive = false
+                let location = pencil.location(in: self)
+                lastPencilLocation = location
+                beginSingleTouch(at: location, timestamp: pencil.timestamp, isPencil: true)
+                return
+            }
+            // A palm or finger resting while the Pencil draws is ignored.
+            if pencilTouchActive { return }
+
             // Second finger down → this is a two-finger gesture. Abort any
             // single-finger interaction and let the recognizers take over.
             if activeTouchCount(event) >= 2 {
@@ -1924,12 +1962,15 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
         private func beginSingleTouch(at location: CGPoint, timestamp: TimeInterval,
                                       isIndirectPointer: Bool = false,
-                                      isSecondaryButton: Bool = false) {
+                                      isSecondaryButton: Bool = false,
+                                      isPencil: Bool = false) {
             guard let session else { return }
 
             // A hardware trackpad or mouse click is already a physical button
             // press: send it at once and let motion drag, with no hold delay.
-            pointerTouchActive = isIndirectPointer
+            // Apple Pencil is just as precise and points where it touches.
+            pointerTouchActive = isIndirectPointer || isPencil
+            pencilTouchActive = isPencil
             if pointerTouchActive, isSecondaryButton {
                 return
             }
@@ -2027,8 +2068,10 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-            guard acceptsPointerInput, let touch = touches.first, let session,
-                  !multiTouchActive, activeTouchCount(event) < 2 else { return }
+            let touch = pencilTouchActive ? touches.first { $0.type == .pencil } : touches.first
+            guard acceptsPointerInput, let touch, let session, !multiTouchActive,
+                  pencilTouchActive || activeTouchCount(event) < 2 else { return }
+            if pencilTouchActive { lastPencilLocation = touch.location(in: self) }
 
             let location = touch.location(in: self)
 
@@ -2069,6 +2112,12 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
         }
 
         override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+            if pencilTouchActive {
+                // Only the Pencil lifting ends its stroke.
+                guard let pencil = touches.first(where: { $0.type == .pencil }) else { return }
+                endPencilTouch(at: pencil.location(in: self), timestamp: pencil.timestamp)
+                return
+            }
             guard let touch = touches.first else { return }
             endSingleTouch(at: touch.location(in: self), timestamp: touch.timestamp,
                            remainingTouchCount: activeTouchCount(event))
@@ -2116,6 +2165,8 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
 
         override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
             guard let session else { return }
+            if pencilTouchActive, !touches.contains(where: { $0.type == .pencil }) { return }
+            pencilTouchActive = false
 
             cancelLongPress()
             cancelPendingPress()
@@ -2136,7 +2187,15 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
             if activeTouchCount(event) == 0 { multiTouchActive = false }
         }
 
+        private func endPencilTouch(at location: CGPoint, timestamp: TimeInterval) {
+            lastPencilLocation = location
+            endSingleTouch(at: location, timestamp: timestamp, remainingTouchCount: 0)
+            pencilTouchActive = false
+        }
+
         private var pointerTouchActive = false
+        private var pencilTouchActive = false
+        private var lastPencilLocation: CGPoint?
 
         private var effectiveTouchMode: RemoteTouchMode {
             if pointerTouchActive { return .direct }
@@ -2163,6 +2222,27 @@ struct RemoteDesktopView<Session: RemoteSessionControlling>: UIViewRepresentable
                 session?.leftButtonUp(at: session?.cursorLocation ?? .zero)
                 cursorLocationDidChange()
             }
+        }
+
+        // MARK: - Apple Pencil double-tap and squeeze
+
+        func pencilInteraction(_ interaction: UIPencilInteraction,
+                               didReceiveTap tap: UIPencilInteraction.Tap) {
+            guard UIPencilInteraction.preferredTapAction != .ignore else { return }
+            performPencilShortcut(PencilShortcutAction.current(), at: tap.hoverPose?.location)
+        }
+
+        func pencilInteraction(_ interaction: UIPencilInteraction,
+                               didReceiveSqueeze squeeze: UIPencilInteraction.Squeeze) {
+            guard squeeze.phase == .ended, UIPencilInteraction.preferredSqueezeAction != .ignore else { return }
+            performPencilShortcut(PencilShortcutAction.current(), at: squeeze.hoverPose?.location)
+        }
+
+        private func performPencilShortcut(_ action: PencilShortcutAction, at hoverLocation: CGPoint?) {
+            guard acceptsPointerInput, let session else { return }
+            let location = hoverLocation ?? lastPencilLocation
+            action.perform(on: session, at: location.flatMap(framebufferPoint(for:)))
+            cursorLocationDidChange()
         }
 
         // MARK: - Deferred press (direct mode)

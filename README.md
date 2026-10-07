@@ -24,6 +24,7 @@ For a replacement development computer, follow [Move Mac releases to another com
 - **Rendering**: full-screen framebuffer drawn into a `CALayer` (aspect-fit), status bar and home indicator hidden.
 - **Input**: tap = left click, drag = click-drag; a floating glass pill toggles a keystroke bar and disconnects.
 - **Paste to Mac**: copy text on iPhone/iPad, then use the native Paste control next to the keyboard button or press Cmd-V while the remote desktop has focus. Requires Fast Connection and a companion build with clipboard support. See [clipboard behavior and verification](docs/md/clipboard-paste.md).
+- **Apple Pencil**: precise direct pointing in any mode with palm rejection, hover to move the pointer, and a configurable double-tap and squeeze action. See [Apple Pencil](docs/md/apple-pencil.md).
 - **Curtain Mode**: cover the Mac's displays and ignore its own keyboard and mouse while you control it; remembered per Mac. Requires Fast Connection. See [Curtain Mode](docs/md/curtain-mode.md).
 - **File transfer**: send files and photos to the Mac's Downloads folder (or drag them onto the desktop on iPad), and get the files selected in the Mac's Finder into the Files app. Requires Fast Connection. See [file transfer](docs/md/file-transfer.md).
 - **App lock**: optional Face ID, Touch ID, Optic ID, or passcode lock with a relock delay; the app switcher never shows a remote screen while it's on. See [app lock](docs/md/app-lock.md).

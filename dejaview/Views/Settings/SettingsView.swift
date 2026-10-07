@@ -12,6 +12,8 @@ struct SettingsView: View {
 
     @State private var isPaywallPresented = false
     @State private var appLock = AppLockController.shared
+    @AppStorage(PencilShortcutAction.preferenceKey)
+    private var pencilShortcut = PencilShortcutAction.defaultAction
 
     var body: some View {
         @Bindable var subscriptionStore = subscriptionStore
@@ -100,6 +102,22 @@ struct SettingsView: View {
                     Text("Sessions")
                 } footer: {
                     Text("Keep watching your Mac in a floating window when you switch apps during a session. Control resumes when you return to Glassy Desk.")
+                }
+            }
+
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                Section {
+                    Picker(selection: $pencilShortcut) {
+                        ForEach(PencilShortcutAction.allCases) { action in
+                            Text(action.title).tag(action)
+                        }
+                    } label: {
+                        Label("Double-Tap and Squeeze", systemImage: "applepencil.tip")
+                    }
+                } header: {
+                    Text("Apple Pencil")
+                } footer: {
+                    Text("Apple Pencil always clicks and drags exactly where it touches, even in trackpad mode, and moves the pointer while hovering. Your resting hand is ignored.")
                 }
             }
 
