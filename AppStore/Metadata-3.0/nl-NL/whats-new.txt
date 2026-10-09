@@ -1,0 +1,9 @@
+Glassy Desk 3.0 is onze grootste update tot nu toe.
+
+• iPhone Duo: de indeling past zich aan de vouw aan, en half gevouwen wordt de onderste helft een trackpad met optioneel toetsenbord
+• Beeld-in-beeld: houd je Mac in beeld terwijl je andere apps gebruikt
+• Bestandsoverdracht: stuur bestanden en foto's naar je Mac en haal bestanden uit de Finder naar de Bestanden-app (Snelle verbinding)
+• Gordijnmodus: bedek het scherm van de Mac en blokkeer de lokale invoer tijdens een sessie (Snelle verbinding)
+• Appvergrendeling: beveilig Glassy Desk met Face ID, Touch ID of je toegangscode
+• Apple Pencil: een nauwkeurige aanwijzer met zweven en acties voor dubbeltikken en knijpen
+• Siri en Opdrachten werken nu betrouwbaar met meerdere vensters

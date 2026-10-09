@@ -1,0 +1,41 @@
+Bereik je Mac vanaf je iPhone, iPad of iPhone Duo. Kijk even op een Mac mini zonder scherm, de Mac Studio in de kast of je buildmachine, en houd lange builds, renders en AI-agents in de gaten zonder op te staan.
+
+Kijk gratis op je Mac. Met Pro krijg je onbeperkte sessies met een maand- of jaarabonnement, of betaal je één keer met Lifetime. Geen account nodig.
+
+TWEE MANIEREN OM VERBINDING TE MAKEN
+• Standaard VNC gebruikt de schermdeling die in macOS is ingebouwd. Je hoeft niets te downloaden op de Mac.
+• Snelle verbinding gebruikt de gratis app Glassy Desk voor Mac: tot 4K bij 60 FPS, H.264-video via hardware die zich aanpast aan je netwerk, en een versleutelde verbinding rechtstreeks met je Mac.
+
+GEMAAKT VOOR MACS ZONDER SCHERM
+• Wek een slapende Mac met Wake-on-LAN en maak dan verbinding
+• Maak automatisch opnieuw verbinding na korte netwerkonderbrekingen
+• Bereik je Mac buiten je huis of kantoor via een VPN zoals Tailscale
+• Kies welk scherm je wilt zien als de Mac er meer dan één heeft
+
+HOUD JE MAC IN DE GATEN TERWIJL JE WERKT
+• Houd een sessie in Beeld-in-beeld terwijl je andere apps gebruikt
+• Maak met één tik verbinding via Siri, Opdrachten en widgets
+• Toon de Mac op een extern scherm en gebruik je apparaat als controller
+
+ECHTE TOETSEN EN EEN ECHTE AANWIJZER
+• Directe aanraking of trackpadmodus, met tikken, slepen, rechtsklikken, scrollen en knijpen om te zoomen
+• Command, Option, Control, pijl- en functietoetsen en veelgebruikte sneltoetsen via het schermtoetsenbord of een hardwaretoetsenbord
+• Apple Pencil als nauwkeurige aanwijzer, met zweven en acties voor dubbeltikken en knijpen
+• Plak tekst van je apparaat op de Mac
+
+BESTANDEN IN BEIDE RICHTINGEN
+Stuur bestanden en foto's naar de map Downloads van de Mac, en haal bestanden die in de Finder zijn geselecteerd naar de Bestanden-app. (Snelle verbinding)
+
+GEMAAKT VOOR IPHONE DUO
+De indeling past zich aan wanneer je hem open- en dichtvouwt. Zet hem half gevouwen neer en de onderste helft wordt een trackpad, met optioneel toetsenbord en speciale toetsen.
+
+PRIVÉ DOOR ONTWERP
+• Geen cloudrelay: verbindingen gaan rechtstreeks naar de computer die je kiest
+• Gordijnmodus bedekt het scherm van de Mac en blokkeert het lokale toetsenbord en de muis terwijl je op afstand werkt (Snelle verbinding)
+• Vergrendel Glassy Desk met Face ID, Touch ID of je toegangscode, en verberg externe schermen in de appkiezer
+• Bewaarde Macs worden gesynchroniseerd via je privé-iCloud-database en wachtwoorden worden versleuteld opgeslagen
+
+COMPATIBILITEIT
+Standaard VNC is ontworpen en getest met Schermdeling en Extern beheer van macOS; andere standaard VNC-servers werken mogelijk ook. Snelle verbinding vereist Glassy Desk voor Mac met macOS 14 of nieuwer, op Apple silicon of Intel. Voor verbinding van buiten je netwerk is een VPN of een andere route naar de Mac nodig.
+
+EULA: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/

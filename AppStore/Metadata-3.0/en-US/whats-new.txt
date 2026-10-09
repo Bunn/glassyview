@@ -1,0 +1,9 @@
+Glassy Desk 3.0 is our biggest update yet.
+
+• iPhone Duo: layouts adapt to the fold, and half-folded the lower half becomes a trackpad with an optional keyboard
+• Picture in Picture: keep watching your Mac while you use other apps
+• File transfer: send files and photos to your Mac, and bring files from the Mac's Finder into the Files app (Fast Connection)
+• Curtain Mode: cover the Mac's screen and block its local input during a session (Fast Connection)
+• App lock: protect Glassy Desk with Face ID, Touch ID, or your passcode
+• Apple Pencil: a precise pointer with hover, plus double-tap and squeeze actions
+• Siri and Shortcuts now work reliably with multiple windows

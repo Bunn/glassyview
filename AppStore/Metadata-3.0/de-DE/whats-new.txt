@@ -1,0 +1,9 @@
+Glassy Desk 3.0 ist unser bisher größtes Update.
+
+• iPhone Duo: Das Layout passt sich dem Falz an, und halb aufgeklappt wird die untere Hälfte zum Trackpad mit optionaler Tastatur
+• Bild-in-Bild: Behalte deinen Mac im Blick, während du andere Apps nutzt
+• Dateiübertragung: Sende Dateien und Fotos an deinen Mac und hole Dateien aus dem Finder in die Dateien-App (Schnellverbindung)
+• Vorhangmodus: Verdecke den Bildschirm des Mac und sperre seine lokale Eingabe während einer Sitzung (Schnellverbindung)
+• App-Sperre: Schütze Glassy Desk mit Face ID, Touch ID oder deinem Code
+• Apple Pencil: ein präziser Zeiger mit Hover sowie Aktionen für Doppeltippen und Drücken
+• Siri und Kurzbefehle funktionieren jetzt zuverlässig mit mehreren Fenstern

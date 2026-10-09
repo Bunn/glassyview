@@ -1,0 +1,41 @@
+Acesse seu Mac pelo iPhone, iPad ou iPhone Duo. Confira um Mac mini sem monitor, o Mac Studio guardado no armário ou sua máquina de build, e acompanhe builds longos, renderizações e agentes de IA sem sair do lugar.
+
+Confira seu Mac de graça. Com o Pro, as sessões são ilimitadas, com plano mensal ou anual, ou com pagamento único vitalício. Sem precisar criar conta.
+
+DUAS FORMAS DE CONECTAR
+• O VNC padrão usa o Compartilhamento de Tela integrado ao macOS. Não é preciso baixar nada no Mac.
+• A Conexão rápida usa o app gratuito Glassy Desk para Mac: até 4K a 60 FPS, vídeo H.264 por hardware que se adapta à sua rede e um canal criptografado direto até o seu Mac.
+
+FEITO PARA MACS SEM MONITOR
+• Ative um Mac em repouso com Wake-on-LAN e conecte-se
+• Reconecte automaticamente após breves quedas de rede
+• Acesse seu Mac fora de casa ou do escritório por uma VPN, como o Tailscale
+• Escolha qual tela mostrar quando o Mac tiver mais de uma
+
+DE OLHO NO MAC ENQUANTO VOCÊ TRABALHA
+• Mantenha uma sessão em Picture in Picture enquanto usa outros apps
+• Conecte-se com um toque pela Siri, pelo app Atalhos e por widgets
+• Mostre o Mac em uma tela externa e use seu dispositivo como controle
+
+TECLAS DE VERDADE E UM PONTEIRO DE VERDADE
+• Toque direto ou modo trackpad, com toque, arrasto, clique com o botão direito, rolagem e pinça para ampliar
+• Command, Option, Control, setas, teclas de função e atalhos comuns pelo teclado na tela ou por um teclado físico
+• Apple Pencil como ponteiro preciso, com detecção de proximidade e ações de toque duplo e aperto
+• Cole no Mac textos do seu dispositivo
+
+ARQUIVOS NOS DOIS SENTIDOS
+Envie arquivos e fotos para a pasta Downloads do Mac e traga para o app Arquivos os arquivos selecionados no Finder do Mac. (Conexão rápida)
+
+FEITO PARA O IPHONE DUO
+O layout se adapta quando você dobra e desdobra o aparelho. Apoie-o meio dobrado e a metade inferior vira um trackpad, com teclado e teclas especiais opcionais.
+
+PRIVACIDADE DESDE A CONCEPÇÃO
+• Sem retransmissão pela nuvem: as conexões vão direto para o computador escolhido
+• O Modo Cortina cobre a tela do Mac e bloqueia o teclado e o mouse locais enquanto você trabalha remotamente (Conexão rápida)
+• Bloqueie o Glassy Desk com Face ID, Touch ID ou seu código e oculte as telas remotas no seletor de apps
+• Os Macs salvos são sincronizados pelo seu banco de dados privado do iCloud, e as senhas são armazenadas com criptografia
+
+COMPATIBILIDADE
+O VNC padrão foi projetado e testado com o Compartilhamento de Tela e o Gerenciamento Remoto do macOS; outros servidores VNC baseados em padrões também podem funcionar. A Conexão rápida requer o Glassy Desk para Mac no macOS 14 ou posterior, com Apple silicon ou Intel. Para se conectar de fora da sua rede, é necessária uma VPN ou outra rota até o Mac.
+
+EULA: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/

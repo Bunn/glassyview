@@ -1,0 +1,41 @@
+Greife vom iPhone, iPad oder iPhone Duo auf deinen Mac zu. Sieh nach einem Mac mini ohne Bildschirm, dem Mac Studio im Schrank oder deinem Build-Rechner und behalte lange Builds, Renderings und KI-Agenten im Blick, ohne aufzustehen.
+
+Sieh kostenlos nach deinem Mac. Mit Pro erhältst du unbegrenzte Sitzungen – im Monats- oder Jahresabo oder mit einem einmaligen Lifetime-Kauf. Kein Konto erforderlich.
+
+ZWEI ARTEN DER VERBINDUNG
+• Standard-VNC nutzt die in macOS integrierte Bildschirmfreigabe. Auf dem Mac muss nichts geladen werden.
+• Die Schnellverbindung nutzt die kostenlose App Glassy Desk für Mac: bis zu 4K bei 60 FPS, Hardware-H.264-Video, das sich deinem Netzwerk anpasst, und eine verschlüsselte Direktverbindung zu deinem Mac.
+
+GEMACHT FÜR MACS OHNE BILDSCHIRM
+• Einen schlafenden Mac per Wake-on-LAN aufwecken und dann verbinden
+• Nach kurzen Netzwerkunterbrechungen automatisch neu verbinden
+• Von außerhalb deines Zuhauses oder Büros über ein VPN wie Tailscale zugreifen
+• Bei mehreren Bildschirmen die gewünschte Anzeige auswählen
+
+DEN MAC IM BLICK, WÄHREND DU ARBEITEST
+• Eine Sitzung per Bild-in-Bild verfolgen, während du andere Apps nutzt
+• Mit einem Tippen über Siri, Kurzbefehle und Widgets verbinden
+• Den Mac auf einem externen Bildschirm zeigen und dein Gerät als Controller nutzen
+
+ECHTE TASTEN UND EIN ECHTER ZEIGER
+• Direkte Berührung oder Trackpad-Modus mit Tippen, Ziehen, Rechtsklick, Scrollen und Zoomen
+• Befehl, Option, Control, Pfeil- und Funktionstasten sowie gängige Kurzbefehle über die Bildschirmtastatur oder eine Hardwaretastatur
+• Apple Pencil als präziser Zeiger, mit Hover sowie Aktionen für Doppeltippen und Drücken
+• Text von deinem Gerät auf dem Mac einfügen
+
+DATEIEN IN BEIDE RICHTUNGEN
+Sende Dateien und Fotos in den Ordner „Downloads“ des Mac und hole im Finder ausgewählte Dateien in die Dateien-App. (Schnellverbindung)
+
+GEMACHT FÜR IPHONE DUO
+Das Layout passt sich beim Auf- und Zuklappen an. Halb aufgeklappt aufgestellt wird die untere Hälfte zum Trackpad, mit optionaler Tastatur und Sondertasten.
+
+DATENSCHUTZ VON GRUND AUF
+• Kein Cloud-Relay: Verbindungen gehen direkt zum ausgewählten Computer
+• Der Vorhangmodus verdeckt den Bildschirm des Mac und sperrt dessen lokale Tastatur und Maus, während du aus der Ferne arbeitest (Schnellverbindung)
+• Glassy Desk mit Face ID, Touch ID oder deinem Code sperren und entfernte Bildschirme im App-Umschalter ausblenden
+• Gespeicherte Macs werden über deine private iCloud-Datenbank synchronisiert, Passwörter werden verschlüsselt gespeichert
+
+KOMPATIBILITÄT
+Standard-VNC wurde für die macOS-Bildschirmfreigabe und Remote Management entwickelt und getestet; andere standardkonforme VNC-Server können funktionieren. Die Schnellverbindung benötigt Glassy Desk für Mac ab macOS 14, auf Apple Silicon oder Intel. Für Verbindungen von außerhalb deines Netzwerks wird ein VPN oder ein anderer Weg zum Mac benötigt.
+
+EULA: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/

@@ -1,0 +1,41 @@
+Reach your Mac from your iPhone, iPad, or iPhone Duo. Check on a headless Mac mini, the Mac Studio in the closet, or your build machine, and keep an eye on long builds, renders, and AI agents without getting up.
+
+Check on your Mac for free. Go Pro for unlimited sessions with a monthly or yearly plan, or pay once with Lifetime. No account to create.
+
+TWO WAYS TO CONNECT
+• Standard VNC uses the Screen Sharing built into macOS. Nothing to download on the Mac.
+• Fast Connection uses the free Glassy Desk for Mac app: up to 4K at 60 FPS, hardware H.264 video that adapts to your network, and an encrypted link straight to your Mac.
+
+MADE FOR HEADLESS MACS
+• Wake a sleeping Mac with Wake-on-LAN, then connect
+• Reconnect automatically after short network drops
+• Reach your Mac from outside your home or office through a VPN such as Tailscale
+• Pick which display to show when the Mac has more than one
+
+WATCH YOUR MAC WHILE YOU WORK
+• Keep a session in Picture in Picture while you use other apps
+• Connect in one tap with Siri, Shortcuts, and the Quick Connect and My Macs widgets
+• Show the Mac on an external display and use your device as the controller
+
+REAL KEYS AND A REAL POINTER
+• Direct touch or trackpad mode, with tap, drag, right-click, scroll, and pinch to zoom
+• Command, Option, Control, arrow, and function keys, plus common shortcuts, from the on-screen or a hardware keyboard
+• Apple Pencil as a precise pointer, with hover and double-tap or squeeze actions
+• Paste text from your device onto the Mac
+
+FILES BOTH WAYS
+Send files and photos to the Mac's Downloads folder, and bring files selected in the Mac's Finder into the Files app. (Fast Connection)
+
+MADE FOR IPHONE DUO
+Layouts adapt as you fold and unfold. Stand it up half-folded and the lower half becomes a trackpad, with an optional keyboard and special keys.
+
+PRIVATE BY DESIGN
+• No cloud relay: connections go straight to the computer you choose
+• Curtain Mode covers the Mac's screen and blocks its local keyboard and mouse while you work remotely (Fast Connection)
+• Lock Glassy Desk with Face ID, Touch ID, or your passcode, and hide remote screens in the app switcher
+• Saved Macs sync through your private iCloud database, and passwords are stored encrypted
+
+COMPATIBILITY
+Standard VNC is designed and tested with macOS Screen Sharing and Remote Management; other standards-based VNC servers may work. Fast Connection requires Glassy Desk for Mac on macOS 14 or later, on Apple silicon or Intel. Connecting from outside your network requires a VPN or other route to the Mac.
+
+EULA: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/

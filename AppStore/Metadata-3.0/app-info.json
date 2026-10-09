@@ -1,0 +1,9 @@
+{
+ "en-US": {"name": "Glassy Desk: Remote Desktop", "subtitle": "Screen Sharing for Mac & VNC", "keywords": "headless,mini,studio,viewer,control,access,server,wake,lan,vpn,trackpad,mouse,keyboard,ai,build"},
+ "de-DE": {"name": "Glassy Desk: Remote Desktop", "subtitle": "Mac-Bildschirmfreigabe & VNC", "keywords": "Fernzugriff,Fernsteuerung,headless,mini,Studio,Viewer,Server,Wake,LAN,VPN,Trackpad,Maus,Tastatur,KI"},
+ "es-ES": {"name": "Glassy Desk: Escritorio remoto", "subtitle": "Compartir pantalla Mac y VNC", "keywords": "acceso,control,headless,mini,studio,visor,servidor,wake,lan,vpn,trackpad,ratón,teclado,ia,compilar"},
+ "pt-BR": {"name": "Glassy Desk: Acesso Remoto", "subtitle": "Compartilhar tela do Mac e VNC", "keywords": "desktop,controle,headless,mini,studio,visualizador,servidor,wake,lan,vpn,trackpad,mouse,teclado,ia"},
+ "nl-NL": {"name": "Glassy Desk: Extern bureaublad", "subtitle": "Schermdeling voor Mac en VNC", "keywords": "toegang,bediening,headless,mini,studio,viewer,server,wake,lan,vpn,trackpad,muis,toetsenbord,ai,build"},
+ "ja": {"name": "Glassy Desk: リモートデスクトップ", "subtitle": "Macの画面共有とVNC", "keywords": "遠隔操作,リモート,アクセス,ヘッドレス,mini,Studio,ビューア,サーバー,Wake,LAN,VPN,トラックパッド,キーボード,マウス,AI,ビルド"},
+ "zh-Hans": {"name": "Glassy Desk：远程桌面", "subtitle": "Mac 屏幕共享与 VNC", "keywords": "远程控制,远程访问,无显示器,mini,Studio,查看器,服务器,唤醒,局域网,VPN,触控板,键盘,鼠标,AI,编译"}
+}
