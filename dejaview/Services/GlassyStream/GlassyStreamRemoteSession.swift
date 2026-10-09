@@ -183,7 +183,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         isSuspendedForBackground = false
         cancelRetryTask()
         releaseActiveInputState()
-        controller.disconnect()
+        controller.disconnect(liftingCurtain: liftsCurtainOnDisconnect)
         clearGeometry()
 
         if status != .idle {
@@ -196,7 +196,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         isSuspendedForBackground = false
         cancelRetryTask()
         releaseActiveInputState()
-        controller.disconnect()
+        controller.disconnect(liftingCurtain: liftsCurtainOnDisconnect)
         retryConfiguration = nil
         automaticReconnectAttempt = 0
         hasConnectedAtLeastOnce = false
@@ -514,6 +514,13 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         guard status == .connected else { return }
         awaitsCurtainResponse = requested
         controller.setCurtainMode(requested)
+    }
+
+    /// Ending the session on purpose lifts the curtain right away. Otherwise the
+    /// Mac keeps it up through its reconnect grace period, as it would after a
+    /// dropped connection.
+    private var liftsCurtainOnDisconnect: Bool {
+        status == .connected && isCurtainModeRequested
     }
 
     func clearCurtainModeMessage() {

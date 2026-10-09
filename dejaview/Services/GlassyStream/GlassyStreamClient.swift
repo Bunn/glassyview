@@ -87,11 +87,36 @@ final class GlassyStreamClient: @unchecked Sendable {
 
     /// Ends the active connection. A caller-requested disconnect completes
     /// successfully; remote/network/protocol failures complete with an error.
-    func disconnect() {
+    ///
+    /// With `liftingCurtain`, first asks the Mac to lift Curtain Mode and
+    /// closes the socket only after that request is written; cancelling right
+    /// away would discard it, leaving the curtain up through the Mac's
+    /// reconnect grace period.
+    func disconnect(liftingCurtain: Bool = false) {
         queue.async { [weak self] in
             guard let self, callbacks != nil else { return }
+            if liftingCurtain { closeAfterLiftingCurtain() }
             finish(.success(()), generation: generation)
         }
+    }
+
+    /// Detaches the connection so `finish` does not cancel it, then closes it
+    /// gracefully once the curtain request and FIN have been handed to TCP.
+    private func closeAfterLiftingCurtain() {
+        guard supportsCurtainMode, case let .authenticated(material) = state, let connection else { return }
+        do {
+            try sendEncrypted(GlassyStreamWire.encodeCurtainRequest(enabled: false),
+                              kind: .curtainRequest, flags: [], material: material, generation: generation)
+        } catch {
+            return
+        }
+        connection.stateUpdateHandler = nil
+        connection.viabilityUpdateHandler = nil
+        self.connection = nil
+        connection.send(content: nil, contentContext: .finalMessage, isComplete: true,
+                        completion: .contentProcessed { _ in connection.cancel() })
+        // Never leave a stalled socket open.
+        queue.asyncAfter(deadline: .now() + 2) { connection.cancel() }
     }
 
     func sendPing(_ payload: Data = Data()) {

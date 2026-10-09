@@ -227,8 +227,9 @@ final class GlassyStreamSessionController {
     }
 
     /// Stops networking, clears the displayed image, and returns to idle.
-    func disconnect() {
-        disconnectCurrentSession(clearError: true)
+    /// `liftingCurtain` asks the Mac to drop Curtain Mode on the way out.
+    func disconnect(liftingCurtain: Bool = false) {
+        disconnectCurrentSession(clearError: true, liftingCurtain: liftingCurtain)
     }
 
     func setCurtainMode(_ enabled: Bool) {
@@ -373,7 +374,7 @@ final class GlassyStreamSessionController {
         disconnectCurrentSession(clearError: true)
     }
 
-    private func disconnectCurrentSession(clearError: Bool) {
+    private func disconnectCurrentSession(clearError: Bool, liftingCurtain: Bool = false) {
         let generation = activeGeneration
         activeGeneration = nil
         cancelVideoReadinessTimeout()
@@ -391,7 +392,8 @@ final class GlassyStreamSessionController {
         renderer.onVideoDimensionsChanged = nil
         renderer.onPresentationReady = nil
         renderer.onPresentationLost = nil
-        client.disconnect()
+        client.disconnect(liftingCurtain: liftingCurtain && state == .connected
+            && authentication?.supportsCurtainMode == true)
         renderer.reset()
         authentication = nil
         hostStatus = nil
