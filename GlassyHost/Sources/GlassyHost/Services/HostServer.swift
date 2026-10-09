@@ -25,6 +25,13 @@ final class HostServer: @unchecked Sendable {
     typealias AdaptiveBitRateHandler = @Sendable (Int?) -> Void
     typealias AuthenticatedClientReplacementHandler = @Sendable () -> Void
     typealias PairedDevicesHandler = @Sendable ([HostPairedDevice]) -> Void
+    /// Connection identifier, decoded message, and whether that connection
+    /// currently owns input.
+    typealias FileTransferHandler = @Sendable (UUID, FileTransferWire.Message, Bool) -> Void
+    typealias ClientEndedHandler = @Sendable (UUID) -> Void
+    /// Connection identifier, requested state, and whether that connection
+    /// currently owns input.
+    typealias CurtainRequestHandler = @Sendable (UUID, Bool, Bool) -> Void
 
     struct PairingCode: Equatable, Sendable {
         let value: String
@@ -158,6 +165,39 @@ final class HostServer: @unchecked Sendable {
 
     func setAdaptiveBitRateHandler(_ handler: AdaptiveBitRateHandler?) {
         core.setAdaptiveBitRateHandler(handler)
+    }
+
+    /// Installs the sink for authenticated file-transfer messages. Delivery is
+    /// serialized in receive order.
+    func setFileTransferHandler(_ handler: FileTransferHandler?) {
+        core.setFileTransferHandler(handler)
+    }
+
+    /// Called after an authenticated connection closes for any reason.
+    func setClientEndedHandler(_ handler: ClientEndedHandler?) {
+        core.setClientEndedHandler(handler)
+    }
+
+    func setCurtainRequestHandler(_ handler: CurtainRequestHandler?) {
+        core.setCurtainRequestHandler(handler)
+    }
+
+    /// Publishes Curtain Mode to every connection that has asked about it.
+    /// Older clients never ask, so they never receive this message.
+    func publishCurtainStatus(_ status: HostProtocol.CurtainStatus) {
+        core.publishCurtainStatus(status)
+    }
+
+    /// Tells one connection why its request did not change Curtain Mode.
+    func sendCurtainStatus(_ status: HostProtocol.CurtainStatus, to clientID: UUID) {
+        core.sendCurtainStatus(status, to: clientID)
+    }
+
+    /// Queues a file-transfer message for one authenticated connection.
+    /// File data shares the connection with video in send order; small
+    /// acknowledgements and results move ahead of pending media.
+    func sendFileTransfer(_ message: FileTransferWire.Message, to clientID: UUID) {
+        core.sendFileTransfer(message, to: clientID)
     }
 
     func setAdaptiveResolutionHandler(_ handler: AdaptiveBitRateHandler?) {
@@ -324,6 +364,10 @@ private extension HostServer {
         private var publishedAdaptiveBitRate: Int?
         private var publishedAdaptiveMaximumWidth: Int?
         private var adaptiveResolutionHandler: AdaptiveBitRateHandler = { _ in }
+        private var fileTransferHandler: FileTransferHandler?
+        private var clientEndedHandler: ClientEndedHandler?
+        private var curtainRequestHandler: CurtainRequestHandler?
+        private var curtainStatus = HostProtocol.CurtainStatus.off
         private var mediaMaintenanceWorkItem: DispatchWorkItem?
         private var streamState: HostProtocol.StreamState = .stopped
         private var accessibilityGranted = false
@@ -473,6 +517,61 @@ private extension HostServer {
                 guard let self else { return }
                 adaptiveBitRateHandler = handler ?? { _ in }
                 publishAdaptiveBitRateIfNeeded(force: true)
+            }
+        }
+
+        func setFileTransferHandler(_ handler: FileTransferHandler?) {
+            queue.async { [weak self] in self?.fileTransferHandler = handler }
+        }
+
+        func setClientEndedHandler(_ handler: ClientEndedHandler?) {
+            queue.async { [weak self] in self?.clientEndedHandler = handler }
+        }
+
+        func setCurtainRequestHandler(_ handler: CurtainRequestHandler?) {
+            queue.async { [weak self] in self?.curtainRequestHandler = handler }
+        }
+
+        func publishCurtainStatus(_ status: HostProtocol.CurtainStatus) {
+            queue.async { [weak self] in
+                guard let self else { return }
+                curtainStatus = status
+                for client in authenticatedClients where client.isSubscribedToCurtain {
+                    sendCurtainStatus(to: client)
+                }
+            }
+        }
+
+        func sendCurtainStatus(_ status: HostProtocol.CurtainStatus, to clientID: UUID) {
+            queue.async { [weak self] in
+                guard let self, let client = clients[clientID], client.isSubscribedToCurtain else { return }
+                sendCurtainStatus(to: client, status: status)
+            }
+        }
+
+        private func sendCurtainStatus(to client: Client, status: HostProtocol.CurtainStatus? = nil) {
+            // Statuses are rare and ordered; never coalesce them, so a
+            // rejection or failure is not replaced by the state that follows.
+            _ = enqueueEncrypted(HostProtocol.encodeCurtainStatus(status ?? curtainStatus), kind: .curtainStatus,
+                                 flags: [], policy: .control, for: client)
+        }
+
+        func sendFileTransfer(_ message: FileTransferWire.Message, to clientID: UUID) {
+            queue.async { [weak self] in
+                guard let self, let client = clients[clientID], client.isAuthenticated else { return }
+                let payload: Data
+                do {
+                    payload = try FileTransferWire.encode(message)
+                } catch {
+                    Self.logger.error("Rejected outgoing file transfer message: \(error.localizedDescription, privacy: .public)")
+                    return
+                }
+                let policy: SendPolicy = switch message {
+                case .acknowledge, .result: .control
+                case .offer, .chunk, .complete, .request: .bulk
+                }
+                _ = enqueueEncrypted(payload, kind: HostProtocol.MessageKind(message.kind),
+                                     flags: [], policy: policy, for: client)
             }
         }
 
@@ -851,6 +950,7 @@ private extension HostServer {
                 client.connection.stateUpdateHandler = nil
                 client.connection.cancel()
                 client.isClosed = true
+                if client.isAuthenticated { clientEndedHandler?(client.id) }
             }
             if hadAuthenticatedClients {
                 authenticatedClientReplacementHandler?()
@@ -1375,6 +1475,22 @@ private extension HostServer {
                         for: client
                     )
                 }
+            case .curtainRequest:
+                let enabled = try HostProtocol.decodeCurtainRequest(plaintext)
+                if !client.isSubscribedToCurtain {
+                    client.isSubscribedToCurtain = true
+                    sendCurtainStatus(to: client)
+                }
+                curtainRequestHandler?(client.id, enabled, inputOwnerID == client.id)
+            case .fileTransferOffer, .fileTransferChunk, .fileTransferAcknowledge,
+                 .fileTransferComplete, .fileTransferResult, .fileTransferRequest:
+                let message: FileTransferWire.Message
+                do {
+                    message = try FileTransferWire.decode(kind: frame.kind.rawValue, payload: plaintext)
+                } catch {
+                    throw HostProtocol.ProtocolError.malformedPayload(error.localizedDescription)
+                }
+                fileTransferHandler?(client.id, message, inputOwnerID == client.id)
             case .pointerInput, .scrollInput, .keyInput, .textInput, .clipboardPaste:
                 let input = try HostProtocol.decodeRemoteInput(
                     kind: frame.kind,
@@ -1410,7 +1526,7 @@ private extension HostServer {
                                                        encrypted: true, policy: policy, encodedWidth: encodedWidth), for: client)
             } catch {
                 Self.logger.error("Could not queue packet: \(error.localizedDescription, privacy: .public)")
-                if policy == .control || policy == .codecConfiguration { remove(client) }
+                if policy == .control || policy == .codecConfiguration || policy == .bulk { remove(client) }
                 return false
             }
         }
@@ -1576,6 +1692,7 @@ private extension HostServer {
                 authenticatedClientReplacementHandler?()
                 for remaining in authenticatedClients { sendStreamStatus(to: remaining) }
             }
+            if client.isAuthenticated { clientEndedHandler?(client.id) }
             client.isClosed = true
             client.authenticationTimeout?.cancel()
             client.mediaNegotiationTimeout?.cancel()
@@ -1643,6 +1760,9 @@ private extension HostServer.Core {
         case keyFrame
         case deltaFrame
         case cursorPosition
+        /// File data: kept in send order, never dropped, bounded by the
+        /// transfer window rather than by media age.
+        case bulk
 
         var isVideoFrame: Bool { self == .keyFrame || self == .deltaFrame }
     }
@@ -1768,6 +1888,8 @@ private extension HostServer.Core {
         var requestedQuality: HostProtocol.StreamQuality = .best
         // Cursor telemetry is opt-in so older clients receive no new messages.
         var isSubscribedToCursorPosition = false
+        // Curtain status is opt-in for the same reason.
+        var isSubscribedToCurtain = false
         var supportsAdaptiveStream = false
         var deliveryWindow = HostMediaDeliveryWindow()
         var ratePolicy = HostAdaptiveRatePolicy()
@@ -1834,7 +1956,7 @@ private extension HostServer.Core {
                 case .codecConfiguration, .keyFrame, .deltaFrame, .cursorPosition:
                     pendingByteCount -= packet.byteCount
                     return true
-                case .control:
+                case .control, .bulk:
                     return false
                 }
             }

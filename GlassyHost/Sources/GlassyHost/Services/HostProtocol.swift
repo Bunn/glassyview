@@ -52,6 +52,10 @@ enum HostProtocol {
         static let pairingPassword = Capabilities(rawValue: 1 << 5)
         static let clipboardPaste = Capabilities(rawValue: 1 << 6)
         static let adaptiveStream = Capabilities(rawValue: 1 << 7)
+        /// Messages 0x30–0x35. See `FileTransferWire`.
+        static let fileTransfer = Capabilities(rawValue: 1 << 8)
+        /// Messages 0x25 and 0x26.
+        static let curtainMode = Capabilities(rawValue: 1 << 9)
     }
 
     static let advertisedCapabilities: Capabilities = [
@@ -61,7 +65,9 @@ enum HostProtocol {
         .streamQualityControl,
         .cursorPositionTelemetry,
         .clipboardPaste,
-        .adaptiveStream
+        .adaptiveStream,
+        .fileTransfer,
+        .curtainMode
     ]
 
     static func advertisedCapabilities(pairingPasswordEnabled: Bool) -> Capabilities {
@@ -92,6 +98,25 @@ enum HostProtocol {
         case keyInput = 0x22
         case textInput = 0x23
         case clipboardPaste = 0x24
+        /// Client → host. Asks to turn Curtain Mode on or off.
+        case curtainRequest = 0x25
+        /// Host → client. Sent only to clients that sent a curtain request.
+        case curtainStatus = 0x26
+
+        case fileTransferOffer = 0x30
+        case fileTransferChunk = 0x31
+        case fileTransferAcknowledge = 0x32
+        case fileTransferComplete = 0x33
+        case fileTransferResult = 0x34
+        case fileTransferRequest = 0x35
+
+        var isFileTransfer: Bool {
+            FileTransferWire.Kind(rawValue: rawValue) != nil
+        }
+
+        init(_ kind: FileTransferWire.Kind) {
+            self.init(rawValue: kind.rawValue)!
+        }
     }
 
     struct Flags: OptionSet, Sendable {
@@ -172,6 +197,49 @@ enum HostProtocol {
         }
         try reader.requireEnd()
         return StreamFeedback(latestHandledVideoSequence: sequence, callbackQueueAgeMilliseconds: age)
+    }
+
+    enum CurtainState: UInt8, CaseIterable, Sendable {
+        case off = 0
+        case on = 1
+        /// Turned off in the Mac's settings, or requested by a view-only device.
+        case unavailable = 2
+        case failed = 3
+    }
+
+    struct CurtainStatus: Equatable, Sendable {
+        let state: CurtainState
+        /// The Mac's own keyboard, mouse, and trackpad are ignored.
+        let blocksLocalInput: Bool
+
+        static let off = CurtainStatus(state: .off, blocksLocalInput: false)
+    }
+
+    /// Four bytes: UInt8 0 (off) or 1 (on), then three reserved zero bytes.
+    static func encodeCurtainRequest(enabled: Bool) -> Data {
+        Data([enabled ? 1 : 0, 0, 0, 0])
+    }
+
+    static func decodeCurtainRequest(_ data: Data) throws -> Bool {
+        let bytes = [UInt8](data)
+        guard bytes.count == 4, bytes[0] <= 1, Array(bytes[1...]) == [0, 0, 0] else {
+            throw ProtocolError.malformedPayload("invalid curtain request")
+        }
+        return bytes[0] == 1
+    }
+
+    /// Four bytes: UInt8 state, UInt8 flags (bit 0 local input blocked), two reserved zero bytes.
+    static func encodeCurtainStatus(_ status: CurtainStatus) -> Data {
+        Data([status.state.rawValue, status.blocksLocalInput ? 1 : 0, 0, 0])
+    }
+
+    static func decodeCurtainStatus(_ data: Data) throws -> CurtainStatus {
+        let bytes = [UInt8](data)
+        guard bytes.count == 4, let state = CurtainState(rawValue: bytes[0]),
+              bytes[1] & ~1 == 0, bytes[2] == 0, bytes[3] == 0 else {
+            throw ProtocolError.malformedPayload("invalid curtain status")
+        }
+        return CurtainStatus(state: state, blocksLocalInput: bytes[1] & 1 != 0)
     }
 
     static func encodeStreamStatus(_ status: StreamStatus) -> Data {

@@ -30,6 +30,20 @@ protocol RemoteSessionControlling: ObservableObject, RemoteSessionInputControlli
     var clipboardPasteError: String? { get }
     func clearClipboardPasteError()
 
+    /// Transfers for this session, when its transport supports files.
+    var fileTransferCenter: FileTransferCenter? { get }
+    /// The connected Mac currently accepts files from this device.
+    var supportsFileTransfer: Bool { get }
+
+    /// The connected Mac can cover its screen while this device controls it.
+    var supportsCurtainMode: Bool { get }
+    /// This device wants Curtain Mode; reapplied after reconnecting.
+    var isCurtainModeRequested: Bool { get }
+    /// Explains a Curtain Mode request the Mac could not fully honor.
+    var curtainModeMessage: String? { get }
+    func setCurtainModeRequested(_ requested: Bool)
+    func clearCurtainModeMessage()
+
     /// Current framebuffer updates. Deliberately NOT part of
     /// `objectWillChange`: frames arrive at display rate, and invalidating
     /// SwiftUI for each one causes constant re-layout (which, among other
@@ -89,4 +103,13 @@ extension RemoteSessionInputControlling {
 extension RemoteSessionControlling {
     var clipboardPasteError: String? { nil }
     func clearClipboardPasteError() {}
+    // Standard VNC has no file transfer.
+    var fileTransferCenter: FileTransferCenter? { nil }
+    var supportsFileTransfer: Bool { false }
+    // Standard VNC cannot cover the Mac's screen.
+    var supportsCurtainMode: Bool { false }
+    var isCurtainModeRequested: Bool { false }
+    var curtainModeMessage: String? { nil }
+    func setCurtainModeRequested(_ requested: Bool) {}
+    func clearCurtainModeMessage() {}
 }

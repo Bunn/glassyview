@@ -16,6 +16,8 @@ final class HostController {
         case adaptiveBitRate(Int?)
         case adaptiveMaximumWidth(Int?)
         case pairedDevices([HostPairedDevice])
+        case curtainRequest(client: UUID, enabled: Bool, isInputOwner: Bool)
+        case clientEnded(UUID)
     }
 
     private(set) var runState: HostRunState = .stopped
@@ -64,6 +66,41 @@ final class HostController {
     private let loginItemService = LoginItemService()
     private let remoteInputService = RemoteInputService()
     private let remoteSessionPower = HostRemoteSessionPowerService()
+    @ObservationIgnored
+    private lazy var fileTransfers = HostFileTransferService(send: { [hostServer] message, clientID in
+        hostServer.sendFileTransfer(message, to: clientID)
+    })
+
+    @ObservationIgnored
+    private var curtain: HostCurtainService!
+
+    /// The controlling device may hide this Mac's screen and ignore its
+    /// keyboard and pointer while connected.
+    var allowsCurtainMode: Bool {
+        get {
+            access(keyPath: \.allowsCurtainMode)
+            return curtain.isAllowed
+        }
+        set {
+            withMutation(keyPath: \.allowsCurtainMode) {
+                curtain.isAllowed = newValue
+            }
+        }
+    }
+
+    /// Files from paired devices are saved in Downloads; devices can also
+    /// ask for the files selected in Finder.
+    var allowsFileTransfers: Bool {
+        get {
+            access(keyPath: \.allowsFileTransfers)
+            return fileTransfers.allowsTransfers
+        }
+        set {
+            withMutation(keyPath: \.allowsFileTransfers) {
+                fileTransfers.allowsTransfers = newValue
+            }
+        }
+    }
 
     @ObservationIgnored
     private var permissionFlowController: PermissionFlowController?
@@ -187,6 +224,21 @@ final class HostController {
                 Task { await self?.refreshAuthorizationStatuses() }
             }
 
+        let hostServer = hostServer
+        let captureService = captureService
+        curtain = HostCurtainService(
+            publish: { status, target in
+                if let target {
+                    hostServer.sendCurtainStatus(status, to: target)
+                } else {
+                    hostServer.publishCurtainStatus(status)
+                }
+            },
+            excludeFromCapture: { windowIDs in
+                try await captureService.setExcludedWindowIDs(windowIDs)
+            }
+        )
+
         // Workspace notifications use their own center, not NotificationCenter.default.
         let workspace = NSWorkspace.shared.notificationCenter
         workspaceWakeObserver = workspace.publisher(for: NSWorkspace.didWakeNotification)
@@ -297,6 +349,10 @@ final class HostController {
         hostServer.setAuthenticatedClientReplacementHandler { [remoteInputService] in
             remoteInputService.releasePressedInput()
         }
+        let fileTransfers = fileTransfers
+        hostServer.setFileTransferHandler { clientID, message, isInputOwner in
+            fileTransfers.handle(message, from: clientID, isInputOwner: isInputOwner)
+        }
         do {
             let store = pairingSecretStore
             let pairingSecret = try await Task.detached(priority: .userInitiated) {
@@ -403,6 +459,7 @@ final class HostController {
             // Close the local input gate before suspending. Buffered listener
             // callbacks must not revive capture while shutdown is in progress.
             remoteInputService.setEnabled(false)
+            curtain.liftNow()
             isServerReady = false
             serverPort = nil
             refreshPairingCode()
@@ -1366,8 +1423,21 @@ final class HostController {
                     handleAdaptiveBitRateChange(adaptiveBitRateBudget)
                 case .pairedDevices(let devices):
                     pairedDevices = devices
+                case let .curtainRequest(client, enabled, isInputOwner):
+                    curtain.handleRequest(from: client, enabled: enabled, isInputOwner: isInputOwner)
+                case .clientEnded(let client):
+                    curtain.clientEnded(client)
                 }
             }
+        }
+
+        let fileTransfers = fileTransfers
+        hostServer.setClientEndedHandler { clientID in
+            fileTransfers.clientEnded(clientID)
+            continuation.yield(.clientEnded(clientID))
+        }
+        hostServer.setCurtainRequestHandler { clientID, enabled, isInputOwner in
+            continuation.yield(.curtainRequest(client: clientID, enabled: enabled, isInputOwner: isInputOwner))
         }
 
         hostServer.setAdaptiveResolutionHandler { width in

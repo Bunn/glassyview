@@ -18,12 +18,31 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     @Published private(set) var displays: [RemoteDisplay] = []
     @Published private(set) var displaySelection: RemoteDisplaySelection = .all
     @Published private(set) var clipboardPasteError: String?
+    @Published private(set) var isCurtainModeRequested = false
+    @Published private(set) var curtainModeMessage: String?
 
     var supportsClipboardPaste: Bool {
         canSendInput && controller.authentication?.supportsClipboardPaste == true
     }
 
+    /// The connected Mac accepts files and this device controls it.
+    var supportsFileTransfer: Bool {
+        canSendInput
+            && controller.authentication?.supportsFileTransfer == true
+            && controller.hostStatus?.ownsInput != false
+    }
+
+    /// The Mac can cover its screen and this device controls it.
+    var supportsCurtainMode: Bool {
+        canSendInput
+            && controller.authentication?.supportsCurtainMode == true
+            && controller.hostStatus?.ownsInput != false
+    }
+
     let controller: GlassyStreamSessionController
+    let fileTransfers: FileTransferCenter
+
+    var fileTransferCenter: FileTransferCenter? { fileTransfers }
 
     private let framebufferUpdateSubject = CurrentValueSubject<RemoteFramebufferUpdate, Never>(.empty)
     private let cursorSubject = CurrentValueSubject<RemoteCursor?, Never>(nil)
@@ -49,6 +68,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     private var isSuspendedForBackground = false
     private var networkPathStatus: NetworkPathStatus?
     private var lastDisconnectMessage: String?
+    private var awaitsCurtainResponse = false
     private let fallbackSavedMachineID = UUID()
 
     var framebufferUpdatePublisher: AnyPublisher<RemoteFramebufferUpdate, Never> {
@@ -77,6 +97,10 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 
     init(controller: GlassyStreamSessionController = GlassyStreamSessionController()) {
         self.controller = controller
+        let fileTransfers = FileTransferCenter(send: controller.sendFileTransfer)
+        self.fileTransfers = fileTransfers
+        let engine = fileTransfers.engine
+        controller.fileTransferSink = { message in engine.receive(message) }
 
         controller.onStateChanged = { [weak self] state, error in
             self?.controllerStateChanged(state, error: error)
@@ -86,6 +110,9 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         }
         controller.onCursorPositionChanged = { [weak self] position in
             self?.updateRemoteCursorPosition(position)
+        }
+        controller.onCurtainStatusChanged = { [weak self] status in
+            self?.curtainStatusChanged(status)
         }
     }
 
@@ -288,6 +315,7 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     func applyPreferences(_ preferences: SessionPreferences) {
         let preferences = preferences.normalized
         touchMode = preferences.touchMode
+        setCurtainModeRequested(preferences.usesCurtainMode)
         setPreferredFrameRate(preferences.frameRate)
         if status == .connected {
             setQuality(preferences.quality)
@@ -477,6 +505,43 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         clipboardPasteError = nil
     }
 
+    // MARK: - Curtain Mode
+
+    func setCurtainModeRequested(_ requested: Bool) {
+        guard requested != isCurtainModeRequested else { return }
+        isCurtainModeRequested = requested
+        curtainModeMessage = nil
+        guard status == .connected else { return }
+        awaitsCurtainResponse = requested
+        controller.setCurtainMode(requested)
+    }
+
+    func clearCurtainModeMessage() {
+        curtainModeMessage = nil
+    }
+
+    private func curtainStatusChanged(_ curtain: GlassyStreamCurtainStatus) {
+        switch curtain.state {
+        case .on:
+            awaitsCurtainResponse = false
+            if !curtain.blocksLocalInput, isCurtainModeRequested {
+                curtainModeMessage = String(localized: "Your Mac's screen is covered, but its own keyboard and mouse still work. On the Mac, allow Accessibility for Glassy Desk.")
+            }
+        case .off:
+            // The Mac reports its current state before handling a new request.
+            guard !awaitsCurtainResponse, isCurtainModeRequested else { return }
+            curtainModeMessage = String(localized: "Curtain Mode ended on your Mac.")
+        case .unavailable:
+            awaitsCurtainResponse = false
+            isCurtainModeRequested = false
+            curtainModeMessage = String(localized: "Curtain Mode is turned off on this Mac, or another device controls it.")
+        case .failed:
+            awaitsCurtainResponse = false
+            isCurtainModeRequested = false
+            curtainModeMessage = String(localized: "Your Mac couldn't cover its screen. Try again.")
+        }
+    }
+
     func sendReturn() {
         sendKey(.return, modifiers: [])
     }
@@ -536,6 +601,12 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
             hasConnectedAtLeastOnce = true
             lastDisconnectMessage = nil
             status = .connected
+            if isCurtainModeRequested {
+                // Each connection asks again; the Mac lifts the curtain soon
+                // after a device disconnects.
+                awaitsCurtainResponse = true
+                controller.setCurtainMode(true)
+            }
             return authentication
         } catch {
             if !disconnectRequested,
@@ -712,6 +783,9 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         _ state: GlassyStreamSessionState,
         error: GlassyStreamSessionError?
     ) {
+        if state != .connected {
+            fileTransfers.connectionEnded()
+        }
         switch state {
         case .idle:
             if isSuspendedForBackground {

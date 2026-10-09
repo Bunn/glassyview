@@ -1,5 +1,7 @@
-import SwiftUI
 import OSLog
+import PhotosUI
+import SwiftUI
+import UniformTypeIdentifiers
 
 /// Full-screen remote session with floating Liquid Glass controls.
 struct SessionView<Session: RemoteSessionControlling>: View {
@@ -38,6 +40,10 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @State private var foldFocusState = SessionFoldFocusState()
     @State private var areBottomControlsCollapsed = false
     @State private var inputBarHeight: CGFloat = 0
+    @State private var isFileImporterPresented = false
+    @State private var isPhotoPickerPresented = false
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var isFileDropTargeted = false
     @State private var didRecordFreeSessionStart = false
     @State private var didRecordFreeSessionLimit = false
 
@@ -62,7 +68,8 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         )
     }
 
-    var body: some View {
+    /// The arrangement, its overlays, and everything it presents.
+    private var presentedSession: some View {
         SessionArrangement(overlayBottomInset: isInputBarVisible ? inputBarHeight : 0,
                            usesDividedLayout: !isExternalControllerActive,
                            onSeparationChange: { isSessionSeparated = $0 }) {
@@ -87,6 +94,12 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                 } else {
                     content
                         .transition(.opacity)
+                        .onDrop(of: [.item], isTargeted: $isFileDropTargeted, perform: sendDroppedFiles)
+                        .overlay {
+                            if isFileDropTargeted, session.supportsFileTransfer {
+                                fileDropHighlight
+                            }
+                        }
                 }
             }
             .overlay(alignment: .top) {
@@ -113,6 +126,14 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         } message: {
             Text(session.clipboardPasteError ?? "")
         }
+        .alert("Curtain Mode", isPresented: Binding(
+            get: { session.curtainModeMessage != nil },
+            set: { if !$0 { session.clearCurtainModeMessage() } }
+        )) {
+            Button("OK") { session.clearCurtainModeMessage() }
+        } message: {
+            Text(session.curtainModeMessage ?? "")
+        }
         .sheet(isPresented: $isSessionPaywallPresented,
                onDismiss: handleSessionPaywallDismissed) {
             RevenueCatPaywallSheet(
@@ -125,6 +146,29 @@ struct SessionView<Session: RemoteSessionControlling>: View {
             FreeSessionTimerSheet(endDate: freeSession.sessionEndDate,
                                   purchase: purchaseFromFreeSessionTimerInfo)
         }
+        .fileImporter(isPresented: $isFileImporterPresented,
+                      allowedContentTypes: [.item],
+                      allowsMultipleSelection: true) { result in
+            switch result {
+            case let .success(urls):
+                session.fileTransferCenter?.sendFiles(at: urls)
+            case let .failure(error):
+                AppLog.ui.error("File selection failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        .photosPicker(isPresented: $isPhotoPickerPresented,
+                      selection: $selectedPhotos,
+                      maxSelectionCount: FileTransferWire.maximumFilesPerRequest,
+                      matching: .any(of: [.images, .videos]),
+                      preferredItemEncoding: .current)
+        .onChange(of: selectedPhotos) { _, items in
+            sendSelectedPhotos(items)
+        }
+    }
+
+    /// Connection lifecycle and free-session enforcement.
+    private var sessionLifecycle: some View {
+        presentedSession
         .onAppear {
             networkPathObserver.start()
             if subscriptionStore.hasProAccess {
@@ -160,6 +204,10 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                 retrySessionIfNeeded()
             }
         }
+    }
+
+    var body: some View {
+        sessionLifecycle
         .onChange(of: session.displays) { _, _ in
             logDisplayControlState(reason: "displayLayoutChanged")
         }
@@ -175,6 +223,9 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
         .onChange(of: session.quality) { _, quality in
             updatePreference(\.quality, to: quality)
+        }
+        .onChange(of: session.isCurtainModeRequested) { _, requested in
+            updatePreference(\.usesCurtainMode, to: requested)
         }
         .onChange(of: streamZoomScale) { _, zoomScale in
             guard !showsInputBar else { return }
@@ -319,6 +370,11 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                     sessionHeader
                     .padding(.horizontal, sidePadding)
                     .padding(.top, compactSpacing || isFoldedControllerActive ? 4 : 20)
+                }
+
+                if let fileTransfers = session.fileTransferCenter {
+                    FileTransferPanel(center: fileTransfers)
+                        .frame(maxWidth: .infinity)
                 }
 
                 if isFoldedControllerActive {
@@ -472,7 +528,9 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                includesResetZoom: includesResetZoom,
                                includesZoomModes: includesZoomModes,
                                includesZoomSteps: includesZoomSteps,
-                               usesTrackpadController: isFoldedControllerActive)
+                               usesTrackpadController: isFoldedControllerActive,
+                               sendFiles: { isFileImporterPresented = true },
+                               sendPhotos: { isPhotoPickerPresented = true })
         }
     }
 
@@ -885,6 +943,62 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
+    }
+
+    // MARK: - File transfer
+
+    private var fileDropHighlight: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(.white.opacity(0.8), style: StrokeStyle(lineWidth: 3, dash: [10, 8]))
+                .padding(12)
+            Label("Drop to Send to Mac", systemImage: "arrow.up.doc")
+                .font(.headline)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .liquidGlass(in: Capsule(), isInteractive: false)
+        }
+        .foregroundStyle(.white)
+        .allowsHitTesting(false)
+        .transition(.opacity)
+    }
+
+    private func sendDroppedFiles(_ providers: [NSItemProvider]) -> Bool {
+        guard session.supportsFileTransfer, let center = session.fileTransferCenter else { return false }
+        for provider in providers {
+            let contentType = provider.registeredContentTypes.first ?? .item
+            // The provided URL is only valid inside this handler, so copy it first.
+            _ = provider.loadFileRepresentation(for: contentType, openInPlace: false) { url, _, error in
+                guard let url else {
+                    AppLog.ui.error("Dropped item could not be read: \(error?.localizedDescription ?? "unknown", privacy: .public)")
+                    return
+                }
+                let name = url.lastPathComponent
+                do {
+                    let copy = try FileTransferCenter.makeTemporaryCopy(of: url, name: name)
+                    Task { @MainActor in center.sendTemporaryCopy(at: copy, name: name) }
+                } catch {
+                    AppLog.ui.error("Dropped item could not be copied: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+        return true
+    }
+
+    private func sendSelectedPhotos(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        selectedPhotos = []
+        guard let center = session.fileTransferCenter else { return }
+        for item in items {
+            Task {
+                do {
+                    guard let file = try await item.loadTransferable(type: OutgoingTransferFile.self) else { return }
+                    center.sendTemporaryCopy(at: file.url, name: file.url.lastPathComponent)
+                } catch {
+                    AppLog.ui.error("Photo could not be prepared for sending: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
     }
 
     private func submitSoftwareInput() {

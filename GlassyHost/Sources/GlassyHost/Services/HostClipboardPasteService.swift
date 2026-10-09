@@ -14,7 +14,7 @@ struct HostClipboardPasteService: Sendable {
                                   virtualKey: code,
                                   keyDown: isDown) else { return }
         event.flags = flags
-        event.post(tap: .cghidEventTap)
+        HostSyntheticInput.post(event)
     }
 
     func paste(_ text: String) {

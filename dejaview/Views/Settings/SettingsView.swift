@@ -7,7 +7,13 @@ struct SettingsView: View {
     @AppStorage(AnalyticsPreference.collectionEnabledKey)
     private var analyticsEnabled = AnalyticsPreference.defaultCollectionEnabled
 
+    @AppStorage(RemotePictureInPictureCoordinator.startsAutomaticallyKey)
+    private var startsPictureInPictureAutomatically = RemotePictureInPictureCoordinator.defaultStartsAutomatically
+
     @State private var isPaywallPresented = false
+    @State private var appLock = AppLockController.shared
+    @AppStorage(PencilShortcutAction.preferenceKey)
+    private var pencilShortcut = PencilShortcutAction.defaultAction
 
     var body: some View {
         @Bindable var subscriptionStore = subscriptionStore
@@ -63,6 +69,58 @@ struct SettingsView: View {
                 }
             }
 
+            Section {
+                Toggle(isOn: appLockBinding) {
+                    Label("Require \(appLock.availableMethod?.title ?? String(localized: "Passcode"))",
+                          systemImage: appLock.availableMethod?.systemImage ?? "lock.fill")
+                }
+                .disabled(appLock.isAuthenticating)
+                if appLock.isEnabled {
+                    Picker("Lock", selection: appLockDelayBinding) {
+                        ForEach(AppLockController.RelockDelay.allCases) { delay in
+                            Text(delay.title).tag(delay)
+                        }
+                    }
+                }
+                if let message = appLock.errorMessage {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Security")
+            } footer: {
+                Text("Hide Glassy Desk and your Macs' screens until you authenticate. The app switcher never shows a remote screen while this is on.")
+            }
+
+            if RemotePictureInPictureCoordinator.shared.isSupported {
+                Section {
+                    Toggle(isOn: $startsPictureInPictureAutomatically) {
+                        Label("Picture in Picture When Leaving", systemImage: "pip")
+                    }
+                } header: {
+                    Text("Sessions")
+                } footer: {
+                    Text("Keep watching your Mac in a floating window when you switch apps during a session. Control resumes when you return to Glassy Desk.")
+                }
+            }
+
+            if UIDevice.current.userInterfaceIdiom == .pad {
+                Section {
+                    Picker(selection: $pencilShortcut) {
+                        ForEach(PencilShortcutAction.allCases) { action in
+                            Text(action.title).tag(action)
+                        }
+                    } label: {
+                        Label("Double-Tap and Squeeze", systemImage: "applepencil.tip")
+                    }
+                } header: {
+                    Text("Apple Pencil")
+                } footer: {
+                    Text("Apple Pencil always clicks and drags exactly where it touches, even in trackpad mode, and moves the pointer while hovering. Your resting hand is ignored.")
+                }
+            }
+
             Section("FAQ") {
                 NavigationLink {
                     FAQView()
@@ -110,6 +168,25 @@ struct SettingsView: View {
             if hasProAccess {
                 isPaywallPresented = false
             }
+        }
+        .onChange(of: startsPictureInPictureAutomatically) { _, startsAutomatically in
+            RemotePictureInPictureCoordinator.shared.setStartsAutomatically(startsAutomatically)
+        }
+    }
+
+    private var appLockBinding: Binding<Bool> {
+        Binding {
+            appLock.isEnabled
+        } set: { enabled in
+            Task { await appLock.setEnabled(enabled) }
+        }
+    }
+
+    private var appLockDelayBinding: Binding<AppLockController.RelockDelay> {
+        Binding {
+            appLock.relockDelay
+        } set: { delay in
+            appLock.setRelockDelay(delay)
         }
     }
 

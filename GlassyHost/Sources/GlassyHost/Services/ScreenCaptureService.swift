@@ -85,6 +85,8 @@ actor ScreenCaptureService {
     private let eventHandler: EventHandler
     private var activeCapture: ActiveCapture?
     private var operationGeneration: UInt64 = 0
+    /// Windows left out of every capture, such as Curtain Mode's shields.
+    private var excludedWindowIDs: Set<CGWindowID> = []
 
     init(eventHandler: @escaping EventHandler = { _ in }) {
         self.eventHandler = eventHandler
@@ -185,7 +187,10 @@ actor ScreenCaptureService {
             from: content.displays,
             requestedDisplayID: requestedDisplayID
         )
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+        let filter = SCContentFilter(
+            display: display,
+            excludingWindows: content.windows.filter { excludedWindowIDs.contains($0.windowID) }
+        )
         let outputSize = Self.outputSize(
             for: display,
             maximumWidth: configuration.maximumWidth,
@@ -249,6 +254,10 @@ actor ScreenCaptureService {
             delegate: streamDelegate,
             frameRelay: frameRelay
         )
+        if !excludedWindowIDs.isEmpty {
+            // Exclusions can change while this start awaited ScreenCaptureKit.
+            try? await setExcludedWindowIDs(excludedWindowIDs)
+        }
         eventHandler(
             .started(
                 displayID: display.displayID,
@@ -258,6 +267,19 @@ actor ScreenCaptureService {
             )
         )
         return frameRelay.stream
+    }
+
+    /// Leaves `windowIDs` out of the current and every later capture. Returns
+    /// after the running stream's filter has changed, so callers can reveal
+    /// those windows without them reaching the stream.
+    func setExcludedWindowIDs(_ windowIDs: Set<CGWindowID>) async throws {
+        excludedWindowIDs = windowIDs
+        guard let activeCapture else { return }
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+        let windows = content.windows.filter { windowIDs.contains($0.windowID) }
+        try await activeCapture.stream.updateContentFilter(
+            SCContentFilter(display: activeCapture.display, excludingWindows: windows)
+        )
     }
 
     /// Change capture dimensions/cadence in the existing stream. Encoder rate

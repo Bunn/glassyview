@@ -33,7 +33,8 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                                   showsTrackpadCursorDot: showsTrackpadCursorDot,
                                   allowsZoom: true,
                                   touchModeOverride: touchModeOverride,
-                                  glassyStreamRenderer: glassyStream.renderer)
+                                  glassyStreamRenderer: glassyStream.renderer,
+                                  providesPictureInPicture: true)
                     .ignoresSafeArea(.container, edges: ignoredContainerSafeAreaEdges)
 
                 if reconnectState == nil {
@@ -50,7 +51,8 @@ struct SessionRemoteContent<Session: RemoteSessionControlling>: View {
                                   acceptsHardwareKeyboardInput: acceptsHardwareKeyboardInput,
                                   acceptsPointerInput: acceptsPointerInput,
                                   showsTrackpadCursorDot: showsTrackpadCursorDot,
-                                  touchModeOverride: touchModeOverride)
+                                  touchModeOverride: touchModeOverride,
+                                  providesPictureInPicture: true)
                     .id(session.displaySelection.id)
                     .ignoresSafeArea(.container, edges: ignoredContainerSafeAreaEdges)
             }

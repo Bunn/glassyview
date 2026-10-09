@@ -37,6 +37,7 @@ struct DejaViewApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .background(AppLockCoverInstaller())
                 .environment(subscriptionStore)
                 .environment(\.analyticsTracker, analytics)
                 .environment(\.funnelMilestoneTracker, funnelMilestones)
@@ -64,6 +65,13 @@ struct DejaViewApp: App {
         .modelContainer(DejaViewModelContainer.shared)
         .onChange(of: scenePhase) { oldPhase, newPhase in
             AppLog.app.info("Scene phase changed to \(String(describing: newPhase), privacy: .public)")
+
+            switch newPhase {
+            case .active: AppLockController.shared.sceneBecameActive()
+            case .inactive: AppLockController.shared.sceneBecameInactive()
+            case .background: AppLockController.shared.sceneEnteredBackground()
+            @unknown default: break
+            }
 
             if newPhase == .background {
                 analytics.flush()

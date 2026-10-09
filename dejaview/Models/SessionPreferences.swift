@@ -9,6 +9,7 @@ struct SessionPreferences: Codable, Equatable, Sendable {
     var showsTrackpadCursorDot = false
     var frameRate: RemoteFrameRate = .balanced
     var quality: RemoteSessionQuality = .best
+    var usesCurtainMode = false
 
     static let `default` = SessionPreferences()
 
@@ -27,6 +28,7 @@ struct SessionPreferences: Codable, Equatable, Sendable {
         case showsTrackpadCursorDot
         case frameRate
         case quality
+        case usesCurtainMode
     }
 
     init(touchMode: RemoteTouchMode = .direct,
@@ -36,7 +38,8 @@ struct SessionPreferences: Codable, Equatable, Sendable {
          pansViewportWithTwoFingers: Bool = false,
          showsTrackpadCursorDot: Bool = false,
          frameRate: RemoteFrameRate = .balanced,
-         quality: RemoteSessionQuality = .best) {
+         quality: RemoteSessionQuality = .best,
+         usesCurtainMode: Bool = false) {
         self.touchMode = touchMode
         self.displaySelection = displaySelection
         self.zoomScale = zoomScale
@@ -45,6 +48,7 @@ struct SessionPreferences: Codable, Equatable, Sendable {
         self.showsTrackpadCursorDot = showsTrackpadCursorDot
         self.frameRate = frameRate
         self.quality = quality
+        self.usesCurtainMode = usesCurtainMode
     }
 
     init(from decoder: any Decoder) throws {
@@ -63,6 +67,7 @@ struct SessionPreferences: Codable, Equatable, Sendable {
         ) ?? false
         frameRate = try container.decodeIfPresent(RemoteFrameRate.self, forKey: .frameRate) ?? .balanced
         quality = try container.decodeIfPresent(RemoteSessionQuality.self, forKey: .quality) ?? .best
+        usesCurtainMode = try container.decodeIfPresent(Bool.self, forKey: .usesCurtainMode) ?? false
         self = normalized
     }
 }

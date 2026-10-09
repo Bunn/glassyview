@@ -23,7 +23,7 @@ final class RemoteInputService: @unchecked Sendable {
         qos: .userInteractive
     ),
          clipboardPaste: HostClipboardPasteService = HostClipboardPasteService(),
-         postEvent: @escaping @Sendable (CGEvent) -> Void = { $0.post(tap: .cghidEventTap) }) {
+         postEvent: @escaping @Sendable (CGEvent) -> Void = HostSyntheticInput.post) {
         queue = inputQueue
         self.clipboardPaste = clipboardPaste
         self.postEvent = postEvent

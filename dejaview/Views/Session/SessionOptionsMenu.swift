@@ -18,15 +18,39 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
     var includesZoomModes = false
     var includesZoomSteps = false
     var usesTrackpadController = false
+    var sendFiles: () -> Void = {}
+    var sendPhotos: () -> Void = {}
+
+    private var pictureInPicture: RemotePictureInPictureCoordinator { .shared }
 
     var body: some View {
         Menu {
+            if pictureInPicture.isSupported {
+                Button("Picture in Picture", systemImage: "pip.enter", action: pictureInPicture.start)
+                    .disabled(!pictureInPicture.isPossible)
+                    .accessibilityHint("Keeps watching your Mac in a floating window while you use other apps.")
+            }
+
             if usesTrackpadController, session.supportsClipboardPaste {
                 PasteButton(payloadType: String.self) { strings in
                     session.pasteText(strings.joined(separator: "\n"))
                 }
                 .labelStyle(.titleAndIcon)
                 .accessibilityLabel("Paste to Mac")
+            }
+            if session.supportsCurtainMode {
+                Toggle("Curtain Mode", systemImage: "eye.slash", isOn: curtainBinding)
+                    .accessibilityHint("Covers your Mac's screen and ignores its own keyboard and mouse while you control it.")
+            }
+            if session.supportsFileTransfer, let fileTransfers = session.fileTransferCenter {
+                Section("Files") {
+                    Button("Send Files to Mac…", systemImage: "doc.badge.arrow.up", action: sendFiles)
+                    Button("Send Photos to Mac…", systemImage: "photo.on.rectangle.angled", action: sendPhotos)
+                    Button("Get Selected Files from Mac", systemImage: "arrow.down.doc",
+                           action: fileTransfers.getSelectedFilesFromMac)
+                        .disabled(fileTransfers.isRequestingFiles)
+                        .accessibilityHint("Sends the files selected in Finder on your Mac to this device.")
+                }
             }
             if includesZoomSteps {
                 Button("Zoom In", systemImage: "plus.magnifyingglass") {
@@ -157,6 +181,14 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
             if (session.touchMode == .trackpad) != isOn {
                 session.toggleTouchMode()
             }
+        }
+    }
+
+    private var curtainBinding: Binding<Bool> {
+        Binding {
+            session.isCurtainModeRequested
+        } set: { requested in
+            session.setCurtainModeRequested(requested)
         }
     }
 

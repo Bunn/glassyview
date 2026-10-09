@@ -16,6 +16,7 @@ struct ExternalDisplayRootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppLockCoverInstaller(isInteractive: false))
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
