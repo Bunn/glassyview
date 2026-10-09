@@ -30,6 +30,8 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>GlassyDeskAppGroup</key>
+	<string>$(APP_GROUP_IDENTIFIER)</string>
 	<key>RevenueCatAPIKey</key>
 	<string>$(REVENUECAT_API_KEY)</string>
 	<key>UIBackgroundModes</key>
