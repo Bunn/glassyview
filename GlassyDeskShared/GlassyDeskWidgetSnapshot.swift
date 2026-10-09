@@ -6,7 +6,9 @@ enum GlassyDeskWidgetKind {
 }
 
 enum GlassyDeskAppGroup {
-    static let identifier = "group.dev.bunn.glassydesk"
+    /// Set per build configuration via `APP_GROUP_IDENTIFIER` so Develop builds don't share the App Store container.
+    static let identifier = Bundle.main.object(forInfoDictionaryKey: "GlassyDeskAppGroup") as? String
+        ?? "group.dev.bunn.glassydesk"
 }
 
 enum WidgetConnectionKind: String, Codable, Hashable, Sendable {

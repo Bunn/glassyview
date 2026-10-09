@@ -130,6 +130,28 @@ struct GlassyStreamRouteLoopbackTests {
         }
     }
 
+    @Test
+    func disconnectLiftingCurtainDeliversTheRequestBeforeClosing() async throws {
+        let hostID = Data(repeating: 0x42, count: 16)
+        let host = try LoopbackPairingHost(hostID: hostID, behavior: "valid", extraCapabilities: 1 << 9)
+        defer { host.stop() }
+        let endpoint = try await host.start()
+        let client = GlassyStreamClient(credentialStore: RouteTestCredentialStore())
+        let events = RouteTestEvents()
+        _ = try await authenticate(client, configuration: .init(
+            endpoint: endpoint, savedMachineID: UUID(),
+            bootstrapCredential: .oneTimeCode("ABCDEFGH2345"), expectedHostIdentifier: hostID
+        ), events: events)
+
+        client.disconnect(liftingCurtain: true)
+
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while host.curtainRequests.isEmpty, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(host.curtainRequests == [Data([0, 0, 0, 0])])
+    }
+
     private func waitForPing(_ host: LoopbackPairingHost) async throws {
         let deadline = ContinuousClock.now.advanced(by: .seconds(3))
         while host.pingCount == 0, ContinuousClock.now < deadline {
