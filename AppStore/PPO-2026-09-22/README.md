@@ -34,3 +34,7 @@ All ten final uploads completed successfully. Local format validation reported z
 [App Store Connect](https://appstoreconnect.apple.com/apps/6787767486/distribution/optimization)
 [Apple: create a test](https://developer.apple.com/help/app-store-connect/create-product-page-optimization-tests/create-a-test)
 [Apple: run a test](https://developer.apple.com/help/app-store-connect/create-product-page-optimization-tests/run-a-test)
+
+## Applied to version 3.0
+
+9 October 2026: the dark treatment won, so its five iPhone images replaced the original iPhone set on version 3.0 (en-US; every other locale falls back to it). The replaced set was pixel-identical to `control/APP_IPHONE_67`. iPad is unchanged. The experiment itself is still running in App Store Connect. Receipt: `receipts/v3.0-dark-applied.json`.
