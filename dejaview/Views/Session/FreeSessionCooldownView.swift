@@ -64,7 +64,7 @@ struct FreeSessionCooldownView: View {
                 .accessibilityAddTraits(.isHeader)
 
             Text(isReady
-                 ? "Your next one-minute session is ready."
+                 ? "Your next 70-second session is ready."
                  : "A short break, then you’re back. Start another free session when the timer finishes.")
                 .font(.body)
                 .foregroundStyle(.secondary)
@@ -128,7 +128,7 @@ struct FreeSessionCooldownView: View {
             .controlSize(.large)
             .disabled(!isReady)
             .accessibilityHint(isReady
-                               ? "Reconnects to your Mac for one minute."
+                               ? "Reconnects to your Mac for 70 seconds."
                                : "Available when the countdown finishes.")
             .accessibilityIdentifier("session.cooldown.restart")
 

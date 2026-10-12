@@ -1,0 +1,128 @@
+{
+  "fill-specializations": [
+    {
+      "value": {
+        "linear-gradient": [
+          "srgb:0.96500,0.97600,0.98400,1.00000",
+          "srgb:0.83500,0.89800,0.98400,1.00000"
+        ],
+        "orientation": {
+          "start": {
+            "x": 0.5,
+            "y": 0
+          },
+          "stop": {
+            "x": 0.5,
+            "y": 1
+          }
+        }
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "linear-gradient": [
+          "srgb:0.00400,0.01200,0.09000,1.00000",
+          "srgb:0.00400,0.04700,0.19000,1.00000"
+        ],
+        "orientation": {
+          "start": {
+            "x": 0.5,
+            "y": 0
+          },
+          "stop": {
+            "x": 0.5,
+            "y": 1
+          }
+        }
+      }
+    }
+  ],
+  "groups": [
+    {
+      "layers": [
+        {
+          "name": "Front Pane",
+          "glass": true,
+          "image-name-specializations": [
+            {
+              "value": "front.png"
+            },
+            {
+              "appearance": "dark",
+              "value": "front-dark.png"
+            },
+            {
+              "appearance": "tinted",
+              "value": "front-mono.png"
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.35
+      },
+      "specular": true,
+      "translucency-specializations": [
+        {
+          "value": {
+            "enabled": false,
+            "value": 0.5
+          }
+        },
+        {
+          "appearance": "tinted",
+          "value": {
+            "enabled": true,
+            "value": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "layers": [
+        {
+          "name": "Back Pane",
+          "glass": true,
+          "image-name-specializations": [
+            {
+              "value": "back.png"
+            },
+            {
+              "appearance": "dark",
+              "value": "back-dark.png"
+            },
+            {
+              "appearance": "tinted",
+              "value": "back-mono.png"
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.35
+      },
+      "specular": true,
+      "translucency-specializations": [
+        {
+          "value": {
+            "enabled": false,
+            "value": 0.5
+          }
+        },
+        {
+          "appearance": "tinted",
+          "value": {
+            "enabled": true,
+            "value": 0.4
+          }
+        }
+      ]
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

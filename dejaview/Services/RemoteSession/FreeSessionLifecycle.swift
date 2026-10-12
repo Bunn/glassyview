@@ -20,7 +20,7 @@ struct FreeSessionCooldown: Equatable {
 @MainActor
 @Observable
 final class FreeSessionLifecycle {
-    static let sessionDuration: TimeInterval = 60
+    static let sessionDuration: TimeInterval = 70
     private static let cooldownStorageKey = "freeSession.cooldownEndDate"
 
     private(set) var sessionEndDate: Date?

@@ -50,6 +50,17 @@ struct SettingsView: View {
                 }
             }
 
+            if UIApplication.shared.supportsAlternateIcons {
+                Section("Appearance") {
+                    NavigationLink {
+                        AppIconPickerView()
+                    } label: {
+                        Label("App Icon", systemImage: "app.badge")
+                    }
+                    .accessibilityIdentifier("settings.app-icon")
+                }
+            }
+
             Section("Getting Started") {
                 if FeatureFlags.isGlassyStreamEnabled {
                     GlassyHostDownloadLink()
