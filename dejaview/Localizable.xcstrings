@@ -5511,42 +5511,42 @@
         }
       }
     },
-    "Enjoy 70-second free sessions with a 30-second break between them. Upgrade to Pro for sessions without time limits." : {
+    "Enjoy one-minute free sessions with a 90-second break between them. Upgrade to Pro for sessions without time limits." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nutze kostenlose 70-Sekunden-Sitzungen mit jeweils 30 Sekunden Pause. Hol dir Pro für Sitzungen ohne Zeitlimit."
+            "value" : "Nutze einminütige kostenlose Sitzungen mit jeweils 90 Sekunden Pause. Hol dir Pro für Sitzungen ohne Zeitlimit."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Disfruta de sesiones gratuitas de 70 segundos con una pausa de 30 segundos entre ellas. Pásate a Pro para tener sesiones sin límite de tiempo."
+            "value" : "Disfruta de sesiones gratuitas de un minuto con una pausa de 90 segundos entre ellas. Pásate a Pro para tener sesiones sin límite de tiempo."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "70秒間の無料セッションを、30秒の休憩を挟んで利用できます。Proにアップグレードすると、時間制限なしで使えます。"
+            "value" : "1分間の無料セッションを、90秒の休憩を挟んで利用できます。Proにアップグレードすると、時間制限なしで使えます。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Geniet van gratis sessies van 70 seconden met een pauze van 30 seconden ertussen. Upgrade naar Pro voor sessies zonder tijdslimiet."
+            "value" : "Geniet van gratis sessies van één minuut met een pauze van 90 seconden ertussen. Upgrade naar Pro voor sessies zonder tijdslimiet."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aproveite sessões gratuitas de 70 segundos com uma pausa de 30 segundos entre elas. Assine o Pro para ter sessões sem limite de tempo."
+            "value" : "Aproveite sessões gratuitas de um minuto com uma pausa de 90 segundos entre elas. Assine o Pro para ter sessões sem limite de tempo."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "免费会话每次 70 秒，两次之间休息30秒。升级到 Pro 即可享受无时间限制的会话。"
+            "value" : "免费会话每次一分钟，两次之间休息90秒。升级到 Pro 即可享受无时间限制的会话。"
           }
         }
       }
@@ -13604,42 +13604,42 @@
         }
       }
     },
-    "Reconnects to your Mac for 70 seconds." : {
+    "Reconnects to your Mac for one minute." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verbindet dich erneut für 70 Sekunden mit deinem Mac."
+            "value" : "Verbindet dich erneut für eine Minute mit deinem Mac."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vuelve a conectarte a tu Mac durante 70 segundos."
+            "value" : "Vuelve a conectarte a tu Mac durante un minuto."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Macに再接続して70秒間利用できます。"
+            "value" : "Macに再接続して1分間利用できます。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Maakt opnieuw verbinding met je Mac voor 70 seconden."
+            "value" : "Maakt opnieuw verbinding met je Mac voor één minuut."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reconecta ao seu Mac por 70 segundos."
+            "value" : "Reconecta ao seu Mac por um minuto."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重新连接到你的 Mac，使用 70 秒。"
+            "value" : "重新连接到你的 Mac，使用一分钟。"
           }
         }
       }
@@ -20340,42 +20340,42 @@
         }
       }
     },
-    "Your next 70-second session is ready." : {
+    "Your next one-minute session is ready." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deine nächste 70-Sekunden-Sitzung ist bereit."
+            "value" : "Deine nächste einminütige Sitzung ist bereit."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tu próxima sesión de 70 segundos está lista."
+            "value" : "Tu próxima sesión de un minuto está lista."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "次の70秒間のセッションを開始できます。"
+            "value" : "次の1分間のセッションを開始できます。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Je volgende sessie van 70 seconden is klaar."
+            "value" : "Je volgende sessie van één minuut is klaar."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sua próxima sessão de 70 segundos está pronta."
+            "value" : "Sua próxima sessão de um minuto está pronta."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "下一次 70 秒会话已准备就绪。"
+            "value" : "下一次一分钟会话已就绪。"
           }
         }
       }

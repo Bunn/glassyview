@@ -64,7 +64,7 @@ struct FreeSessionCooldownView: View {
                 .accessibilityAddTraits(.isHeader)
 
             Text(isReady
-                 ? "Your next 70-second session is ready."
+                 ? "Your next one-minute session is ready."
                  : "A short break, then you’re back. Start another free session when the timer finishes.")
                 .font(.body)
                 .foregroundStyle(.secondary)
@@ -94,7 +94,7 @@ struct FreeSessionCooldownView: View {
                         .foregroundStyle(.mint)
                         .transition(.opacity.combined(with: .scale(scale: reduceMotion ? 1 : 0.8)))
                 } else {
-                    Text(String(format: "0:%02d", remainingSeconds))
+                    Text(String(format: "%d:%02d", remainingSeconds / 60, remainingSeconds % 60))
                         .font(.system(size: 48, weight: .semibold, design: .rounded).monospacedDigit())
                         .contentTransition(.numericText(countsDown: true))
                         .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: remainingSeconds)
@@ -128,7 +128,7 @@ struct FreeSessionCooldownView: View {
             .controlSize(.large)
             .disabled(!isReady)
             .accessibilityHint(isReady
-                               ? "Reconnects to your Mac for 70 seconds."
+                               ? "Reconnects to your Mac for one minute."
                                : "Available when the countdown finishes.")
             .accessibilityIdentifier("session.cooldown.restart")
 
@@ -165,7 +165,7 @@ struct FreeSessionCooldownView: View {
 }
 
 #Preview("Countdown") {
-    FreeSessionCooldownView(cooldown: FreeSessionCooldown(endDate: .now.addingTimeInterval(30)),
+    FreeSessionCooldownView(cooldown: FreeSessionCooldown(endDate: .now.addingTimeInterval(90)),
                             sessionTitle: "Studio Mac", restart: {}, purchase: {}, close: {})
         .preferredColorScheme(.dark)
 }
