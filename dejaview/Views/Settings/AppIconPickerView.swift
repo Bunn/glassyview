@@ -26,14 +26,6 @@ struct AppIconPickerView: View {
                     }
                 }
                 .padding(.vertical, 8)
-            } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Choose how Glassy Desk looks on your Home Screen. Every icon adapts to the dark, clear, and tinted styles.")
-
-                    if !subscriptionStore.hasProAccess {
-                        Text("Additional icons are included with Glassy Desk Pro.")
-                    }
-                }
             }
         }
         .navigationTitle("App Icon")

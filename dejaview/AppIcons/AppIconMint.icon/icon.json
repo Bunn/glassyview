@@ -3,8 +3,8 @@
     {
       "value": {
         "linear-gradient": [
-          "srgb:0.96500,0.98400,0.97832,1.00000",
-          "srgb:0.83500,0.98400,0.96272,1.00000"
+          "srgb:0.96471,0.98431,0.97647,1.00000",
+          "srgb:0.84314,0.98431,0.96471,1.00000"
         ],
         "orientation": {
           "start": {
@@ -22,8 +22,8 @@
       "appearance": "dark",
       "value": {
         "linear-gradient": [
-          "srgb:0.00400,0.07392,0.09000,1.00000",
-          "srgb:0.00400,0.18092,0.19000,1.00000"
+          "srgb:0.00784,0.07451,0.09020,1.00000",
+          "srgb:0.01176,0.18039,0.18824,1.00000"
         ],
         "orientation": {
           "start": {
@@ -46,15 +46,15 @@
           "glass": true,
           "image-name-specializations": [
             {
-              "value": "front.png"
+              "value": "front.svg"
             },
             {
               "appearance": "dark",
-              "value": "front-dark.png"
+              "value": "front-dark.svg"
             },
             {
               "appearance": "tinted",
-              "value": "front-mono.png"
+              "value": "front-mono.svg"
             }
           ]
         }
@@ -87,15 +87,15 @@
           "glass": true,
           "image-name-specializations": [
             {
-              "value": "back.png"
+              "value": "back.svg"
             },
             {
               "appearance": "dark",
-              "value": "back-dark.png"
+              "value": "back-dark.svg"
             },
             {
               "appearance": "tinted",
-              "value": "back-mono.png"
+              "value": "back-mono.svg"
             }
           ]
         }

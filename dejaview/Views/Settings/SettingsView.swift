@@ -100,8 +100,6 @@ struct SettingsView: View {
                 }
             } header: {
                 Text("Security")
-            } footer: {
-                Text("Hide Glassy Desk and your Macs' screens until you authenticate. The app switcher never shows a remote screen while this is on.")
             }
 
             if RemotePictureInPictureCoordinator.shared.isSupported {
@@ -111,8 +109,6 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Sessions")
-                } footer: {
-                    Text("Keep watching your Mac in a floating window when you switch apps during a session. Control resumes when you return to Glassy Desk.")
                 }
             }
 
@@ -127,8 +123,6 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Apple Pencil")
-                } footer: {
-                    Text("Apple Pencil always clicks and drags exactly where it touches, even in trackpad mode, and moves the pointer while hovering. Your resting hand is ignored.")
                 }
             }
 
