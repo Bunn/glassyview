@@ -2,7 +2,7 @@
 
 Eight App Store screenshots each for iPhone (`APP_IPHONE_67`, 1320 × 2868) and iPad (`APP_IPAD_PRO_3GEN_129`, 2064 × 2752). They replace a set that mixed dark and light artwork and carried up to four lines of copy per image. Every image here follows one recipe: dark navy background, a single headline line, and the device as the subject. The app itself is shown in its dark appearance.
 
-| # | Headline (iPhone / iPad) | Capture |
+| # | Headline in en-US (iPhone / iPad) | Capture |
 |---|---|---|
 | 01 | Your Mac, in your pocket. / Your Mac, in your hands. | Hosts list behind, live landscape session in front |
 | 02 | Every Mac, one tap away. | Hosts list |
@@ -13,7 +13,7 @@ Eight App Store screenshots each for iPhone (`APP_IPHONE_67`, 1320 × 2868) and 
 | 07 | Send files to your Mac. | Live session with the file transfer panel |
 | 08 | Only you see your Mac. | Curtain Mode: the Mac's own screen shielded above, the live session on the device |
 
-Uploaded to App Store Connect on 13 October 2026 for version 3.1, en-US only, replacing the previous five-image iPhone and iPad sets. The other six locales have no screenshots of their own.
+Uploaded to App Store Connect on 13 October 2026 for version 3.1 in all seven locales. Only the en-US images are committed; the others are built on demand (see below).
 
 ## How they were made
 
@@ -26,6 +26,30 @@ Uploaded to App Store Connect on 13 October 2026 for version 3.1, en-US only, re
 - **Image 08** is not a capture of a Mac with Curtain Mode on. `raw/mac-curtain.png` is the Mac app's own `HostCurtainShieldView`, copied verbatim from `GlassyHost/Sources/GlassyHost/Services/HostCurtainService.swift` and rendered offscreen with SwiftUI `ImageRenderer` at 1280 × 720 @2x. `compose.py` draws the display around it and crops to the centre of the shield (2× on iPhone, 1.6× on iPad) so its text is legible at store size. The device below reuses the live-session capture from image 01. The Session Options menu with Curtain Mode ticked is not shown: it pulls up the keyboard and includes a debug-only item.
 
 Rebuild with `python3 compose.py` (or `python3 compose.py ipad 02` for one image).
+
+## Languages and copy
+
+Headlines live in `copy.json`, one block per App Store locale, keyed by image number. Image 01 has separate iPhone and iPad lines. To change copy, edit the line and rebuild; to add a language, add a block named after its App Store locale code. Each headline is one line and shrinks to fit the margins, so keep translations short. Japanese and Simplified Chinese use Hiragino fonts (`LOCALE_FONTS` in `compose.py`); a new script needs an entry there.
+
+Only the headline is translated. The app UI inside the device is the English capture in every locale.
+
+```sh
+python3 compose.py --locale de-DE   # one locale
+python3 compose.py --locale all     # every locale in copy.json
+```
+
+en-US is written to `en-US/` and committed. Every other locale is written to `build/<locale>/`, which git ignores.
+
+Upload with `asc`. `--replace` deletes the locale's existing set for that device type first; swap `--confirm` for `--dry-run` to preview.
+
+```sh
+# en-US
+asc screenshots upload --app 6787767486 --version 3.1 --locale en-US --path en-US/iphone --device-type IPHONE_67 --replace --confirm
+asc screenshots upload --app 6787767486 --version 3.1 --locale en-US --path en-US/ipad --device-type IPAD_PRO_3GEN_129 --replace --confirm
+# every other locale, from build/
+asc screenshots upload --app 6787767486 --version 3.1 --path build --device-type IPHONE_67 --replace --confirm
+asc screenshots upload --app 6787767486 --version 3.1 --path build --device-type IPAD_PRO_3GEN_129 --replace --confirm
+```
 
 ## Edits to app pixels
 

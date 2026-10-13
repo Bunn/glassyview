@@ -1,0 +1,72 @@
+{
+  "en-US": {
+    "01": {"iphone": "Your Mac, in your pocket.", "ipad": "Your Mac, in your hands."},
+    "02": "Every Mac, one tap away.",
+    "03": "Type with real Mac keys.",
+    "04": "Two ways to connect.",
+    "05": "Keep your Mac in view.",
+    "06": "Big screen. Full control.",
+    "07": "Send files to your Mac.",
+    "08": "Only you see your Mac."
+  },
+  "de-DE": {
+    "01": {"iphone": "Dein Mac in der Hosentasche.", "ipad": "Dein Mac in deinen Händen."},
+    "02": "Jeder Mac, nur ein Tipp entfernt.",
+    "03": "Tippe mit echten Mac-Tasten.",
+    "04": "Zwei Wege zur Verbindung.",
+    "05": "Behalte deinen Mac im Blick.",
+    "06": "Großer Bildschirm. Volle Kontrolle.",
+    "07": "Sende Dateien an deinen Mac.",
+    "08": "Nur du siehst deinen Mac."
+  },
+  "es-ES": {
+    "01": {"iphone": "Tu Mac, en tu bolsillo.", "ipad": "Tu Mac, en tus manos."},
+    "02": "Cada Mac, a un toque.",
+    "03": "Escribe con teclas de Mac.",
+    "04": "Dos formas de conectar.",
+    "05": "Tu Mac, siempre a la vista.",
+    "06": "Pantalla grande. Control total.",
+    "07": "Envía archivos a tu Mac.",
+    "08": "Solo tú ves tu Mac."
+  },
+  "ja": {
+    "01": {"iphone": "Macを、ポケットに。", "ipad": "Macを、その手に。"},
+    "02": "どのMacも、ワンタップで。",
+    "03": "Macのキーで、そのまま入力。",
+    "04": "接続方法は2つ。",
+    "05": "Macを、いつも視界に。",
+    "06": "大画面で、思いのままに。",
+    "07": "ファイルをMacへ送信。",
+    "08": "Macを見られるのは、あなただけ。"
+  },
+  "nl-NL": {
+    "01": {"iphone": "Je Mac, in je broekzak.", "ipad": "Je Mac, in je handen."},
+    "02": "Elke Mac, één tik verwijderd.",
+    "03": "Typ met echte Mac-toetsen.",
+    "04": "Twee manieren om te verbinden.",
+    "05": "Houd je Mac in beeld.",
+    "06": "Groot scherm. Volledige controle.",
+    "07": "Stuur bestanden naar je Mac.",
+    "08": "Alleen jij ziet je Mac."
+  },
+  "pt-BR": {
+    "01": {"iphone": "Seu Mac, no seu bolso.", "ipad": "Seu Mac, nas suas mãos."},
+    "02": "Todo Mac, a um toque.",
+    "03": "Digite com teclas de Mac.",
+    "04": "Duas formas de conectar.",
+    "05": "Seu Mac, sempre à vista.",
+    "06": "Tela grande. Controle total.",
+    "07": "Envie arquivos para o seu Mac.",
+    "08": "Só você vê o seu Mac."
+  },
+  "zh-Hans": {
+    "01": {"iphone": "你的 Mac，就在口袋里。", "ipad": "你的 Mac，尽在掌中。"},
+    "02": "每台 Mac，一触即达。",
+    "03": "用真正的 Mac 按键输入。",
+    "04": "两种连接方式。",
+    "05": "让 Mac 始终在视线内。",
+    "06": "大屏显示，尽在掌控。",
+    "07": "把文件发送到 Mac。",
+    "08": "只有你能看到你的 Mac。"
+  }
+}

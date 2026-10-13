@@ -3,19 +3,32 @@
 
 Every image uses the same recipe: dark navy background, one headline line,
 and the device as the subject. Inputs are simulator captures in raw/ (see
-README.md for how they were taken and what was retouched).
+README.md for how they were taken and what was retouched). Headlines come
+from copy.json, one block per App Store locale.
 
-    python3 compose.py            # everything
-    python3 compose.py iphone 02  # one image
+    python3 compose.py                    # en-US, everything
+    python3 compose.py iphone 02          # en-US, one image
+    python3 compose.py --locale de-DE     # one other locale
+    python3 compose.py --locale all       # every locale in copy.json
+
+en-US is written to en-US/, which is committed. Every other locale goes to
+build/<locale>/, which git ignores.
 """
+import argparse
+import json
 import os
-import sys
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(HERE, "raw")
 SF = "/System/Library/Fonts/SFNS.ttf"
+# Headline fonts for locales SF has no glyphs for: (path, face index).
+LOCALE_FONTS = {
+    "ja": ("/System/Library/Fonts/ヒラギノ角ゴシック W7.ttc", 0),
+    "zh-Hans": ("/System/Library/Fonts/Hiragino Sans GB.ttc", 2),
+}
+SOURCE_LOCALE = "en-US"
 
 NAVY_TOP, NAVY_BOTTOM = (3, 7, 22), (7, 20, 60)
 GLOW = (28, 120, 255)
@@ -23,47 +36,61 @@ WHITE = (255, 255, 255)
 
 # Canvas, simulator scale, and device hardware (in screenshot pixels).
 DEVICES = {
-    "iphone": dict(size=(1320, 2868), scale=3, out="en-US/iphone",
+    "iphone": dict(size=(1320, 2868), scale=3,
                    corner=186, bezel=34, rim=7, island=(378, 111, 42)),
-    "ipad": dict(size=(2064, 2752), scale=2, out="en-US/ipad",
+    "ipad": dict(size=(2064, 2752), scale=2,
                  corner=50, bezel=62, rim=7, island=None),
 }
 
 SHOTS = {
     "iphone": [
-        dict(out="01-your-mac.png", headline="Your Mac, in your pocket.", layout="hero",
+        dict(out="01-your-mac.png", layout="hero",
              back="iphone-hosts.png", front="iphone-landscape.png"),
-        dict(out="02-hosts.png", headline="Every Mac, one tap away.", capture="iphone-hosts.png"),
-        dict(out="03-keyboard.png", headline="Type with real Mac keys.", capture="iphone-keyboard.png"),
-        dict(out="04-two-ways.png", headline="Two ways to connect.", capture="iphone-add-mac.png"),
-        dict(out="05-picture-in-picture.png", headline="Keep your Mac in view.", layout="pip",
+        dict(out="02-hosts.png", capture="iphone-hosts.png"),
+        dict(out="03-keyboard.png", capture="iphone-keyboard.png"),
+        dict(out="04-two-ways.png", capture="iphone-add-mac.png"),
+        dict(out="05-picture-in-picture.png", layout="pip",
              capture="iphone-home.png"),
-        dict(out="06-external-display.png", headline="Big screen. Full control.", layout="external",
+        dict(out="06-external-display.png", layout="external",
              capture="iphone-controller.png"),
-        dict(out="07-file-transfer.png", headline="Send files to your Mac.", capture="iphone-files.png"),
-        dict(out="08-curtain-mode.png", headline="Only you see your Mac.", layout="external",
+        dict(out="07-file-transfer.png", capture="iphone-files.png"),
+        dict(out="08-curtain-mode.png", layout="external",
              capture="iphone-landscape.png", display="mac-curtain.png", zoom=2.0, display_width=0.9),
     ],
     "ipad": [
-        dict(out="01-your-mac.png", headline="Your Mac, in your hands.", layout="hero",
+        dict(out="01-your-mac.png", layout="hero",
              back="ipad-hosts.png", front="ipad-landscape.png"),
-        dict(out="02-hosts.png", headline="Every Mac, one tap away.", capture="ipad-hosts.png"),
-        dict(out="03-keyboard.png", headline="Type with real Mac keys.", capture="ipad-keyboard.png"),
-        dict(out="04-two-ways.png", headline="Two ways to connect.", capture="ipad-add-mac.png"),
-        dict(out="05-picture-in-picture.png", headline="Keep your Mac in view.", capture="ipad-pip.png"),
-        dict(out="06-external-display.png", headline="Big screen. Full control.", layout="external",
+        dict(out="02-hosts.png", capture="ipad-hosts.png"),
+        dict(out="03-keyboard.png", capture="ipad-keyboard.png"),
+        dict(out="04-two-ways.png", capture="ipad-add-mac.png"),
+        dict(out="05-picture-in-picture.png", capture="ipad-pip.png"),
+        dict(out="06-external-display.png", layout="external",
              capture="ipad-controller.png"),
-        dict(out="07-file-transfer.png", headline="Send files to your Mac.", capture="ipad-files.png"),
-        dict(out="08-curtain-mode.png", headline="Only you see your Mac.", layout="external",
+        dict(out="07-file-transfer.png", capture="ipad-files.png"),
+        dict(out="08-curtain-mode.png", layout="external",
              capture="ipad-landscape.png", display="mac-curtain.png", zoom=1.6),
     ],
 }
 
 
-def font(path, size, weight):
-    f = ImageFont.truetype(path, size)
-    f.set_variation_by_name(weight)
+def headline_font(locale, size):
+    if locale in LOCALE_FONTS:
+        path, index = LOCALE_FONTS[locale]
+        return ImageFont.truetype(path, size, index=index)
+    f = ImageFont.truetype(SF, size)
+    f.set_variation_by_name("Bold")
     return f
+
+
+def load_copy():
+    with open(os.path.join(HERE, "copy.json"), encoding="utf-8") as file:
+        return json.load(file)
+
+
+def headline_text(copy, locale, device, shot):
+    """The headline for a shot, keyed in copy.json by its two-digit number."""
+    text = copy[locale][shot["out"][:2]]
+    return text[device] if isinstance(text, dict) else text
 
 
 def lerp(a, b, t):
@@ -213,25 +240,25 @@ def background(size):
     return column.resize(size)
 
 
-def headline(canvas, text):
+def headline(canvas, text, locale):
     """One centered line, as large as fits the margins. Returns its bottom edge."""
     width, height = canvas.size
     margin = round(width * 0.07)
     size = round(width * 0.105)
-    while font(SF, size, "Bold").getlength(text) > width - 2 * margin:
+    while headline_font(locale, size).getlength(text) > width - 2 * margin:
         size -= 2
-    chosen = font(SF, size, "Bold")
+    chosen = headline_font(locale, size)
     top = round(height * 0.062)
     draw = ImageDraw.Draw(canvas)
     draw.text((width / 2, top), text, font=chosen, fill=WHITE, anchor="ma")
     return top + chosen.getbbox(text)[3]
 
 
-def compose(device, shot):
+def compose(device, shot, locale, text):
     spec = DEVICES[device]
     width, height = spec["size"]
     canvas = background(spec["size"])
-    text_bottom = headline(canvas, shot["headline"])
+    text_bottom = headline(canvas, text, locale)
     top = text_bottom + round(height * 0.045)
     bottom = height - round(height * 0.04)
     available = bottom - top
@@ -272,22 +299,30 @@ def compose(device, shot):
         center_y = top + (available - device_height) * (0.5 if body.height > body.width else 0.42) + device_height / 2
         place(canvas, body, (width / 2, center_y), device_width)
 
-    out = os.path.join(HERE, spec["out"])
-    os.makedirs(out, exist_ok=True)
-    canvas.save(os.path.join(out, shot["out"]), optimize=True)
-    print("wrote", os.path.join(spec["out"], shot["out"]))
+    folder = os.path.join(locale, device)
+    if locale != SOURCE_LOCALE:
+        folder = os.path.join("build", folder)
+    os.makedirs(os.path.join(HERE, folder), exist_ok=True)
+    canvas.save(os.path.join(HERE, folder, shot["out"]), optimize=True)
+    print("wrote", os.path.join(folder, shot["out"]))
 
 
 def main():
-    wanted_device = sys.argv[1] if len(sys.argv) > 1 else None
-    wanted_shot = sys.argv[2] if len(sys.argv) > 2 else None
-    for device, shots in SHOTS.items():
-        if wanted_device and device != wanted_device:
-            continue
-        for shot in shots:
-            if wanted_shot and not shot["out"].startswith(wanted_shot):
+    copy = load_copy()
+    parser = argparse.ArgumentParser(description="Compose the App Store screenshots.")
+    parser.add_argument("device", nargs="?", choices=sorted(SHOTS), help="only this device")
+    parser.add_argument("shot", nargs="?", help="only the image whose file name starts with this, e.g. 02")
+    parser.add_argument("--locale", default=SOURCE_LOCALE, choices=sorted(copy) + ["all"],
+                        help="a locale from copy.json, or all (default: %(default)s)")
+    args = parser.parse_args()
+    for locale in sorted(copy) if args.locale == "all" else [args.locale]:
+        for device, shots in SHOTS.items():
+            if args.device and device != args.device:
                 continue
-            compose(device, shot)
+            for shot in shots:
+                if args.shot and not shot["out"].startswith(args.shot):
+                    continue
+                compose(device, shot, locale, headline_text(copy, locale, device, shot))
 
 
 if __name__ == "__main__":
