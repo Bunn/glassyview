@@ -36,9 +36,13 @@ SHOTS = {
         dict(out="02-hosts.png", headline="Every Mac, one tap away.", capture="iphone-hosts.png"),
         dict(out="03-keyboard.png", headline="Type with real Mac keys.", capture="iphone-keyboard.png"),
         dict(out="04-two-ways.png", headline="Two ways to connect.", capture="iphone-add-mac.png"),
-        dict(out="05-fast-connection.png", headline="Pair once. Connect fast.", capture="iphone-fast.png"),
+        dict(out="05-picture-in-picture.png", headline="Keep your Mac in view.", layout="pip",
+             capture="iphone-home.png"),
         dict(out="06-external-display.png", headline="Big screen. Full control.", layout="external",
              capture="iphone-controller.png"),
+        dict(out="07-file-transfer.png", headline="Send files to your Mac.", capture="iphone-files.png"),
+        dict(out="08-curtain-mode.png", headline="Only you see your Mac.", layout="external",
+             capture="iphone-landscape.png", display="mac-curtain.png", zoom=2.0, display_width=0.9),
     ],
     "ipad": [
         dict(out="01-your-mac.png", headline="Your Mac, in your hands.", layout="hero",
@@ -46,9 +50,12 @@ SHOTS = {
         dict(out="02-hosts.png", headline="Every Mac, one tap away.", capture="ipad-hosts.png"),
         dict(out="03-keyboard.png", headline="Type with real Mac keys.", capture="ipad-keyboard.png"),
         dict(out="04-two-ways.png", headline="Two ways to connect.", capture="ipad-add-mac.png"),
-        dict(out="05-fast-connection.png", headline="Pair once. Connect fast.", capture="ipad-fast.png"),
+        dict(out="05-picture-in-picture.png", headline="Keep your Mac in view.", capture="ipad-pip.png"),
         dict(out="06-external-display.png", headline="Big screen. Full control.", layout="external",
              capture="ipad-controller.png"),
+        dict(out="07-file-transfer.png", headline="Send files to your Mac.", capture="ipad-files.png"),
+        dict(out="08-curtain-mode.png", headline="Only you see your Mac.", layout="external",
+             capture="ipad-landscape.png", display="mac-curtain.png", zoom=1.6),
     ],
 }
 
@@ -74,9 +81,9 @@ def prepare(name, device):
     def blank(box):  # the free-session countdown, which subscribers never see
         draw.rectangle(tuple(round(v * scale) for v in box), fill=(0, 0, 0))
 
-    if name in ("iphone-keyboard.png", "iphone-controller.png"):
+    if name in ("iphone-keyboard.png", "iphone-controller.png", "iphone-files.png"):
         blank((14, 76, 112, 132))
-    if name in ("ipad-landscape.png", "ipad-keyboard.png", "ipad-controller.png"):
+    if name in ("ipad-landscape.png", "ipad-keyboard.png", "ipad-controller.png", "ipad-files.png"):
         blank((14, 14, 112, 70))
     if name == "iphone-landscape.png":
         # Here the countdown floats over the Mac, so put the desktop back.
@@ -88,6 +95,28 @@ def prepare(name, device):
         draw.rectangle((box[0], box[1], box[2] - 1, box[3] - 1), fill=(0, 0, 0))
         image.paste(desktop.crop((0, box[1], box[2] - left, box[3])), (left, box[1]))
     return image
+
+
+def with_pip(screen, device):
+    """Draw a Picture in Picture window showing the Mac over a Home Screen capture.
+
+    The iPhone simulator has no Picture in Picture, so this stands in for it. Proportions,
+    corner, and placement follow the real window in ipad-pip.png.
+    """
+    scale = DEVICES[device]["scale"]
+    desktop = Image.open(os.path.join(RAW, "mac-desktop.png")).convert("RGB")
+    width = round(300 * scale)
+    size = (width, round(width * desktop.height / desktop.width))
+    left = screen.width - size[0] - round(16 * scale)
+    top = round(756 * scale) - size[1]
+
+    shadow = Image.new("L", screen.size, 0)
+    ImageDraw.Draw(shadow).rounded_rectangle((left, top + 6 * scale, left + size[0], top + size[1] + 6 * scale),
+                                             22 * scale, fill=150)
+    shadow = shadow.filter(ImageFilter.GaussianBlur(14 * scale))
+    screen.paste(Image.new("RGB", screen.size, (0, 0, 0)), (0, 0), shadow)
+    screen.paste(desktop.resize(size, Image.LANCZOS), (left, top), rounded_mask(size, 22 * scale))
+    return screen
 
 
 # --- Device ---------------------------------------------------------------
@@ -125,15 +154,25 @@ def framed(screen, device):
     return body
 
 
-def monitor(width):
-    """An external display showing the Mac, which is where the session goes in controller mode."""
-    desktop = Image.open(os.path.join(RAW, "mac-desktop.png")).convert("RGB")
+def monitor(width, showing="mac-desktop.png", zoom=1.0):
+    """A display above the device: the Mac in controller mode, or the Mac's own curtained screen.
+
+    zoom > 1 crops to the centre of the image, so the curtain's small text stays legible.
+    """
+    desktop = Image.open(os.path.join(RAW, showing)).convert("RGB")
+    if zoom > 1:
+        inset_x = round(desktop.width * (1 - 1 / zoom) / 2)
+        inset_y = round(desktop.height * (1 - 1 / zoom) / 2)
+        desktop = desktop.crop((inset_x, inset_y, desktop.width - inset_x, desktop.height - inset_y))
     bezel = max(8, round(width * 0.012))
+    rim = max(2, bezel // 5)
     screen = desktop.resize((width - 2 * bezel, round((width - 2 * bezel) * desktop.height / desktop.width)),
                             Image.LANCZOS)
     size = (width, screen.height + 2 * bezel)
     body = Image.new("RGBA", size, (0, 0, 0, 0))
-    body.paste(Image.new("RGB", size, (16, 17, 22)), (0, 0), rounded_mask(size, bezel * 2))
+    body.paste(Image.new("RGB", size, (70, 76, 94)), (0, 0), rounded_mask(size, bezel * 2))
+    inner = (size[0] - 2 * rim, size[1] - 2 * rim)
+    body.paste(Image.new("RGB", inner, (16, 17, 22)), (rim, rim), rounded_mask(inner, bezel * 2 - rim))
     body.paste(screen, (bezel, bezel), rounded_mask(screen.size, bezel))
     return body
 
@@ -210,7 +249,8 @@ def compose(device, shot):
         # The Mac on a display above, the device below it as trackpad and keyboard.
         body = framed(prepare(shot["capture"], device), device)
         landscape = body.width > body.height
-        display = monitor(round(width * (0.8 if landscape else 0.88)))
+        display = monitor(round(width * shot.get("display_width", 0.8 if landscape else 0.88)),
+                          shot.get("display", "mac-desktop.png"), shot.get("zoom", 1.0))
         overlap = display.height * 0.12
         device_height = available - display.height + overlap
         device_width = min(width * 0.88, device_height * body.width / body.height)
@@ -220,7 +260,10 @@ def compose(device, shot):
         place(canvas, display, (width / 2, start + display.height / 2), display.width)
         place(canvas, body, (width / 2, start + display.height - overlap + device_height / 2), device_width)
     else:
-        body = framed(prepare(shot["capture"], device), device)
+        screen = prepare(shot["capture"], device)
+        if shot.get("layout") == "pip":
+            screen = with_pip(screen, device)
+        body = framed(screen, device)
         fit = min(width * 0.9 / body.width, available / body.height)
         if body.width > body.height:  # landscape device on a portrait page
             fit = width * 0.93 / body.width
