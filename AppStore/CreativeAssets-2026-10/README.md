@@ -7,7 +7,7 @@ The product page header and the search results image for Glassy Desk, in the sam
 | `en-US/header.png` | 3840 × 1646 | Product page header |
 | `en-US/search-results.png` | 3840 × 2560 | Search results asset |
 
-Not uploaded to App Store Connect yet.
+Uploaded to the Asset Library on 13 October 2026 and assigned to the header and search results slots of version 3.1 in all seven locales: the same header everywhere, and each locale's own search results image. They have not been submitted for review.
 
 ## Design
 
@@ -34,3 +34,15 @@ python3 creative.py --locale all     # every locale in copy.json
 en-US is written to `en-US/` and committed. Every other locale is written to `build/<locale>/`, which git ignores.
 
 Sizes and formats come from `asc asset-library specs`: the header must be exactly 3840 × 1646, the search results image 3:2 between 1920 and 3840 wide, both PNG without transparency.
+
+## Uploading
+
+Upload an image to the Asset Library, then assign it to a slot on a version localization. Localization IDs come from `asc localizations list --app 6787767486 --version 3.1`; the image ID is in the upload's output.
+
+```sh
+asc asset-library images upload --library-id 6787767486 --file en-US/header.png
+asc localizations placements create --localization-id LOCALIZATION_ID --image-id IMAGE_ID --placement-type PRODUCT_PAGE_HEADER_ASSET
+asc localizations placements create --localization-id LOCALIZATION_ID --image-id IMAGE_ID --placement-type APP_STORE_SEARCH_RESULTS_ASSET
+```
+
+A slot holds one asset. To replace one, use `asc localizations placements swap` with the old placement's ID. The library lists files by name, so the localized search images were uploaded as `search-results-<locale>.png`.
