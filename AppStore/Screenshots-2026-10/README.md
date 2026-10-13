@@ -13,7 +13,7 @@ Eight App Store screenshots each for iPhone (`APP_IPHONE_67`, 1320 × 2868) and 
 | 07 | Send files to your Mac. | Live session with the file transfer panel |
 | 08 | Only you see your Mac. | Curtain Mode: the Mac's own screen shielded above, the live session on the device |
 
-Not uploaded to App Store Connect yet.
+Uploaded to App Store Connect on 13 October 2026 for version 3.1, en-US only, replacing the previous five-image iPhone and iPad sets. The other six locales have no screenshots of their own.
 
 ## How they were made
 
