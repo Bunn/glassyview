@@ -8,6 +8,8 @@ struct MyMacsEntry: TimelineEntry {
         case ready
         case noSavedMacs
         case unavailable
+        /// The saved Macs exist but can't be read until the device is unlocked.
+        case locked
     }
 
     let date: Date
@@ -63,9 +65,10 @@ nonisolated struct MyMacsProvider: AppIntentTimelineProvider {
         in context: Context
     ) async -> Timeline<MyMacsEntry> {
         let date = Date.now
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: date)
-            ?? date.addingTimeInterval(900)
         let entry = entry(for: configuration, family: context.family, date: date)
+        let minutes = entry.state == .locked ? 5 : 15
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: minutes, to: date)
+            ?? date.addingTimeInterval(TimeInterval(minutes * 60))
         return Timeline(entries: [entry], policy: .after(nextUpdate))
     }
 
@@ -74,7 +77,15 @@ nonisolated struct MyMacsProvider: AppIntentTimelineProvider {
         family: WidgetFamily,
         date: Date
     ) -> MyMacsEntry {
-        let allMachines = WidgetSnapshotStore.appGroup().read()?.machines ?? []
+        let allMachines: [WidgetMachineSnapshot]
+        switch WidgetSnapshotStore.appGroup().load() {
+        case .snapshot(let snapshot):
+            allMachines = snapshot.machines
+        case .missing:
+            allMachines = []
+        case .unreadable:
+            return MyMacsEntry(date: date, machines: [], state: .locked)
+        }
         guard !allMachines.isEmpty else {
             return MyMacsEntry(date: date, machines: [], state: .noSavedMacs)
         }
@@ -120,7 +131,7 @@ private struct MyMacsWidgetView: View {
 
     var body: some View {
         Group {
-            if redactionReasons.contains(.privacy), !entry.machines.isEmpty {
+            if entry.state == .locked || (redactionReasons.contains(.privacy) && !entry.machines.isEmpty) {
                 privacyView
                     .widgetURL(GlassyDeskWidgetDeepLink.hosts.url)
                     .unredacted()

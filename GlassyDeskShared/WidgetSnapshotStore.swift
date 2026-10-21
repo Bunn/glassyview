@@ -5,6 +5,15 @@ enum WidgetSnapshotStoreError: Error, Equatable {
     case snapshotTooLarge
 }
 
+/// What a widget found when it looked for the snapshot.
+enum WidgetSnapshotReadResult: Equatable, Sendable {
+    case snapshot(GlassyDeskWidgetSnapshot)
+    /// No usable snapshot: the app hasn't written one, or it is corrupt or from another schema.
+    case missing
+    /// A snapshot exists but can't be opened right now, for example before the first unlock after a restart.
+    case unreadable
+}
+
 struct WidgetSnapshotStore: Sendable {
     static let fileName = "widget-snapshot.json"
     static let maximumFileSize = 256 * 1_024
@@ -22,14 +31,26 @@ struct WidgetSnapshotStore: Sendable {
     }
 
     func read() -> GlassyDeskWidgetSnapshot? {
-        guard let fileURL else { return nil }
-        guard let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe),
-              data.count <= Self.maximumFileSize,
+        if case .snapshot(let snapshot) = load() { return snapshot }
+        return nil
+    }
+
+    func load() -> WidgetSnapshotReadResult {
+        guard let fileURL else { return .unreadable }
+        let data: Data
+        do {
+            data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            return .missing
+        } catch {
+            return .unreadable
+        }
+        guard data.count <= Self.maximumFileSize,
               let snapshot = try? Self.decoder.decode(GlassyDeskWidgetSnapshot.self, from: data),
               snapshot.schemaVersion == GlassyDeskWidgetSnapshot.currentSchemaVersion else {
-            return nil
+            return .missing
         }
-        return snapshot
+        return .snapshot(snapshot)
     }
 
     func write(_ snapshot: GlassyDeskWidgetSnapshot) throws {
@@ -46,7 +67,9 @@ struct WidgetSnapshotStore: Sendable {
             at: directoryURL,
             withIntermediateDirectories: true
         )
-        try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUnlessOpen])
+        // Widgets refresh while the device is locked. With a "complete" protection class they
+        // can't open the file then, and showed "No saved Macs" until the app was opened again.
+        try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 
     private var fileURL: URL? {

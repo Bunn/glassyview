@@ -7,6 +7,8 @@ struct QuickConnectEntry: TimelineEntry {
         case ready
         case noSavedMacs
         case unavailable
+        /// The saved Macs exist but can't be read until the device is unlocked.
+        case locked
     }
 
     let date: Date
@@ -44,16 +46,26 @@ nonisolated struct QuickConnectProvider: AppIntentTimelineProvider {
         in context: Context
     ) async -> Timeline<QuickConnectEntry> {
         let date = Date.now
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: date)
-            ?? date.addingTimeInterval(900)
-        return Timeline(entries: [entry(for: configuration, date: date)], policy: .after(nextUpdate))
+        let entry = entry(for: configuration, date: date)
+        let minutes = entry.state == .locked ? 5 : 15
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: minutes, to: date)
+            ?? date.addingTimeInterval(TimeInterval(minutes * 60))
+        return Timeline(entries: [entry], policy: .after(nextUpdate))
     }
 
     private func entry(
         for configuration: QuickConnectConfigurationIntent,
         date: Date
     ) -> QuickConnectEntry {
-        let machines = WidgetSnapshotStore.appGroup().read()?.machines ?? []
+        let machines: [WidgetMachineSnapshot]
+        switch WidgetSnapshotStore.appGroup().load() {
+        case .snapshot(let snapshot):
+            machines = snapshot.machines
+        case .missing:
+            machines = []
+        case .unreadable:
+            return QuickConnectEntry(date: date, machine: nil, state: .locked)
+        }
         guard !machines.isEmpty else {
             return QuickConnectEntry(date: date, machine: nil, state: .noSavedMacs)
         }
@@ -293,25 +305,35 @@ private struct QuickConnectWidgetView: View {
     }
 
     private var emptyTitle: String {
-        entry.state == .unavailable
-            ? String(localized: "Mac unavailable")
-            : String(localized: "No saved Macs")
+        switch entry.state {
+        case .unavailable: String(localized: "Mac unavailable")
+        case .locked: String(localized: "Mac hidden")
+        case .ready, .noSavedMacs: String(localized: "No saved Macs")
+        }
     }
 
     private var emptyMessage: String {
-        entry.state == .unavailable
-            ? String(localized: "Touch and hold to choose another Mac.")
-            : String(localized: "Open Glassy Desk to add one.")
+        switch entry.state {
+        case .unavailable: String(localized: "Touch and hold to choose another Mac.")
+        case .locked: String(localized: "Unlock to view your Mac.")
+        case .ready, .noSavedMacs: String(localized: "Open Glassy Desk to add one.")
+        }
     }
 
     private var emptyStatusTitle: String {
-        entry.state == .unavailable
-            ? String(localized: "Choose another")
-            : String(localized: "Setup needed")
+        switch entry.state {
+        case .unavailable: String(localized: "Choose another")
+        case .locked: String(localized: "Locked")
+        case .ready, .noSavedMacs: String(localized: "Setup needed")
+        }
     }
 
     private var emptyStatusSymbol: String {
-        entry.state == .unavailable ? "exclamationmark.circle.fill" : "plus.circle.fill"
+        switch entry.state {
+        case .unavailable: "exclamationmark.circle.fill"
+        case .locked: "lock.fill"
+        case .ready, .noSavedMacs: "plus.circle.fill"
+        }
     }
 }
 

@@ -19,6 +19,15 @@ final class SwiftDataSavedMachineRepository: SavedMachineRepository, @unchecked 
     }
 
     func loadMachines() -> [SavedMachine] {
+        do {
+            return try fetchMachines()
+        } catch {
+            AppLog.storage.error("Failed to fetch saved machines from SwiftData: \(error.localizedDescription, privacy: .public)")
+            return []
+        }
+    }
+
+    func fetchMachines() throws -> [SavedMachine] {
         performLegacyMigrationIfNeeded()
 
         let context = ModelContext(modelContainer)
@@ -30,14 +39,9 @@ final class SwiftDataSavedMachineRepository: SavedMachineRepository, @unchecked 
             ]
         )
 
-        do {
-            let records = try context.fetch(descriptor)
-            AppLog.storage.info("Loaded \(records.count, privacy: .public) saved machines from SwiftData")
-            return records.map(\.savedMachine)
-        } catch {
-            AppLog.storage.error("Failed to fetch saved machines from SwiftData: \(error.localizedDescription, privacy: .public)")
-            return []
-        }
+        let records = try context.fetch(descriptor)
+        AppLog.storage.info("Loaded \(records.count, privacy: .public) saved machines from SwiftData")
+        return records.map(\.savedMachine)
     }
 
     func addMachine(_ machine: SavedMachine) {

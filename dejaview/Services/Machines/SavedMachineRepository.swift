@@ -3,6 +3,8 @@ import Security
 
 protocol SavedMachineRepository {
     func loadMachines() -> [SavedMachine]
+    /// Like `loadMachines()`, but throws when the store can't be read instead of returning an empty list.
+    func fetchMachines() throws -> [SavedMachine]
     func addMachine(_ machine: SavedMachine)
     func updateMachine(_ machine: SavedMachine)
     func deleteMachine(withID id: UUID)
@@ -20,6 +22,12 @@ protocol SavedMachineRepository {
     func deletePassword(for id: UUID)
     func sessionPreferences(for id: UUID) -> SessionPreferences
     func setSessionPreferences(_ preferences: SessionPreferences, for id: UUID)
+}
+
+extension SavedMachineRepository {
+    func fetchMachines() throws -> [SavedMachine] {
+        loadMachines()
+    }
 }
 
 struct UserDefaultsSavedMachineRepository: SavedMachineRepository {

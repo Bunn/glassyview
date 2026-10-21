@@ -4,6 +4,8 @@ import Foundation
 protocol MachineStoring: AnyObject {
     var machines: [SavedMachine] { get }
     var recentConnections: [ConnectionHistoryEntry] { get }
+    /// False until saved machines have been read successfully, so an empty list can be told apart from a failed read.
+    var hasLoadedMachines: Bool { get }
 
     func reload()
     func add(_ machine: SavedMachine, password: String)

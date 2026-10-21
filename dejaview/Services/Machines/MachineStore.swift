@@ -14,6 +14,7 @@ final class MachineStore: MachineStoring {
 
     private(set) var machines: [SavedMachine] = []
     private(set) var recentConnections: [ConnectionHistoryEntry] = []
+    private(set) var hasLoadedMachines = false
 
     @ObservationIgnored private let repository: SavedMachineRepository
     @ObservationIgnored private let widgetSnapshotPublisher: any WidgetSnapshotPublishing
@@ -32,10 +33,18 @@ final class MachineStore: MachineStoring {
     }
 
     func reload() {
-        let loadedMachines = repository.loadMachines()
         let loadedRecentConnections = repository.loadRecentConnections(limit: recentConnectionLimit)
-        machines = loadedMachines
         recentConnections = loadedRecentConnections
+        let loadedMachines: [SavedMachine]
+        do {
+            loadedMachines = try repository.fetchMachines()
+        } catch {
+            // Keep the machines already shown, and don't tell the widgets there are none.
+            AppLog.storage.error("Failed to reload saved machines; keeping \(self.machines.count, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        machines = loadedMachines
+        hasLoadedMachines = true
         widgetSnapshotPublisher.publish(machines: loadedMachines)
 
         let recentIDs = loadedRecentConnections.isEmpty

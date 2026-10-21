@@ -92,6 +92,50 @@ struct GlassyDeskWidgetSnapshotTests {
     }
 
     @Test
+    func fileStoreTellsMissingApartFromUnreadable() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = WidgetSnapshotStore(directoryURL: directory)
+        #expect(store.load() == .missing)
+
+        let snapshot = GlassyDeskWidgetSnapshotBuilder().build(
+            machines: [input(id: firstID, name: "Mac", order: 0)],
+            generatedAt: now
+        )
+        try store.write(snapshot)
+        #expect(store.load() == .snapshot(snapshot))
+
+        // A file that exists but can't be opened, as when data protection keeps it locked.
+        let fileURL = directory.appendingPathComponent(WidgetSnapshotStore.fileName)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: fileURL.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: fileURL.path) }
+        #expect(store.load() == .unreadable)
+        #expect(store.read() == nil)
+        #expect(WidgetSnapshotStore(directoryURL: nil).load() == .unreadable)
+    }
+
+    @Test @MainActor
+    func failedMachineLoadDoesNotPublishAnEmptyList() {
+        let repository = FlakySavedMachineRepository()
+        let publisher = SpyWidgetSnapshotPublisher()
+        repository.fails = true
+
+        let machineStore = MachineStore(repository: repository, widgetSnapshotPublisher: publisher)
+        #expect(!machineStore.hasLoadedMachines)
+        #expect(publisher.publishedMachineCounts.isEmpty)
+
+        repository.fails = false
+        machineStore.reload()
+        #expect(machineStore.hasLoadedMachines)
+        #expect(publisher.publishedMachineCounts == [1])
+
+        repository.fails = true
+        machineStore.reload()
+        #expect(machineStore.machines.count == 1)
+        #expect(publisher.publishedMachineCounts == [1])
+    }
+
+    @Test
     func fileStoreRejectsUnknownSchemaVersions() throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -235,4 +279,47 @@ private final class SpyWidgetTimelineReloader: WidgetTimelineReloading {
     func reloadWidgetTimelines() {
         reloadCount += 1
     }
+}
+
+@MainActor
+private final class SpyWidgetSnapshotPublisher: WidgetSnapshotPublishing {
+    private(set) var publishedMachineCounts: [Int] = []
+
+    func publish(machines: [SavedMachine]) {
+        publishedMachineCounts.append(machines.count)
+    }
+
+    func publish(
+        machines: [SavedMachine],
+        reachabilityStatuses: [UUID: MachineReachabilityStatus],
+        checkedAt: Date
+    ) {
+        publishedMachineCounts.append(machines.count)
+    }
+}
+
+private struct SavedMachineLoadError: Error {}
+
+private final class FlakySavedMachineRepository: SavedMachineRepository {
+    var fails = false
+    private let machines = [SavedMachine(name: "Studio Mac", host: "studio.local", username: "")]
+
+    func loadMachines() -> [SavedMachine] { (try? fetchMachines()) ?? [] }
+    func fetchMachines() throws -> [SavedMachine] {
+        if fails { throw SavedMachineLoadError() }
+        return machines
+    }
+    func addMachine(_ machine: SavedMachine) {}
+    func updateMachine(_ machine: SavedMachine) {}
+    func deleteMachine(withID id: UUID) {}
+    func loadRecentConnections(limit: Int) -> [ConnectionHistoryEntry] { [] }
+    func startSession(withID id: UUID, to machine: SavedMachine, connectedAt: Date) {}
+    func finishSession(withID id: UUID, endedAt: Date, outcome: ConnectionHistoryOutcome) {}
+    func deleteRecentConnection(withID id: UUID) {}
+    func clearRecentConnections() {}
+    func password(for id: UUID) -> String? { nil }
+    func setPassword(_ password: String, for id: UUID) {}
+    func deletePassword(for id: UUID) {}
+    func sessionPreferences(for id: UUID) -> SessionPreferences { .default }
+    func setSessionPreferences(_ preferences: SessionPreferences, for id: UUID) {}
 }

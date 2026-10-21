@@ -1471,11 +1471,13 @@ struct ContentView<Session: RemoteSessionControlling,
             AppLog.reachability.info("Skipping saved machine reachability refresh because there are no saved machines")
             machineReachabilityStatuses.removeAll()
             machineReachabilityEndpoints.removeAll()
-            widgetSnapshotPublisher.publish(
-                machines: [],
-                reachabilityStatuses: [:],
-                checkedAt: .now
-            )
+            if store.hasLoadedMachines {
+                widgetSnapshotPublisher.publish(
+                    machines: [],
+                    reachabilityStatuses: [:],
+                    checkedAt: .now
+                )
+            }
             return
         }
 
