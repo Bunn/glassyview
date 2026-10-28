@@ -76,7 +76,7 @@ struct SubscriptionManagementView: View {
                 Text(subscriptionStore.errorMessage)
             }
             .sheet(isPresented: $isPaywallPresented) {
-                RevenueCatPaywallSheet()
+                ProPaywallSheet()
             }
             .sheet(isPresented: $isCustomerCenterPresented) {
                 RevenueCatCustomerCenterSheet()

@@ -37,6 +37,9 @@ struct DejaViewApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                #if DEBUG
+                .modifier(PaywallLaunchPreview())
+                #endif
                 .background(AppLockCoverInstaller())
                 .environment(subscriptionStore)
                 .environment(\.analyticsTracker, analytics)

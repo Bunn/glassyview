@@ -9,6 +9,8 @@ protocol SubscriptionClient {
     func offerings() async throws -> Offerings
     func purchase(_ package: Package) async throws -> SubscriptionPurchaseResult
     func restorePurchases() async throws -> CustomerInfo
+    /// Whether the customer can redeem each package's introductory offer, keyed by product identifier.
+    func introOfferEligibility(for packages: [Package]) async -> [String: Bool]
 }
 
 struct SubscriptionPurchaseResult {
@@ -42,5 +44,12 @@ struct RevenueCatSubscriptionClient: SubscriptionClient {
 
     func restorePurchases() async throws -> CustomerInfo {
         try await Purchases.shared.restorePurchases()
+    }
+
+    func introOfferEligibility(for packages: [Package]) async -> [String: Bool] {
+        let eligibility = await Purchases.shared.checkTrialOrIntroDiscountEligibility(packages: packages)
+        return Dictionary(eligibility.map { package, eligibility in
+            (package.storeProduct.productIdentifier, eligibility.status == .eligible)
+        }, uniquingKeysWith: { first, _ in first })
     }
 }

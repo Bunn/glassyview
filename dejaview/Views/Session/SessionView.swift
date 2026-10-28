@@ -136,7 +136,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
         .sheet(isPresented: $isSessionPaywallPresented,
                onDismiss: handleSessionPaywallDismissed) {
-            RevenueCatPaywallSheet(
+            ProPaywallSheet(
                 source: sessionPaywallSource,
                 onProAccessGranted: handleSessionProAccessGranted
             )
@@ -754,7 +754,7 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         freeSession.clearLimits()
         opensPaywallAfterFreeSessionInfoDismissal = false
         isFreeSessionTimerInfoPresented = false
-        isSessionPaywallPresented = false
+        // The paywall closes itself after celebrating; the session reconnects behind it.
         if needsReconnect {
             shouldRetryAfterDisconnect = true
             retrySessionIfNeeded()

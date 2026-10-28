@@ -167,12 +167,7 @@ struct SettingsView: View {
             Text(subscriptionStore.restoreResultMessage)
         }
         .sheet(isPresented: $isPaywallPresented) {
-            RevenueCatPaywallSheet()
-        }
-        .onChange(of: subscriptionStore.hasProAccess) { _, hasProAccess in
-            if hasProAccess {
-                isPaywallPresented = false
-            }
+            ProPaywallSheet()
         }
         .onChange(of: startsPictureInPictureAutomatically) { _, startsAutomatically in
             RemotePictureInPictureCoordinator.shared.setStartsAutomatically(startsAutomatically)

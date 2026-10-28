@@ -10,6 +10,8 @@ final class SubscriptionStore {
     private(set) var customerInfo: CustomerInfo?
     private(set) var offerings: Offerings?
     private(set) var currentOffering: Offering?
+    /// Product identifiers whose introductory offer this customer can redeem.
+    private(set) var introOfferEligibleProductIDs: Set<String> = []
     private(set) var isRefreshing = false
     private(set) var isPurchasing = false
     private(set) var isRestoring = false
@@ -66,6 +68,12 @@ final class SubscriptionStore {
         _ = await (customerUpdate, productUpdate)
     }
 
+    /// Fetches products again even while a wider refresh is still waiting on the network.
+    func reloadOfferings() async {
+        guard isConfigured else { return }
+        await refreshOfferings()
+    }
+
     func applyCachedCustomerInfo() {
         guard client.isConfigured, customerInfo == nil,
               let cachedCustomerInfo = client.cachedCustomerInfo else { return }
@@ -85,6 +93,7 @@ final class SubscriptionStore {
     private func refreshOfferings() async {
         do {
             apply(try await client.offerings())
+            await refreshIntroOfferEligibility()
         } catch is CancellationError {
             return
         } catch {
@@ -103,35 +112,58 @@ final class SubscriptionStore {
 
     func purchase(_ package: Package) async {
         guard isConfigured else { return }
+        if case .failed(let error) = await purchaseOutcome(for: package) {
+            present(error)
+        }
+    }
+
+    /// Purchases without presenting errors, so a paywall can report them in place.
+    func purchaseOutcome(for package: Package) async -> SubscriptionPurchaseOutcome {
+        guard client.isConfigured else { return .failed(ErrorCode.configurationError as NSError) }
 
         isPurchasing = true
         defer { isPurchasing = false }
 
         do {
             let result = try await client.purchase(package)
-            guard !result.userCancelled else { return }
+            guard !result.userCancelled else { return .cancelled }
 
             apply(result.customerInfo)
+            return .purchased
+        } catch where ErrorCode(rawValue: (error as NSError).code) == .purchaseCancelledError {
+            return .cancelled
         } catch {
-            present(error)
+            AppLog.subscriptions.error("RevenueCat purchase failed: \(error.localizedDescription, privacy: .public)")
+            return .failed(error as NSError)
         }
     }
 
     func restorePurchases() async {
         guard isConfigured else { return }
+        switch await restoreOutcome() {
+        case .restored, .nothingToRestore:
+            restoreResultMessage = hasProAccess
+                ? String(localized: "Your Glassy Desk Pro access has been restored.")
+                : String(localized: "No active Glassy Desk Pro purchase was found. Check that you’re using the Apple Account used for your purchase.")
+            isRestoreResultPresented = true
+        case .failed(let error):
+            present(error)
+        }
+    }
+
+    /// Restores without presenting the result, so a paywall can report it in place.
+    func restoreOutcome() async -> SubscriptionRestoreOutcome {
+        guard client.isConfigured else { return .failed(ErrorCode.configurationError as NSError) }
 
         isRestoring = true
         defer { isRestoring = false }
 
         do {
-            let customerInfo = try await client.restorePurchases()
-            apply(customerInfo)
-            restoreResultMessage = hasProAccess
-                ? String(localized: "Your Glassy Desk Pro access has been restored.")
-                : String(localized: "No active Glassy Desk Pro purchase was found. Check that you’re using the Apple Account used for your purchase.")
-            isRestoreResultPresented = true
+            apply(try await client.restorePurchases())
+            return hasProAccess ? .restored : .nothingToRestore
         } catch {
-            present(error)
+            AppLog.subscriptions.error("RevenueCat restore failed: \(error.localizedDescription, privacy: .public)")
+            return .failed(error as NSError)
         }
     }
 
@@ -165,6 +197,21 @@ final class SubscriptionStore {
         AppLog.subscriptions.info("Updated RevenueCat offerings; hasCurrent=\((offerings.current != nil), privacy: .public)")
     }
 
+    private func refreshIntroOfferEligibility() async {
+        let packages = currentOffering?.availablePackages.filter {
+            $0.storeProduct.introductoryDiscount != nil
+        } ?? []
+        guard !packages.isEmpty else {
+            introOfferEligibleProductIDs = []
+            return
+        }
+
+        let eligibility = await client.introOfferEligibility(for: packages)
+        introOfferEligibleProductIDs = Set(eligibility.compactMap { productID, isEligible in
+            isEligible ? productID : nil
+        })
+    }
+
     private func present(_ error: Error) {
         AppLog.subscriptions.error("RevenueCat operation failed: \(error.localizedDescription, privacy: .public)")
         present(message: error.localizedDescription)
@@ -174,4 +221,16 @@ final class SubscriptionStore {
         errorMessage = message
         isErrorPresented = true
     }
+}
+
+enum SubscriptionPurchaseOutcome {
+    case purchased
+    case cancelled
+    case failed(NSError)
+}
+
+enum SubscriptionRestoreOutcome {
+    case restored
+    case nothingToRestore
+    case failed(NSError)
 }

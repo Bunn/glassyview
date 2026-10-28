@@ -31,16 +31,11 @@ struct AppIconPickerView: View {
         .navigationTitle("App Icon")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $isPaywallPresented) {
-            RevenueCatPaywallSheet()
+            ProPaywallSheet()
         }
         .alert("App Icon", isPresented: $isErrorPresented) {
         } message: {
             Text("The app icon couldn’t be changed. Try again.")
-        }
-        .onChange(of: subscriptionStore.hasProAccess) { _, hasProAccess in
-            if hasProAccess {
-                isPaywallPresented = false
-            }
         }
     }
 

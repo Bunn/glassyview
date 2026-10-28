@@ -44,6 +44,7 @@ private final class SubscriptionClientStub: SubscriptionClient {
 
     func purchase(_ package: Package) async throws -> SubscriptionPurchaseResult { throw Failure.offline }
     func restorePurchases() async throws -> CustomerInfo { try await customerInfo() }
+    func introOfferEligibility(for packages: [Package]) async -> [String: Bool] { [:] }
 }
 
 @MainActor
