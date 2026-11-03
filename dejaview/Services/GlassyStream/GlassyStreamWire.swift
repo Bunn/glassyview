@@ -33,6 +33,8 @@ enum GlassyStreamWire {
         static let fileTransfer = Capabilities(rawValue: 1 << 8)
         /// Messages 0x25 and 0x26.
         static let curtainMode = Capabilities(rawValue: 1 << 9)
+        /// Messages 0x27 and 0x28.
+        static let clipboardCopy = Capabilities(rawValue: 1 << 10)
     }
 
     enum MessageKind: UInt8, Sendable {
@@ -57,6 +59,8 @@ enum GlassyStreamWire {
         case clipboardPaste = 0x24
         case curtainRequest = 0x25
         case curtainStatus = 0x26
+        case clipboardCopyRequest = 0x27
+        case clipboardCopy = 0x28
         case fileTransferOffer = 0x30
         case fileTransferChunk = 0x31
         case fileTransferAcknowledge = 0x32
@@ -404,6 +408,30 @@ enum GlassyStreamWire {
             throw violation("invalid curtain status")
         }
         return GlassyStreamCurtainStatus(state: state, blocksLocalInput: bytes[1] & 1 != 0)
+    }
+
+    static func encodeClipboardCopyRequest(_ request: GlassyStreamClipboardCopyRequest) -> Data {
+        Data([request.rawValue, 0, 0, 0])
+    }
+
+    static func decodeClipboardCopy(_ data: Data) throws -> GlassyStreamClipboardCopy {
+        let bytes = [UInt8](data.prefix(4))
+        guard bytes.count == 4, let outcome = GlassyStreamClipboardCopy.Outcome(rawValue: bytes[0]),
+              bytes[1] & ~1 == 0, bytes[2] == 0, bytes[3] == 0 else {
+            throw violation("invalid clipboard copy")
+        }
+        let body = data.dropFirst(4)
+        var text: String?
+        if outcome == .text {
+            guard (1...maximumClipboardTextLength).contains(body.count),
+                  let decoded = String(data: body, encoding: .utf8) else {
+                throw violation("clipboard copy text must be 1...1048576 UTF-8 bytes")
+            }
+            text = decoded
+        } else if !body.isEmpty {
+            throw violation("clipboard copy carries unexpected text")
+        }
+        return GlassyStreamClipboardCopy(outcome: outcome, isAutomatic: bytes[1] & 1 != 0, text: text)
     }
 
     static func encodeKeyFrameRequest() -> Data {

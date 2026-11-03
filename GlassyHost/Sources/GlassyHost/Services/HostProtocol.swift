@@ -56,6 +56,8 @@ enum HostProtocol {
         static let fileTransfer = Capabilities(rawValue: 1 << 8)
         /// Messages 0x25 and 0x26.
         static let curtainMode = Capabilities(rawValue: 1 << 9)
+        /// Messages 0x27 and 0x28.
+        static let clipboardCopy = Capabilities(rawValue: 1 << 10)
     }
 
     static let advertisedCapabilities: Capabilities = [
@@ -67,7 +69,8 @@ enum HostProtocol {
         .clipboardPaste,
         .adaptiveStream,
         .fileTransfer,
-        .curtainMode
+        .curtainMode,
+        .clipboardCopy
     ]
 
     static func advertisedCapabilities(pairingPasswordEnabled: Bool) -> Capabilities {
@@ -102,6 +105,10 @@ enum HostProtocol {
         case curtainRequest = 0x25
         /// Host → client. Sent only to clients that sent a curtain request.
         case curtainStatus = 0x26
+        /// Client → host. Follows the Mac's clipboard or asks for it once.
+        case clipboardCopyRequest = 0x27
+        /// Host → client. Sent only to clients that sent a copy request.
+        case clipboardCopy = 0x28
 
         case fileTransferOffer = 0x30
         case fileTransferChunk = 0x31
@@ -218,6 +225,47 @@ enum HostProtocol {
     /// Four bytes: UInt8 0 (off) or 1 (on), then three reserved zero bytes.
     static func encodeCurtainRequest(enabled: Bool) -> Data {
         Data([enabled ? 1 : 0, 0, 0, 0])
+    }
+
+    enum ClipboardCopyRequest: UInt8, CaseIterable, Sendable {
+        case stopFollowing = 0
+        case follow = 1
+        case sendNow = 2
+    }
+
+    /// What a clipboard copy message carries. Only `.text` has a payload.
+    enum ClipboardCopyOutcome: UInt8, CaseIterable, Sendable {
+        case text = 0
+        case empty = 1
+        case files = 2
+        case tooLarge = 3
+        case concealed = 4
+        case notAllowed = 5
+        case blockedByMac = 6
+        case unsupported = 7
+    }
+
+    struct ClipboardCopy: Equatable, Sendable {
+        let outcome: ClipboardCopyOutcome
+        let isAutomatic: Bool
+        var text: String?
+    }
+
+    static func encodeClipboardCopyRequest(_ request: ClipboardCopyRequest) -> Data {
+        Data([request.rawValue, 0, 0, 0])
+    }
+
+    static func decodeClipboardCopyRequest(_ data: Data) throws -> ClipboardCopyRequest {
+        let bytes = [UInt8](data)
+        guard bytes.count == 4, let request = ClipboardCopyRequest(rawValue: bytes[0]),
+              Array(bytes[1...]) == [0, 0, 0] else {
+            throw ProtocolError.malformedPayload("invalid clipboard copy request")
+        }
+        return request
+    }
+
+    static func encodeClipboardCopy(_ copy: ClipboardCopy) -> Data {
+        Data([copy.outcome.rawValue, copy.isAutomatic ? 1 : 0, 0, 0]) + Data((copy.text ?? "").utf8)
     }
 
     static func decodeCurtainRequest(_ data: Data) throws -> Bool {

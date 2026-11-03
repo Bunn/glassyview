@@ -32,6 +32,8 @@ final class HostServer: @unchecked Sendable {
     /// Connection identifier, requested state, and whether that connection
     /// currently owns input.
     typealias CurtainRequestHandler = @Sendable (UUID, Bool, Bool) -> Void
+    /// Client, request, and whether that client controls this Mac.
+    typealias ClipboardCopyRequestHandler = @Sendable (UUID, HostProtocol.ClipboardCopyRequest, Bool) -> Void
 
     struct PairingCode: Equatable, Sendable {
         let value: String
@@ -198,6 +200,16 @@ final class HostServer: @unchecked Sendable {
     /// acknowledgements and results move ahead of pending media.
     func sendFileTransfer(_ message: FileTransferWire.Message, to clientID: UUID) {
         core.sendFileTransfer(message, to: clientID)
+    }
+
+    func setClipboardCopyRequestHandler(_ handler: ClipboardCopyRequestHandler?) {
+        core.setClipboardCopyRequestHandler(handler)
+    }
+
+    /// Queues the Mac's clipboard for the connection that controls this Mac.
+    /// Older clients never ask, so they never receive this message.
+    func sendClipboardCopy(_ copy: HostProtocol.ClipboardCopy, to clientID: UUID) {
+        core.sendClipboardCopy(copy, to: clientID)
     }
 
     func setAdaptiveResolutionHandler(_ handler: AdaptiveBitRateHandler?) {
@@ -367,6 +379,7 @@ private extension HostServer {
         private var fileTransferHandler: FileTransferHandler?
         private var clientEndedHandler: ClientEndedHandler?
         private var curtainRequestHandler: CurtainRequestHandler?
+        private var clipboardCopyRequestHandler: ClipboardCopyRequestHandler?
         private var curtainStatus = HostProtocol.CurtainStatus.off
         private var mediaMaintenanceWorkItem: DispatchWorkItem?
         private var streamState: HostProtocol.StreamState = .stopped
@@ -530,6 +543,20 @@ private extension HostServer {
 
         func setCurtainRequestHandler(_ handler: CurtainRequestHandler?) {
             queue.async { [weak self] in self?.curtainRequestHandler = handler }
+        }
+
+        func setClipboardCopyRequestHandler(_ handler: ClipboardCopyRequestHandler?) {
+            queue.async { [weak self] in self?.clipboardCopyRequestHandler = handler }
+        }
+
+        func sendClipboardCopy(_ copy: HostProtocol.ClipboardCopy, to clientID: UUID) {
+            queue.async { [weak self] in
+                // Control may have moved since the Mac read its clipboard.
+                guard let self, let client = clients[clientID],
+                      copy.outcome == .notAllowed || inputOwnerID == clientID else { return }
+                _ = enqueueEncrypted(HostProtocol.encodeClipboardCopy(copy), kind: .clipboardCopy,
+                                     flags: [], policy: .bulk, for: client)
+            }
         }
 
         func publishCurtainStatus(_ status: HostProtocol.CurtainStatus) {
@@ -1482,6 +1509,9 @@ private extension HostServer {
                     sendCurtainStatus(to: client)
                 }
                 curtainRequestHandler?(client.id, enabled, inputOwnerID == client.id)
+            case .clipboardCopyRequest:
+                let request = try HostProtocol.decodeClipboardCopyRequest(plaintext)
+                clipboardCopyRequestHandler?(client.id, request, inputOwnerID == client.id)
             case .fileTransferOffer, .fileTransferChunk, .fileTransferAcknowledge,
                  .fileTransferComplete, .fileTransferResult, .fileTransferRequest:
                 let message: FileTransferWire.Message

@@ -103,6 +103,13 @@ struct HostSettingsView: View {
                 Text("Files sent from a paired iPhone or iPad are saved in Downloads. A device can also get the files selected in Finder; the first time, macOS asks to let Glassy Desk control Finder.")
             }
             Section {
+                Toggle("Allow copying to devices", isOn: $controller.allowsClipboardCopy)
+            } header: {
+                Text("Clipboard")
+            } footer: {
+                Text("Text you copy while controlling this Mac from an iPhone or iPad goes to that device's clipboard. Anything a password manager marks as private stays here. If macOS asks, choose Allow, or set Glassy Desk to Allow in Privacy & Security › Paste from Other Apps.")
+            }
+            Section {
                 Toggle("Allow Curtain Mode", isOn: $controller.allowsCurtainMode)
             } header: {
                 Text("Curtain Mode")

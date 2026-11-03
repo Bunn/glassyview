@@ -72,6 +72,11 @@ final class HostController {
     })
 
     @ObservationIgnored
+    private lazy var clipboardCopy = HostClipboardCopyService(send: { [hostServer] copy, clientID in
+        hostServer.sendClipboardCopy(copy, to: clientID)
+    })
+
+    @ObservationIgnored
     private var curtain: HostCurtainService!
 
     /// The controlling device may hide this Mac's screen and ignore its
@@ -98,6 +103,19 @@ final class HostController {
         set {
             withMutation(keyPath: \.allowsFileTransfers) {
                 fileTransfers.allowsTransfers = newValue
+            }
+        }
+    }
+
+    /// The controlling device receives what it copies on this Mac.
+    var allowsClipboardCopy: Bool {
+        get {
+            access(keyPath: \.allowsClipboardCopy)
+            return clipboardCopy.allowsCopy
+        }
+        set {
+            withMutation(keyPath: \.allowsClipboardCopy) {
+                clipboardCopy.allowsCopy = newValue
             }
         }
     }
@@ -343,7 +361,8 @@ final class HostController {
         await refreshAuthorizationStatuses()
         refreshLoginItemStatus()
         remoteInputService.setDisplayID(selectedDisplayID)
-        hostServer.setRemoteInputHandler { [remoteInputService] event in
+        hostServer.setRemoteInputHandler { [remoteInputService, clipboardCopy] event in
+            clipboardCopy.noteRemoteInput()
             remoteInputService.handle(event)
         }
         hostServer.setAuthenticatedClientReplacementHandler { [remoteInputService] in
@@ -1432,8 +1451,13 @@ final class HostController {
         }
 
         let fileTransfers = fileTransfers
+        let clipboardCopy = clipboardCopy
+        hostServer.setClipboardCopyRequestHandler { clientID, request, isInputOwner in
+            clipboardCopy.handle(request, from: clientID, isInputOwner: isInputOwner)
+        }
         hostServer.setClientEndedHandler { clientID in
             fileTransfers.clientEnded(clientID)
+            clipboardCopy.clientEnded(clientID)
             continuation.yield(.clientEnded(clientID))
         }
         hostServer.setCurtainRequestHandler { clientID, enabled, isInputOwner in

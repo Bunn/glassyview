@@ -20,9 +20,18 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     @Published private(set) var clipboardPasteError: String?
     @Published private(set) var isCurtainModeRequested = false
     @Published private(set) var curtainModeMessage: String?
+    @Published private(set) var macClipboardNotice: MacClipboardNotice?
+    @Published private(set) var followsMacClipboard: Bool
 
     var supportsClipboardPaste: Bool {
         canSendInput && controller.authentication?.supportsClipboardPaste == true
+    }
+
+    /// The Mac can share its clipboard and this device controls it.
+    var supportsMacClipboard: Bool {
+        canSendInput
+            && controller.authentication?.supportsClipboardCopy == true
+            && controller.hostStatus?.ownsInput != false
     }
 
     /// The connected Mac accepts files and this device controls it.
@@ -40,6 +49,9 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
     }
 
     let controller: GlassyStreamSessionController
+    private static let followsMacClipboardKey = "clipboard.followsMac"
+    private let defaults: UserDefaults
+    private let writeMacClipboard: (String) -> Void
     let fileTransfers: FileTransferCenter
 
     var fileTransferCenter: FileTransferCenter? { fileTransfers }
@@ -95,8 +107,13 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         nil
     }
 
-    init(controller: GlassyStreamSessionController = GlassyStreamSessionController()) {
+    init(controller: GlassyStreamSessionController = GlassyStreamSessionController(),
+         defaults: UserDefaults = .standard,
+         writeMacClipboard: @escaping (String) -> Void = MacClipboardNotice.writeToPasteboard) {
         self.controller = controller
+        self.defaults = defaults
+        self.writeMacClipboard = writeMacClipboard
+        followsMacClipboard = defaults.object(forKey: Self.followsMacClipboardKey) as? Bool ?? true
         let fileTransfers = FileTransferCenter(send: controller.sendFileTransfer)
         self.fileTransfers = fileTransfers
         let engine = fileTransfers.engine
@@ -113,6 +130,9 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         }
         controller.onCurtainStatusChanged = { [weak self] status in
             self?.curtainStatusChanged(status)
+        }
+        controller.onClipboardCopy = { [weak self] copy in
+            self?.macClipboardCopyReceived(copy)
         }
     }
 
@@ -505,6 +525,32 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
         clipboardPasteError = nil
     }
 
+    // MARK: - Mac clipboard
+
+    func copyMacClipboard() {
+        controller.requestClipboardCopy(.sendNow)
+    }
+
+    func setFollowsMacClipboard(_ follows: Bool) {
+        guard follows != followsMacClipboard else { return }
+        followsMacClipboard = follows
+        defaults.set(follows, forKey: Self.followsMacClipboardKey)
+        controller.requestClipboardCopy(follows ? .follow : .stopFollowing)
+    }
+
+    func clearMacClipboardNotice() {
+        macClipboardNotice = nil
+    }
+
+    private func macClipboardCopyReceived(_ copy: GlassyStreamClipboardCopy) {
+        // A copy on its way when the person turned this off is not wanted.
+        guard !copy.isAutomatic || followsMacClipboard else { return }
+        if copy.outcome == .text, let text = copy.text {
+            writeMacClipboard(text)
+        }
+        macClipboardNotice = MacClipboardNotice(copy: copy)
+    }
+
     // MARK: - Curtain Mode
 
     func setCurtainModeRequested(_ requested: Bool) {
@@ -613,6 +659,10 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
                 // after a device disconnects.
                 awaitsCurtainResponse = true
                 controller.setCurtainMode(true)
+            }
+            if followsMacClipboard {
+                // Each connection asks again; the Mac forgets when one ends.
+                controller.requestClipboardCopy(.follow)
             }
             return authentication
         } catch {

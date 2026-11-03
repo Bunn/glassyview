@@ -3156,6 +3156,46 @@
         }
       }
     },
+    "Clipboard" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zwischenablage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portapapeles"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリップボード"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klembord"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Área de Transferência"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剪贴板"
+          }
+        }
+      }
+    },
     "Close" : {
       "localizations" : {
         "de" : {
@@ -4476,6 +4516,167 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "控制你的 Mac"
+          }
+        }
+      }
+    },
+    "Copied to %@" : {
+      "comment" : "Confirms text copied on the Mac is on this device. The argument is iPhone or iPad.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf %@ kopiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiado en %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@にコピーしました"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gekopieerd naar %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiado para %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拷贝到 %@"
+          }
+        }
+      }
+    },
+    "Copy Automatically" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatisch kopieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar automáticamente"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動的にコピー"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatisch kopiëren"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar automaticamente"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动拷贝"
+          }
+        }
+      }
+    },
+    "Copy from Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vom Mac kopieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar del Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macからコピー"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieer van Mac"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar do Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Mac 拷贝"
+          }
+        }
+      }
+    },
+    "Copying is turned off on this Mac, or another device controls it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieren ist auf diesem Mac deaktiviert oder ein anderes Gerät steuert ihn."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La copia está desactivada en este Mac o lo controla otro dispositivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacではコピーがオフになっているか、別のデバイスが操作しています。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopiëren staat uit op deze Mac, of een ander apparaat bedient hem."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A cópia está desativada neste Mac ou outro dispositivo o controla."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 Mac 已关闭拷贝，或由其他设备控制。"
           }
         }
       }
@@ -5827,46 +6028,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑计算机"
-          }
-        }
-      }
-    },
-    "Enjoy one-minute free sessions with a 90-second break between them. Upgrade to Pro for sessions without time limits." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nutze einminütige kostenlose Sitzungen mit jeweils 90 Sekunden Pause. Hol dir Pro für Sitzungen ohne Zeitlimit."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Disfruta de sesiones gratuitas de un minuto con una pausa de 90 segundos entre ellas. Pásate a Pro para tener sesiones sin límite de tiempo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1分間の無料セッションを、90秒の休憩を挟んで利用できます。Proにアップグレードすると、時間制限なしで使えます。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geniet van gratis sessies van één minuut met een pauze van 90 seconden ertussen. Upgrade naar Pro voor sessies zonder tijdslimiet."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aproveite sessões gratuitas de um minuto com uma pausa de 90 segundos entre elas. Assine o Pro para ter sessões sem limite de tempo."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "免费会话每次一分钟，两次之间休息90秒。升级到 Pro 即可享受无时间限制的会话。"
           }
         }
       }
@@ -7512,6 +7673,46 @@
         }
       }
     },
+    "Files copied on your Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dateien auf dem Mac kopiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archivos copiados en el Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macでファイルをコピーしました"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bestanden gekopieerd op je Mac"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arquivos copiados no Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在 Mac 上拷贝文件"
+          }
+        }
+      }
+    },
     "Fills the Mac address and port." : {
       "localizations" : {
         "de" : {
@@ -8245,6 +8446,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "功能键"
+          }
+        }
+      }
+    },
+    "Get Files" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dateien holen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtener archivos"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルを取得"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haal bestanden op"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obter Arquivos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "获取文件"
           }
         }
       }
@@ -11733,46 +11974,6 @@
     "No nearby Macs yet" : {
 
     },
-    "No one-minute cap. No 90-second break." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kein Ein-Minuten-Limit. Keine 90-Sekunden-Pause."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sin límite de un minuto. Sin pausa de 90 segundos."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1分の制限も、90秒の休憩もありません。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geen limiet van één minuut. Geen pauze van 90 seconden."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sem limite de um minuto. Sem pausa de 90 segundos."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有一分钟上限，也没有 90 秒间隔。"
-          }
-        }
-      }
-    },
     "No Recent Sessions" : {
       "localizations" : {
         "de" : {
@@ -12349,6 +12550,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一次性代码"
+          }
+        }
+      }
+    },
+    "Only text can be copied from your Mac for now." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vom Mac kann derzeit nur Text kopiert werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Por ahora solo se puede copiar texto del Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在、Macからコピーできるのはテキストのみです。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Van je Mac kan voorlopig alleen tekst worden gekopieerd."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Por enquanto, só é possível copiar texto do Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前只能从 Mac 拷贝文本。"
           }
         }
       }
@@ -14194,6 +14435,46 @@
     "Purchases Unavailable" : {
 
     },
+    "Puts the text on your Mac's clipboard on this device's clipboard." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legt den Text aus der Zwischenablage deines Mac in die Zwischenablage dieses Geräts."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pone el texto del portapapeles del Mac en el portapapeles de este dispositivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macのクリップボードのテキストをこのデバイスのクリップボードに入れます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zet de tekst op het klembord van je Mac op het klembord van dit apparaat."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coloca o texto da Área de Transferência do Mac na Área de Transferência deste dispositivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 Mac 剪贴板上的文本放到此设备的剪贴板。"
+          }
+        }
+      }
+    },
     "Reachability" : {
       "localizations" : {
         "de" : {
@@ -14640,46 +14921,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新连接到此计算机。"
-          }
-        }
-      }
-    },
-    "Reconnects to your Mac for one minute." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verbindet dich erneut für eine Minute mit deinem Mac."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vuelve a conectarte a tu Mac durante un minuto."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Macに再接続して1分間利用できます。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Maakt opnieuw verbinding met je Mac voor één minuut."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reconecta ao seu Mac por um minuto."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新连接到你的 Mac，使用一分钟。"
           }
         }
       }
@@ -18125,6 +18366,86 @@
         }
       }
     },
+    "Text you copy on your Mac while controlling it also goes to this device's clipboard." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text, den du beim Steuern deines Mac kopierst, landet auch in der Zwischenablage dieses Geräts."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El texto que copies en el Mac mientras lo controlas también llega al portapapeles de este dispositivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macの操作中にコピーしたテキストは、このデバイスのクリップボードにも入ります。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tekst die je op je Mac kopieert terwijl je hem bedient, komt ook op het klembord van dit apparaat."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O texto copiado no Mac enquanto você o controla também vai para a Área de Transferência deste dispositivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "控制 Mac 时拷贝的文本也会进入此设备的剪贴板。"
+          }
+        }
+      }
+    },
+    "That's too much text to copy at once. Copy up to 1 MB." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das ist zu viel Text auf einmal. Kopiere bis zu 1 MB."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es demasiado texto para copiarlo de una vez. Copia hasta 1 MB."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一度にコピーするにはテキストが多すぎます。1 MBまでコピーできます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dat is te veel tekst om in één keer te kopiëren. Kopieer maximaal 1 MB."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "É texto demais para copiar de uma vez. Copie até 1 MB."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一次拷贝的文本过多。最多可拷贝 1 MB。"
+          }
+        }
+      }
+    },
     "The code refreshes every minute. You only need to pair once." : {
 
     },
@@ -18790,6 +19111,46 @@
     },
     "This isn’t a valid Glassy Desk pairing QR code. Scan the code displayed in Glassy Desk on your Mac." : {
 
+    },
+    "This item is marked private on your Mac, so it stayed there." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Objekt ist auf deinem Mac als privat markiert und bleibt dort."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este elemento está marcado como privado en el Mac, así que se quedó allí."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この項目はMacで非公開に設定されているため、Macに残っています。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit onderdeel is op je Mac als privé gemarkeerd en is daar gebleven."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este item está marcado como privado no Mac, por isso ficou lá."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此项目在 Mac 上被标记为私密，因此留在了 Mac 上。"
+          }
+        }
+      }
     },
     "This Mac uses a newer pairing format. Update Glassy Desk on your iPhone or iPad, then scan the QR code again." : {
 
@@ -21711,42 +22072,82 @@
     "You can still connect by entering the pairing code shown on your Mac." : {
 
     },
-    "Your free minute is up. Pick up right where you left off." : {
+    "Your Mac is blocking this. In Privacy & Security on the Mac, set Glassy Desk to Allow under Paste from Other Apps." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Deine kostenlose Minute ist vorbei. Mach genau dort weiter, wo du aufgehört hast."
+            "value" : "Dein Mac blockiert das. Stelle auf dem Mac unter „Datenschutz & Sicherheit“ bei „Aus anderen Apps einsetzen“ Glassy Desk auf „Erlauben“."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Se acabó tu minuto gratis. Retoma justo donde lo dejaste."
+            "value" : "El Mac lo está bloqueando. En Privacidad y seguridad del Mac, ajusta Glassy Desk a Permitir en Pegar desde otras apps."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "無料の1分が終了しました。中断したところからすぐに再開できます。"
+            "value" : "Macがブロックしています。Macの「プライバシーとセキュリティ」の「ほかのアプリからペースト」で、Glassy Deskを「許可」に設定してください。"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Je gratis minuut is voorbij. Ga verder waar je gebleven was."
+            "value" : "Je Mac blokkeert dit. Stel op de Mac bij Privacy en beveiliging onder Plakken vanuit andere apps Glassy Desk in op Sta toe."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seu minuto grátis acabou. Continue exatamente de onde parou."
+            "value" : "O Mac está bloqueando isso. Em Privacidade e Segurança no Mac, defina o Glassy Desk como Permitir em Colar de Outros Apps."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "免费的一分钟已用完。从刚才中断的地方继续。"
+            "value" : "Mac 阻止了此操作。请在 Mac 的“隐私与安全性”中，将“从其他 App 粘贴”下的 Glassy Desk 设为“允许”。"
+          }
+        }
+      }
+    },
+    "Your Mac's clipboard is empty." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Zwischenablage deines Mac ist leer."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El portapapeles del Mac está vacío."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macのクリップボードは空です。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het klembord van je Mac is leeg."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A Área de Transferência do Mac está vazia."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac 的剪贴板为空。"
           }
         }
       }
@@ -21976,46 +22377,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下一次免费会话已就绪。"
-          }
-        }
-      }
-    },
-    "Your next one-minute session is ready." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Deine nächste einminütige Sitzung ist bereit."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu próxima sesión de un minuto está lista."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "次の1分間のセッションを開始できます。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Je volgende sessie van één minuut is klaar."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sua próxima sessão de um minuto está pronta."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下一次一分钟会话已就绪。"
           }
         }
       }
@@ -22578,6 +22939,206 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法更改 App 图标。请重试。"
+          }
+        }
+      }
+    },
+    "Enjoy one-minute free sessions with a 90-second break between them. Upgrade to Pro for sessions without time limits." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nutze einminütige kostenlose Sitzungen mit jeweils 90 Sekunden Pause. Hol dir Pro für Sitzungen ohne Zeitlimit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disfruta de sesiones gratuitas de un minuto con una pausa de 90 segundos entre ellas. Pásate a Pro para tener sesiones sin límite de tiempo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1分間の無料セッションを、90秒の休憩を挟んで利用できます。Proにアップグレードすると、時間制限なしで使えます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geniet van gratis sessies van één minuut met een pauze van 90 seconden ertussen. Upgrade naar Pro voor sessies zonder tijdslimiet."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aproveite sessões gratuitas de um minuto com uma pausa de 90 segundos entre elas. Assine o Pro para ter sessões sem limite de tempo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费会话每次一分钟，两次之间休息90秒。升级到 Pro 即可享受无时间限制的会话。"
+          }
+        }
+      }
+    },
+    "No one-minute cap. No 90-second break." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Ein-Minuten-Limit. Keine 90-Sekunden-Pause."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin límite de un minuto. Sin pausa de 90 segundos."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1分の制限も、90秒の休憩もありません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geen limiet van één minuut. Geen pauze van 90 seconden."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem limite de um minuto. Sem pausa de 90 segundos."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有一分钟上限，也没有 90 秒间隔。"
+          }
+        }
+      }
+    },
+    "Reconnects to your Mac for one minute." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbindet dich erneut für eine Minute mit deinem Mac."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuelve a conectarte a tu Mac durante un minuto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macに再接続して1分間利用できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maakt opnieuw verbinding met je Mac voor één minuut."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconecta ao seu Mac por um minuto."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新连接到你的 Mac，使用一分钟。"
+          }
+        }
+      }
+    },
+    "Your free minute is up. Pick up right where you left off." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine kostenlose Minute ist vorbei. Mach genau dort weiter, wo du aufgehört hast."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se acabó tu minuto gratis. Retoma justo donde lo dejaste."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無料の1分が終了しました。中断したところからすぐに再開できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je gratis minuut is voorbij. Ga verder waar je gebleven was."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu minuto grátis acabou. Continue exatamente de onde parou."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免费的一分钟已用完。从刚才中断的地方继续。"
+          }
+        }
+      }
+    },
+    "Your next one-minute session is ready." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine nächste einminütige Sitzung ist bereit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu próxima sesión de un minuto está lista."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次の1分間のセッションを開始できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je volgende sessie van één minuut is klaar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua próxima sessão de um minuto está pronta."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一次一分钟会话已就绪。"
           }
         }
       }

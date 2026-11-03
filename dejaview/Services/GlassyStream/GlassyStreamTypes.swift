@@ -31,6 +31,7 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
     let supportsClipboardPaste: Bool
     let supportsFileTransfer: Bool
     let supportsCurtainMode: Bool
+    let supportsClipboardCopy: Bool
     /// The selected route becomes trusted only after encrypted authentication.
     let connectedAddress: GlassyStreamDirectAddress?
 
@@ -40,6 +41,7 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
          supportsClipboardPaste: Bool = false,
          supportsFileTransfer: Bool = false,
          supportsCurtainMode: Bool = false,
+         supportsClipboardCopy: Bool = false,
          connectedAddress: GlassyStreamDirectAddress? = nil) {
         self.hostIdentifier = hostIdentifier
         self.hostName = hostName
@@ -50,6 +52,7 @@ struct GlassyStreamAuthentication: Equatable, Sendable {
         self.supportsClipboardPaste = supportsClipboardPaste
         self.supportsFileTransfer = supportsFileTransfer
         self.supportsCurtainMode = supportsCurtainMode
+        self.supportsClipboardCopy = supportsClipboardCopy
         self.connectedAddress = connectedAddress
     }
 }
@@ -66,6 +69,32 @@ enum GlassyStreamEvent: Equatable, Sendable {
     /// Delivered in receive order on the media queue; never dropped.
     case fileTransfer(FileTransferWire.Message)
     case curtainStatus(GlassyStreamCurtainStatus)
+    case clipboardCopy(GlassyStreamClipboardCopy)
+}
+
+enum GlassyStreamClipboardCopyRequest: UInt8, Sendable {
+    case stopFollowing = 0
+    case follow = 1
+    case sendNow = 2
+}
+
+/// The Mac's answer about its clipboard. Only `.text` carries content.
+struct GlassyStreamClipboardCopy: Equatable, Sendable {
+    enum Outcome: UInt8, Sendable {
+        case text = 0
+        case empty = 1
+        case files = 2
+        case tooLarge = 3
+        case concealed = 4
+        case notAllowed = 5
+        case blockedByMac = 6
+        case unsupported = 7
+    }
+
+    let outcome: Outcome
+    /// False when this device asked for the clipboard.
+    let isAutomatic: Bool
+    var text: String?
 }
 
 /// Curtain Mode on the Mac: its displays covered and, when permitted, its own

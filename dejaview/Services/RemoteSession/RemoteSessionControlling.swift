@@ -30,6 +30,16 @@ protocol RemoteSessionControlling: ObservableObject, RemoteSessionInputControlli
     var clipboardPasteError: String? { get }
     func clearClipboardPasteError()
 
+    /// The connected Mac can share its clipboard with this device.
+    var supportsMacClipboard: Bool { get }
+    /// Text copied on the Mac goes to this device's clipboard without asking.
+    var followsMacClipboard: Bool { get }
+    /// What just happened with the Mac's clipboard, for a brief confirmation.
+    var macClipboardNotice: MacClipboardNotice? { get }
+    func copyMacClipboard()
+    func setFollowsMacClipboard(_ follows: Bool)
+    func clearMacClipboardNotice()
+
     /// Transfers for this session, when its transport supports files.
     var fileTransferCenter: FileTransferCenter? { get }
     /// The connected Mac currently accepts files from this device.
@@ -103,6 +113,13 @@ extension RemoteSessionInputControlling {
 extension RemoteSessionControlling {
     var clipboardPasteError: String? { nil }
     func clearClipboardPasteError() {}
+    // Standard VNC doesn't share the Mac's clipboard.
+    var supportsMacClipboard: Bool { false }
+    var followsMacClipboard: Bool { false }
+    var macClipboardNotice: MacClipboardNotice? { nil }
+    func copyMacClipboard() {}
+    func setFollowsMacClipboard(_ follows: Bool) {}
+    func clearMacClipboardNotice() {}
     // Standard VNC has no file transfer.
     var fileTransferCenter: FileTransferCenter? { nil }
     var supportsFileTransfer: Bool { false }

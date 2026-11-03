@@ -2,7 +2,7 @@
 
 Copy text in another iPhone/iPad app, return to the connected remote desktop, and tap **Paste to Mac** beside the keyboard control. With a hardware keyboard, press **Cmd-V** while the desktop has focus. External-display controller mode supports the same action. In the local “Type to send” field, native Paste still inserts text into that local field for editing before sending.
 
-This version supports plain text, including Unicode and multiple lines, up to 1 MiB of UTF-8. It requires Fast Connection and companion support on the Mac. Images, files, rich formatting, and Mac-to-iOS clipboard transfer are outside this feature. The Paste control appears only after a compatible Mac authenticates. Standard VNC keeps its existing keyboard behavior.
+This version supports plain text, including Unicode and multiple lines, up to 1 MiB of UTF-8. It requires Fast Connection and companion support on the Mac. Images, files, and rich formatting are outside this feature. For the other direction, see [copy from the Mac](clipboard-copy.md). The Paste control appears only after a compatible Mac authenticates. Standard VNC keeps its existing keyboard behavior.
 
 ## Avoiding permission loops
 

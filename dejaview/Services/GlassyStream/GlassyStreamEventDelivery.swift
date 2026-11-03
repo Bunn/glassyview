@@ -95,7 +95,7 @@ final class GlassyStreamEventDelivery: @unchecked Sendable {
             retired = removeVideoLocked()
             appendDiscontinuityLocked(at: timestamp)
             recover = requestRecoveryLocked()
-        case .authenticated, .fileTransfer, .curtainStatus:
+        case .authenticated, .fileTransfer, .curtainStatus, .clipboardCopy:
             entries.append(entry)
         }
         let schedule = !draining && !entries.isEmpty

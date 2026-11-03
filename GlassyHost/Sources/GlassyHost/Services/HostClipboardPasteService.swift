@@ -7,7 +7,10 @@ struct HostClipboardPasteService: Sendable {
     var writeText: @Sendable (String) -> Bool = { text in
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        return pasteboard.setString(text, forType: .string)
+        guard pasteboard.setString(text, forType: .string) else { return false }
+        // Keeps text that came from a device from being copied back to it.
+        pasteboard.setData(Data(), forType: HostClipboardCopyPolicy.fromDeviceType)
+        return true
     }
     var postKey: @Sendable (CGKeyCode, Bool, CGEventFlags) -> Void = { code, isDown, flags in
         guard let event = CGEvent(keyboardEventSource: nil,

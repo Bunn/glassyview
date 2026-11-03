@@ -38,6 +38,17 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
                 .labelStyle(.titleAndIcon)
                 .accessibilityLabel("Paste to Mac")
             }
+            if session.supportsMacClipboard {
+                Section("Clipboard") {
+                    Button("Copy from Mac", systemImage: "doc.on.clipboard", action: session.copyMacClipboard)
+                        .accessibilityHint("Puts the text on your Mac's clipboard on this device's clipboard.")
+                    Toggle("Copy Automatically", systemImage: "arrow.triangle.2.circlepath", isOn: Binding(
+                        get: { session.followsMacClipboard },
+                        set: { session.setFollowsMacClipboard($0) }
+                    ))
+                    .accessibilityHint("Text you copy on your Mac while controlling it also goes to this device's clipboard.")
+                }
+            }
             if session.supportsCurtainMode {
                 Toggle("Curtain Mode", systemImage: "eye.slash", isOn: curtainBinding)
                     .accessibilityHint("Covers your Mac's screen and ignores its own keyboard and mouse while you control it.")

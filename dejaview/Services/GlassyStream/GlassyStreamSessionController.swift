@@ -126,6 +126,7 @@ final class GlassyStreamSessionController {
     /// the media queue. Hopping through the main actor could reorder them.
     @ObservationIgnored
     var onCurtainStatusChanged: (@MainActor @Sendable (GlassyStreamCurtainStatus) -> Void)?
+    var onClipboardCopy: (@MainActor @Sendable (GlassyStreamClipboardCopy) -> Void)?
 
     @ObservationIgnored
     var fileTransferSink: (@Sendable (FileTransferWire.Message) -> Void)?
@@ -237,6 +238,11 @@ final class GlassyStreamSessionController {
         client.setCurtainMode(enabled)
     }
 
+    func requestClipboardCopy(_ request: GlassyStreamClipboardCopyRequest) {
+        guard state == .connected, authentication?.supportsClipboardCopy == true else { return }
+        client.requestClipboardCopy(request)
+    }
+
     func setStreamQuality(_ quality: RemoteSessionQuality) {
         guard state == .connected,
               authentication?.supportsStreamQuality == true else { return }
@@ -282,6 +288,10 @@ final class GlassyStreamSessionController {
         case .curtainStatus(let status):
             curtainStatus = status
             onCurtainStatusChanged?(status)
+
+        case .clipboardCopy(let copy):
+            guard state == .connected else { return }
+            onClipboardCopy?(copy)
 
         case .pong, .fileTransfer:
             break

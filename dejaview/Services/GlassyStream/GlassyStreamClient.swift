@@ -21,6 +21,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         let supportsAdaptiveStream: Bool
         let supportsFileTransfer: Bool
         let supportsCurtainMode: Bool
+        let supportsClipboardCopy: Bool
     }
 
     private enum State: Sendable {
@@ -54,6 +55,7 @@ final class GlassyStreamClient: @unchecked Sendable {
     private var supportsAdaptiveStream = false
     private var supportsFileTransfer = false
     private var supportsCurtainMode = false
+    private var supportsClipboardCopy = false
     private var eventDelivery: GlassyStreamEventDelivery?
     private var lastHandledVideoSequence: UInt64 = 0
     private var pendingFeedbackAge: UInt32 = 0
@@ -215,6 +217,22 @@ final class GlassyStreamClient: @unchecked Sendable {
         }
     }
 
+    /// Follows the Mac's clipboard or asks for it once. Ignored by hosts
+    /// without the capability, which would reject the message.
+    func requestClipboardCopy(_ request: GlassyStreamClipboardCopyRequest) {
+        queue.async { [weak self] in
+            guard let self, supportsClipboardCopy,
+                  case let .authenticated(material) = state,
+                  connection != nil else { return }
+            do {
+                try sendEncrypted(GlassyStreamWire.encodeClipboardCopyRequest(request),
+                                  kind: .clipboardCopyRequest, flags: [], material: material, generation: generation)
+            } catch {
+                finish(.failure(clientError(error)), generation: generation)
+            }
+        }
+    }
+
     /// Sends one file-transfer message on an authenticated connection to a
     /// host that negotiated the capability. Messages are queued in call order.
     func sendFileTransfer(_ message: FileTransferWire.Message) {
@@ -336,6 +354,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         supportsClipboardPaste = false
         supportsFileTransfer = false
         supportsCurtainMode = false
+        supportsClipboardCopy = false
         selectedEndpoint = nil
         state = .connecting
 
@@ -636,7 +655,8 @@ final class GlassyStreamClient: @unchecked Sendable {
                                   supportsClipboardPaste: capabilities.contains(.clipboardPaste),
                                   supportsAdaptiveStream: capabilities.contains(.adaptiveStream),
                                   supportsFileTransfer: capabilities.contains(.fileTransfer),
-                                  supportsCurtainMode: capabilities.contains(.curtainMode))
+                                  supportsCurtainMode: capabilities.contains(.curtainMode),
+                                  supportsClipboardCopy: capabilities.contains(.clipboardCopy))
         )
         try sendPlaintext(GlassyStreamWire.encodeClientHello(hello),
                           kind: .clientHello,
@@ -691,6 +711,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         supportsAdaptiveStream = pending.supportsAdaptiveStream
         supportsFileTransfer = pending.supportsFileTransfer
         supportsCurtainMode = pending.supportsCurtainMode
+        supportsClipboardCopy = pending.supportsClipboardCopy
         if supportsAdaptiveStream {
             try sendEncrypted(GlassyStreamWire.encodeStreamFeedback(sequence: 0, queueAgeMilliseconds: 0),
                               kind: .streamFeedback, flags: [], material: pending.material, generation: generation)
@@ -724,6 +745,7 @@ final class GlassyStreamClient: @unchecked Sendable {
                 supportsClipboardPaste: pending.supportsClipboardPaste,
                 supportsFileTransfer: pending.supportsFileTransfer,
                 supportsCurtainMode: pending.supportsCurtainMode,
+                supportsClipboardCopy: pending.supportsClipboardCopy,
                 connectedAddress: connectedAddress
             )
         ))
@@ -787,6 +809,11 @@ final class GlassyStreamClient: @unchecked Sendable {
                 throw GlassyStreamClientError.protocolViolation("host sent curtain status without advertising support")
             }
             deliver(.curtainStatus(try GlassyStreamWire.decodeCurtainStatus(plaintext)))
+        case .clipboardCopy:
+            guard supportsClipboardCopy, !frame.flags.contains(.keyFrame) else {
+                throw GlassyStreamClientError.protocolViolation("host sent clipboard text without advertising support")
+            }
+            deliver(.clipboardCopy(try GlassyStreamWire.decodeClipboardCopy(plaintext)))
         case .fileTransferOffer, .fileTransferChunk, .fileTransferAcknowledge,
              .fileTransferComplete, .fileTransferResult:
             guard supportsFileTransfer, !frame.flags.contains(.keyFrame) else {
@@ -941,6 +968,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         supportsAdaptiveStream = false
         supportsFileTransfer = false
         supportsCurtainMode = false
+        supportsClipboardCopy = false
         lastHandledVideoSequence = 0
         pendingFeedbackAge = 0
         configuration = nil

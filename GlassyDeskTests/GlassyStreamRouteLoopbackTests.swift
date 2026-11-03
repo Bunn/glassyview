@@ -96,6 +96,41 @@ struct GlassyStreamRouteLoopbackTests {
     }
 
     @Test(arguments: [false, true])
+    func macClipboardRequiresNegotiatedSupport(supported: Bool) async throws {
+        let hostID = Data(repeating: 0x42, count: 16)
+        let host = try LoopbackPairingHost(hostID: hostID, behavior: "valid",
+                                           extraCapabilities: supported ? 1 << 10 : 0)
+        defer { host.stop() }
+        let endpoint = try await host.start()
+        let client = GlassyStreamClient(credentialStore: RouteTestCredentialStore())
+        defer { client.disconnect() }
+        let events = RouteTestEvents()
+        let authentication = try await authenticate(client, configuration: .init(
+            endpoint: endpoint, savedMachineID: UUID(),
+            bootstrapCredential: .oneTimeCode("ABCDEFGH2345"), expectedHostIdentifier: hostID
+        ), events: events)
+        #expect(authentication.supportsClipboardCopy == supported)
+
+        client.requestClipboardCopy(.follow)
+        client.requestClipboardCopy(.sendNow)
+        client.sendPing()
+        try await waitForPing(host)
+        #expect(host.clipboardCopyRequests == (supported ? [Data([1, 0, 0, 0]), Data([2, 0, 0, 0])] : []))
+
+        try host.sendRaw(kind: .clipboardCopy, payload: Data([0, 1, 0, 0]) + Data("hello".utf8))
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while ContinuousClock.now < deadline {
+            if supported ? !events.clipboardCopies.isEmpty : events.completion != nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        if supported {
+            #expect(events.clipboardCopies == [.init(outcome: .text, isAutomatic: true, text: "hello")])
+        } else {
+            #expect(events.completion?.contains("without advertising support") == true)
+        }
+    }
+
+    @Test(arguments: [false, true])
     func curtainModeRequiresNegotiatedSupport(supported: Bool) async throws {
         let hostID = Data(repeating: 0x42, count: 16)
         let host = try LoopbackPairingHost(hostID: hostID, behavior: "valid",
@@ -254,6 +289,8 @@ struct GlassyStreamRouteLoopbackTests {
                             events?.append(message)
                         } else if case let .curtainStatus(status) = event {
                             events?.append(status)
+                        } else if case let .clipboardCopy(copy) = event {
+                            events?.append(copy)
                         }
                     },
                     onCompletion: { completion in
@@ -303,10 +340,14 @@ private final class RouteTestEvents: @unchecked Sendable {
     private let lock = NSLock()
     private var messages: [FileTransferWire.Message] = []
     private var curtain: [GlassyStreamCurtainStatus] = []
+    private var clipboard: [GlassyStreamClipboardCopy] = []
     private var completionMessage: String?
 
     var curtainStatuses: [GlassyStreamCurtainStatus] { lock.withLock { curtain } }
     func append(_ status: GlassyStreamCurtainStatus) { lock.withLock { curtain.append(status) } }
+
+    var clipboardCopies: [GlassyStreamClipboardCopy] { lock.withLock { clipboard } }
+    func append(_ copy: GlassyStreamClipboardCopy) { lock.withLock { clipboard.append(copy) } }
 
     var fileTransfers: [FileTransferWire.Message] { lock.withLock { messages } }
     var completion: String? { lock.withLock { completionMessage } }
@@ -325,6 +366,7 @@ private final class LoopbackPairingHost: @unchecked Sendable {
     private var connections: [NWConnection] = []
     private var receivedFileTransferMessages: [FileTransferWire.Message] = []
     private var receivedCurtainRequests: [Data] = []
+    private var receivedClipboardCopyRequests: [Data] = []
     private var nextServerSequence: UInt64 = 3
     private var buffers: [ObjectIdentifier: Data] = [:]
     private var receivedProofs = 0
@@ -337,6 +379,7 @@ private final class LoopbackPairingHost: @unchecked Sendable {
     var pingCount: Int { queue.sync { receivedPings } }
     var fileTransferMessages: [FileTransferWire.Message] { queue.sync { receivedFileTransferMessages } }
     var curtainRequests: [Data] { queue.sync { receivedCurtainRequests } }
+    var clipboardCopyRequests: [Data] { queue.sync { receivedClipboardCopyRequests } }
 
     init(hostID: Data, behavior: String, supportsClipboardPaste: Bool = false,
          extraCapabilities: UInt32 = 0) throws {
@@ -446,6 +489,8 @@ private final class LoopbackPairingHost: @unchecked Sendable {
                             receivedClipboardPayloads.append(plaintext)
                         } else if frame.kind == .curtainRequest {
                             receivedCurtainRequests.append(plaintext)
+                        } else if frame.kind == .clipboardCopyRequest {
+                            receivedClipboardCopyRequests.append(plaintext)
                         } else if FileTransferWire.Kind(rawValue: frame.kind.rawValue) != nil {
                             receivedFileTransferMessages.append(
                                 try FileTransferWire.decode(kind: frame.kind.rawValue, payload: plaintext)
