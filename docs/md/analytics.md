@@ -28,6 +28,7 @@ continue independently of this optional setting.
 | Are people deliberately resetting the one-minute allowance? | `free_session_restarted_after_limit` and milestone `gv_ms_refresh_after_limit` |
 | Which upgrade prompt works best? | `paywall_presented` grouped by `settings`, `free_session_timer`, `free_session_cooldown`, or historical `session_limit` |
 | Does the cooldown screen lead to Pro? | Cooldown views and upgrade taps, then paywall and purchase events with `source: free_session_cooldown` |
+| Does the What's New screen lead to ratings? | `whats_new_viewed`, `review_prompt_viewed`, `review_rate_tapped`, `review_write_tapped`, and `review_feedback_tapped`, all with `source: whats_new` |
 | Do people reject the offer before trying to buy? | `paywall_dismissed / paywall_presented` |
 | Do they show intent but abandon Apple's purchase sheet? | `purchase_cancelled / purchase_started` |
 | Is billing infrastructure blocking conversion? | `purchase_failed`, grouped by its sanitized reason |
@@ -128,6 +129,11 @@ free_session_timer_opened
 free_session_limit_reached
 free_session_cooldown_viewed
 free_session_cooldown_upgrade_tapped
+whats_new_viewed
+review_prompt_viewed
+review_rate_tapped
+review_write_tapped
+review_feedback_tapped
 paywall_presented
 paywall_dismissed
 purchase_started
@@ -156,7 +162,7 @@ Allowed context values used by Glassy Desk are:
 
 ```text
 source:  app, onboarding, settings, free_session_timer, free_session_cooldown,
-         session_limit, unknown
+         session_limit, whats_new, unknown
 outcome: success, failure, cancelled, unavailable
 reason:  network, store_unavailable, purchase_not_allowed, payment_pending,
          configuration, unknown

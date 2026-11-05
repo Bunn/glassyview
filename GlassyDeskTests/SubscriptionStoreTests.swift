@@ -105,10 +105,35 @@ struct SubscriptionStoreTests {
         #expect(!store.restoreResultMessage.isEmpty)
     }
 
-    private func customerInfo(pro: Bool) -> CustomerInfo {
+    @Test("Only an active purchase counts as paying", arguments: [
+        (true, PeriodType.normal, true),
+        (true, PeriodType.intro, true),
+        (true, PeriodType.trial, false),
+        (false, PeriodType.normal, false),
+    ])
+    func payingCustomer(pro: Bool, period: PeriodType, isPaying: Bool) {
+        let client = SubscriptionClientStub(cached: customerInfo(pro: pro, period: period))
+        #expect(SubscriptionStore(client: client).isPayingCustomer == isPaying)
+    }
+
+    @Test("Access status is unknown only while configured purchases have no customer info")
+    func accessStatusKnown() async {
+        let client = SubscriptionClientStub(info: customerInfo(pro: false))
+        let store = SubscriptionStore(client: client)
+        #expect(!store.isAccessStatusKnown)
+        #expect(!store.isPayingCustomer)
+        await store.refresh()
+        #expect(store.isAccessStatusKnown)
+
+        let unconfigured = SubscriptionClientStub()
+        unconfigured.isConfigured = false
+        #expect(SubscriptionStore(client: unconfigured).isAccessStatusKnown)
+    }
+
+    private func customerInfo(pro: Bool, period: PeriodType = .normal) -> CustomerInfo {
         let entitlement = EntitlementInfo(
             identifier: SubscriptionStore.proEntitlementIdentifier,
-            isActive: pro, willRenew: false, periodType: .normal,
+            isActive: pro, willRenew: false, periodType: period,
             store: .appStore, productIdentifier: "dev.bunn.glassydesk.pro",
             isSandbox: true, ownershipType: .purchased
         )

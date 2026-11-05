@@ -32,6 +32,17 @@ final class SubscriptionStore {
         proEntitlement?.isActive == true
     }
 
+    /// Has Pro through a purchase. A free trial gives Pro access before any payment.
+    var isPayingCustomer: Bool {
+        hasProAccess && proEntitlement?.periodType != .trial
+    }
+
+    /// False until the first cached or fetched customer info arrives, when someone
+    /// who paid can't yet be told apart from someone who didn't.
+    var isAccessStatusKnown: Bool {
+        customerInfo != nil || !client.isConfigured
+    }
+
     var proEntitlement: EntitlementInfo? {
         customerInfo?.entitlements[Self.proEntitlementIdentifier]
     }

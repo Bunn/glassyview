@@ -19,6 +19,11 @@ enum AnalyticsEventName: String, Codable, Sendable {
     case freeSessionLimitReached = "free_session_limit_reached"
     case freeSessionCooldownViewed = "free_session_cooldown_viewed"
     case freeSessionCooldownUpgradeTapped = "free_session_cooldown_upgrade_tapped"
+    case whatsNewViewed = "whats_new_viewed"
+    case reviewPromptViewed = "review_prompt_viewed"
+    case reviewRateTapped = "review_rate_tapped"
+    case reviewWriteTapped = "review_write_tapped"
+    case reviewFeedbackTapped = "review_feedback_tapped"
     case paywallPresented = "paywall_presented"
     case paywallDismissed = "paywall_dismissed"
     case purchaseStarted = "purchase_started"
@@ -37,6 +42,7 @@ enum AnalyticsEventSource: String, Codable, Sendable {
     case freeSessionTimer = "free_session_timer"
     case freeSessionCooldown = "free_session_cooldown"
     case sessionLimit = "session_limit"
+    case whatsNew = "whats_new"
     case unknown
 }
 

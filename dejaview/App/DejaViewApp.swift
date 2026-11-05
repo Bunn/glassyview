@@ -39,6 +39,7 @@ struct DejaViewApp: App {
             ContentView()
                 #if DEBUG
                 .modifier(PaywallLaunchPreview())
+                .modifier(ReleaseAnnouncementLaunchPreview())
                 #endif
                 .background(AppLockCoverInstaller())
                 .environment(subscriptionStore)

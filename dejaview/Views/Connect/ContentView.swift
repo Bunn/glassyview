@@ -12,6 +12,8 @@ struct ContentView<Session: RemoteSessionControlling,
 
     @StateObject private var session: Session
     @StateObject private var glassySession: GlassyStreamRemoteSession
+    @Environment(SubscriptionStore.self) private var subscriptionStore
+
     @State private var browser: Browser
     @State private var store: Store
     @State private var intentRouter: Router
@@ -27,6 +29,7 @@ struct ContentView<Session: RemoteSessionControlling,
     @State private var isOnboardingPresented = false
     @State private var isSessionPresented = false
     @State private var isSettingsPresented = false
+    @State private var releaseAnnouncement: ReleaseAnnouncement?
 
     @State private var machineEditorRequest: MachineEditorRequest?
     @State private var addMachineRequest: AddMachineRequest?
@@ -103,6 +106,9 @@ struct ContentView<Session: RemoteSessionControlling,
                 OnboardingView(onComplete: completeOnboarding)
             }
             .interactiveDismissDisabled()
+        }
+        .sheet(item: $releaseAnnouncement) { announcement in
+            ReleaseAnnouncementView(announcement: announcement)
         }
         .sheet(isPresented: $isSettingsPresented) {
             NavigationStack {
@@ -268,6 +274,10 @@ struct ContentView<Session: RemoteSessionControlling,
             // ends the only reason to keep the connection open.
             guard UIApplication.shared.applicationState == .background else { return }
             suspendGlassyForBackground(allowsPictureInPictureGrace: false)
+        }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            await presentReleaseAnnouncementIfDue()
         }
         .task(id: machineReachabilitySignature) {
             await monitorSavedMachineReachability()
@@ -770,11 +780,54 @@ struct ContentView<Session: RemoteSessionControlling,
     private func completeOnboarding() {
         hasCompletedOnboarding = true
         isOnboardingPresented = false
+        // Onboarding has just covered everything, so this release isn't news.
+        ReleaseAnnouncementState().markAnnounced()
         funnelMilestones.record(.onboardingCompleted)
         analytics.track(
             .onboardingCompleted,
             context: AnalyticsEventContext(source: .onboarding, outcome: .success)
         )
+    }
+
+    /// Runs only on launch or on returning to the app, never when a session ends,
+    /// so the review screen can't follow a dropped connection or a free-session limit.
+    /// The short wait lets a widget or Siri request arrive and take priority.
+    private func presentReleaseAnnouncementIfDue() async {
+        guard !AnalyticsRuntime.isUnitTestHost, !AnalyticsRuntime.isUITestingLaunch else { return }
+
+        try? await Task.sleep(for: .seconds(1))
+        // A release is announced only once, so wait rather than treat a paying
+        // customer whose subscription hasn't loaded yet as free.
+        guard !Task.isCancelled, isIdleForReleaseAnnouncement, subscriptionStore.isAccessStatusKnown else { return }
+
+        let state = ReleaseAnnouncementState()
+        let hasUsedApp = !store.machines.isEmpty || !store.recentConnections.isEmpty
+        guard let announcement = state.pendingAnnouncement(hasCompletedOnboarding: hasCompletedOnboarding,
+                                                           hasUsedApp: hasUsedApp,
+                                                           isPayingCustomer: subscriptionStore.isPayingCustomer) else { return }
+        state.markAnnounced(announcement.release)
+        releaseAnnouncement = announcement
+    }
+
+    /// True when nothing is on screen or underway that the announcement would interrupt.
+    private var isIdleForReleaseAnnouncement: Bool {
+        let isPresentingSomething = isOnboardingPresented
+            || isSessionPresented
+            || isSettingsPresented
+            || machineEditorRequest != nil
+            || addMachineRequest != nil
+            || glassyPairingRequest != nil
+            || isDeleteConfirmationPresented
+            || isDeletionFailurePresented
+            || isClearRecentConnectionsConfirmationPresented
+            || isWakeFailurePresented
+            || isGlassyConnectionFailurePresented
+        let isConnecting = pendingConnectionMachine != nil
+            || glassyConnectTask != nil
+            || preparedGlassySession != nil
+            || wakingMachineID != nil
+            || intentRouter.request != nil
+        return releaseAnnouncement == nil && !isPresentingSomething && !isConnecting
     }
 
     private func refreshNearbyMacs() {

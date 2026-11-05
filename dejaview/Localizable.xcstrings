@@ -2366,6 +2366,46 @@
         }
       }
     },
+    "Bring Over Copied Files" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopierte Dateien holen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trae los archivos copiados"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピーしたファイルを取得"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haal gekopieerde bestanden op"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traga arquivos copiados"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "获取拷贝的文件"
+          }
+        }
+      }
+    },
     "Camera Access Needed" : {
 
     },
@@ -2908,6 +2948,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择已保存的 Tailscale 100.64–100.127 地址、Tailscale IPv6 地址或完整的 .ts.net 名称。使用附近或其他路线的一次性代码。"
+          }
+        }
+      }
+    },
+    "Choose Copy from Mac in the session menu to fetch what's already there, such as something a long-running job copied." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wähle „Vom Mac kopieren“ im Sitzungsmenü, um zu holen, was dort bereits liegt, etwa das Ergebnis eines lange laufenden Auftrags."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige Copiar del Mac en el menú de la sesión para obtener lo que ya está allí, como algo que haya copiado un proceso largo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セッションメニューで「Macからコピー」を選ぶと、時間のかかる処理がコピーした内容など、すでにある内容を取得できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kies Kopieer van Mac in het sessiemenu om op te halen wat er al staat, zoals iets dat een langlopende taak heeft gekopieerd."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha Copiar do Mac no menu da sessão para obter o que já está lá, como algo copiado por uma tarefa demorada."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在会话菜单中选择“从 Mac 拷贝”，即可获取其中已有的内容，例如长时间运行的任务拷贝的内容。"
           }
         }
       }
@@ -4601,6 +4681,46 @@
         }
       }
     },
+    "Copy files in Finder, then tap Get Files to bring them to this device." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopiere Dateien im Finder und tippe dann auf „Dateien holen“, um sie auf dieses Gerät zu übertragen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia archivos en el Finder y toca Obtener archivos para traerlos a este dispositivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finderでファイルをコピーし、「ファイルを取得」をタップすると、このデバイスに取り込めます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieer bestanden in de Finder en tik op Haal bestanden op om ze naar dit apparaat te halen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copie arquivos no Finder e toque em Obter Arquivos para trazê-los para este dispositivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“访达”中拷贝文件，然后轻点“获取文件”，即可将它们传到这台设备上。"
+          }
+        }
+      }
+    },
     "Copy from Mac" : {
       "localizations" : {
         "de" : {
@@ -4637,6 +4757,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从 Mac 拷贝"
+          }
+        }
+      }
+    },
+    "Copy from Your Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vom Mac kopieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia desde tu Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macからコピー"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieer van je Mac"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copie do seu Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Mac 拷贝"
+          }
+        }
+      }
+    },
+    "Copy text on your Mac during a session, and it's ready to paste on this device." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopiere während einer Sitzung Text auf deinem Mac, und du kannst ihn auf diesem Gerät einsetzen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia texto en tu Mac durante una sesión y podrás pegarlo en este dispositivo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セッション中にMacでテキストをコピーすると、このデバイスですぐにペーストできます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieer tijdens een sessie tekst op je Mac en plak hem meteen op dit apparaat."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copie texto no seu Mac durante uma sessão e cole neste dispositivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在会话期间拷贝 Mac 上的文本，即可粘贴到这台设备上。"
           }
         }
       }
@@ -9394,6 +9594,46 @@
     "Good to Know" : {
 
     },
+    "Grab the Mac's Clipboard" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zwischenablage des Mac holen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtén el portapapeles del Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macのクリップボードを取得"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haal het klembord van de Mac op"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtenha a área de transferência do Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "获取 Mac 的剪贴板"
+          }
+        }
+      }
+    },
     "Held" : {
       "localizations" : {
         "de" : {
@@ -9430,6 +9670,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "举行"
+          }
+        }
+      }
+    },
+    "Help Glassy Desk Grow" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hilf Glassy Desk zu wachsen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ayuda a Glassy Desk a crecer"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Deskの成長にご協力ください"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help Glassy Desk groeien"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajude o Glassy Desk a crescer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帮助 Glassy Desk 成长"
           }
         }
       }
@@ -14475,6 +14755,46 @@
         }
       }
     },
+    "Rate Glassy Desk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk bewerten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valorar Glassy Desk"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Deskを評価"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beoordeel Glassy Desk"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avaliar o Glassy Desk"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为 Glassy Desk 评分"
+          }
+        }
+      }
+    },
     "Reachability" : {
       "localizations" : {
         "de" : {
@@ -15484,6 +15804,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要求的质量"
+          }
+        }
+      }
+    },
+    "Requires Fast Connection and Glassy Desk for Mac 3.1 or later." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erfordert Schnellverbindung und Glassy Desk für Mac 3.1 oder neuer."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requiere Conexión rápida y Glassy Desk para Mac 3.1 o posterior."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高速接続とGlassy Desk for Mac 3.1以降が必要です。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vereist Snelle verbinding en Glassy Desk voor Mac 3.1 of nieuwer."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requer Conexão rápida e Glassy Desk para Mac 3.1 ou posterior."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要快速连接和 Glassy Desk for Mac 3.1 或更高版本。"
           }
         }
       }
@@ -17745,6 +18105,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无需等待，想用多久就用多久。"
+          }
+        }
+      }
+    },
+    "Something not working? **Send Feedback**" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Funktioniert etwas nicht? **Feedback senden**"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Algo no funciona? **Enviar comentarios**"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うまく動かない場合は **フィードバックを送信**"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Werkt er iets niet? **Stuur feedback**"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algo não está funcionando? **Enviar Feedback**"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遇到问题？**发送反馈**"
           }
         }
       }
@@ -21404,6 +21804,46 @@
         }
       }
     },
+    "Want to say more? You can add a written review too." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Möchtest du mehr sagen? Du kannst auch eine Rezension schreiben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Quieres decir algo más? También puedes escribir una reseña."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もっと伝えたいことがあれば、レビューを書くこともできます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wil je meer kwijt? Je kunt ook een recensie schrijven."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quer dizer mais? Você também pode escrever uma avaliação."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还想多说几句？你也可以撰写评论。"
+          }
+        }
+      }
+    },
     "Watch builds, renders, and AI agents finish." : {
       "localizations" : {
         "de" : {
@@ -21603,6 +22043,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "支持什么输入？"
+          }
+        }
+      }
+    },
+    "What's New" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neuigkeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novedades"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新機能"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wat is er nieuw"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novidades"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新功能"
           }
         }
       }
@@ -21902,6 +22382,46 @@
         }
       }
     },
+    "Write a Review" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rezension schreiben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escribir una reseña"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レビューを書く"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schrijf een recensie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escrever uma Avaliação"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撰写评论"
+          }
+        }
+      }
+    },
     "Yearly" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -22188,6 +22708,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的购买正在等待批准。获得批准后，专业版将立即解锁。"
+          }
+        }
+      }
+    },
+    "Your rating helps other Mac owners find Glassy Desk and shows what to build next. It only takes a moment." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Bewertung hilft anderen Mac-Besitzern, Glassy Desk zu finden, und zeigt, was als Nächstes entstehen sollte. Es dauert nur einen Moment."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu valoración ayuda a otros usuarios de Mac a encontrar Glassy Desk y muestra qué crear a continuación. Solo te llevará un momento."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "評価は、ほかのMacユーザーがGlassy Deskを見つける助けになり、次に作るべきものを知る手がかりになります。すぐに終わります。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je beoordeling helpt andere Mac-gebruikers Glassy Desk te vinden en laat zien wat we hierna moeten bouwen. Het kost maar even."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua avaliação ajuda outras pessoas com Mac a encontrar o Glassy Desk e mostra o que criar em seguida. Leva só um instante."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的评分能帮助其他 Mac 用户发现 Glassy Desk，也能指明接下来该开发什么。只需片刻。"
           }
         }
       }
