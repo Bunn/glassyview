@@ -35,13 +35,7 @@ struct ReleaseAnnouncementView: View {
             PaywallBackdrop(animates: !reduceMotion && scenePhase == .active)
         }
         .overlay(alignment: .topTrailing) {
-            Button("Close", systemImage: "xmark", action: dismiss.callAsFunction)
-                .labelStyle(.iconOnly)
-                .font(.body.weight(.semibold))
-                .frame(minWidth: 44, minHeight: 44)
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .padding(12)
+            SheetCloseButton(action: dismiss.callAsFunction)
                 .accessibilityIdentifier("releaseAnnouncement.close")
         }
         // The default iPad form sheet is too short for the full-height layout.

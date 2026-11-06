@@ -49,13 +49,7 @@ struct ProPaywallSheet: View {
         }
         .overlay(alignment: .topTrailing) {
             if !isCelebrating {
-                Button("Close", systemImage: "xmark", action: dismiss.callAsFunction)
-                    .labelStyle(.iconOnly)
-                    .font(.body.weight(.semibold))
-                    .frame(minWidth: 44, minHeight: 44)
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.circle)
-                    .padding(12)
+                SheetCloseButton(action: dismiss.callAsFunction)
                     .disabled(subscriptionStore.isPurchasing)
                     .accessibilityIdentifier("subscription.paywall.close")
                     .transition(.opacity)
