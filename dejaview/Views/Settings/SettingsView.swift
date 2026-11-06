@@ -146,6 +146,13 @@ struct SettingsView: View {
 
             Section("About") {
                 NavigationLink {
+                    WhatsNewHistoryView()
+                } label: {
+                    Label("What's New", systemImage: "sparkles")
+                }
+                .accessibilityIdentifier("settings.whatsNewLink")
+
+                NavigationLink {
                     AboutView()
                 } label: {
                     Label("About Glassy Desk", systemImage: "info.circle")

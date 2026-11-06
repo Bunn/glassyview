@@ -84,11 +84,32 @@ struct ReleaseAnnouncementTests {
         #expect(pending(state, at: over)?.asksForReview == true)
     }
 
-    @Test("The shipped release has content and no invented reviews")
+    @Test("The shipped releases have content and no invented reviews")
     func shippedContent() {
-        #expect(!WhatsNewRelease.current.features.isEmpty)
-        #expect(Set(WhatsNewRelease.current.features.map(\.id)).count == WhatsNewRelease.current.features.count)
+        #expect(WhatsNewRelease.current == WhatsNewRelease.all.first)
+        for release in WhatsNewRelease.all {
+            #expect(!release.features.isEmpty, "\(release.id) has no features")
+            #expect(Set(release.features.map(\.id)).count == release.features.count, "\(release.id) repeats a feature")
+        }
         #expect(AppReviewTestimonial.published.allSatisfy { (1...5).contains($0.rating) })
+    }
+
+    @Test("The release list is newest first, with one entry per version")
+    func releaseOrder() {
+        let versions = WhatsNewRelease.all.map { $0.id.split(separator: ".").compactMap { Int($0) } }
+        #expect(Set(WhatsNewRelease.all.map(\.id)).count == WhatsNewRelease.all.count)
+        #expect(zip(versions, versions.dropFirst()).allSatisfy { $0.lexicographicallyPrecedes($1) == false && $0 != $1 })
+    }
+
+    @Test("The launch announces the newest release")
+    func announcesNewest() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defaults.removePersistentDomain(forName: #function)
+        let state = ReleaseAnnouncementState(defaults: defaults)
+
+        let announcement = state.pendingAnnouncement(hasCompletedOnboarding: true, hasUsedApp: true,
+                                                     isPayingCustomer: false)
+        #expect(announcement?.release.id == WhatsNewRelease.all.first?.id)
     }
 
     @Test("Events use the names and source the Worker allows")

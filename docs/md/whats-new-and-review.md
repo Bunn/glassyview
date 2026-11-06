@@ -17,7 +17,11 @@ Both screens appear at most once per announced release, even if they're closed s
 
 ## Announcing a release
 
-Update `WhatsNewRelease.current` in [ReleaseAnnouncement.swift](../../dejaview/Services/ReleaseAnnouncements/ReleaseAnnouncement.swift) with a new `id` and its features, and add the translations to `Localizable.xcstrings`. Keep this to a few big releases a year. A new App Store version on its own doesn't show anything.
+Add the release to the top of `WhatsNewRelease.all` in [ReleaseAnnouncement.swift](../../dejaview/Services/ReleaseAnnouncements/ReleaseAnnouncement.swift), with its version as the `id` and its features, and add the translations to `Localizable.xcstrings`. The first entry is the one announced after launch. Keep this to a few big releases a year. A new App Store version on its own doesn't show anything, and bug-fix releases stay out of the list.
+
+## What's New in Settings
+
+**Settings > About > What's New** lists every release in `WhatsNewRelease.all`, newest first, with the same features and footnotes as the launch screen. The list goes back to 1.2, written from the App Store release notes. Reading it doesn't mark a release as announced, so it never skips the launch screen or the review screen that follows it.
 
 ## The review screen
 

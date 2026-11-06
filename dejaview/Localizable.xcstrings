@@ -995,6 +995,86 @@
         }
       }
     },
+    "A New Controls Menu" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein neues Steuerungsmenü"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un nuevo menú de controles"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいコントロールメニュー"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een nieuw bedieningsmenu"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um novo menu de controles"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全新的控制菜单"
+          }
+        }
+      }
+    },
+    "A precise pointer with hover, plus double-tap and squeeze actions." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein präziser Zeiger mit Schweben, dazu Aktionen für Doppeltippen und Drücken."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un puntero preciso con función flotante, además de acciones al tocar dos veces y apretar."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホバーに対応した正確なポインタに加え、ダブルタップやスクイーズの操作も使えます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een precieze aanwijzer met zweven, plus acties voor dubbeltikken en knijpen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um ponteiro preciso com passar o cursor, além de ações de toque duplo e apertar."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持悬停的精准指针，还可使用轻点两下和捏压操作。"
+          }
+        }
+      }
+    },
     "A session supports taps, drags, right click gestures, scrolling, pinch zoom, hardware keyboard input, and the on-screen shortcut strip." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1072,6 +1152,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "稍作休息，即可继续。倒计时结束后，就能开始新的免费会话。"
+          }
+        }
+      }
+    },
+    "A streamlined menu gives your desktop more room, whether it's expanded or collapsed." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein schlankeres Menü gibt deinem Schreibtisch mehr Platz, ob ausgeklappt oder eingeklappt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un menú más sencillo deja más espacio al escritorio, tanto expandido como contraído."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すっきりしたメニューで、展開しても折りたたんでもデスクトップを広く表示できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een gestroomlijnd menu geeft je bureaublad meer ruimte, of het nu uitgevouwen of samengevouwen is."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um menu mais enxuto dá mais espaço à mesa, esteja ele expandido ou recolhido."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精简的菜单无论展开还是收起，都能为桌面留出更多空间。"
           }
         }
       }
@@ -1825,6 +1945,46 @@
         }
       }
     },
+    "App Lock" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App-Sperre"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloqueo de la app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appロック"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App-vergrendeling"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bloqueio do app"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 锁"
+          }
+        }
+      }
+    },
     "App User ID" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1862,6 +2022,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "应用程序用户 ID"
+          }
+        }
+      }
+    },
+    "Apple Pencil" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Pencil"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Pencil"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Pencil"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Pencil"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Pencil"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Pencil"
           }
         }
       }
@@ -2321,6 +2521,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最适合 Mac"
+          }
+        }
+      }
+    },
+    "Better Typing" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Besseres Tippen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mejor escritura"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力しやすく"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beter typen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digitação melhor"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更好的输入体验"
           }
         }
       }
@@ -3232,6 +3472,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除最近的会话？"
+          }
+        }
+      }
+    },
+    "Clearer Connection Setup" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Übersichtlichere Verbindungseinrichtung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuración de conexión más clara"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "わかりやすくなった接続設定"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duidelijkere verbindingsinstellingen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuração de conexão mais clara"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更清晰的连接设置"
           }
         }
       }
@@ -5056,6 +5336,46 @@
     "Couldn’t Update Saved Mac" : {
 
     },
+    "Cover the Mac's screen and keep anyone at the Mac from using it while you're connected." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verdecke den Bildschirm des Mac und verhindere, dass jemand vor Ort ihn bedient, solange du verbunden bist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cubre la pantalla del Mac e impide que alguien lo use desde el propio Mac mientras estás conectado."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続中はMacの画面を隠し、Macの前にいる人が操作できないようにします。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bedek het scherm van de Mac en voorkom dat iemand bij de Mac hem gebruikt terwijl je verbonden bent."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cubra a tela do Mac e impeça que alguém use o próprio Mac enquanto você está conectado."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接期间遮住 Mac 的屏幕，让 Mac 前的人无法操作。"
+          }
+        }
+      }
+    },
     "Ctrl" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5134,6 +5454,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "当前产品"
+          }
+        }
+      }
+    },
+    "Curtain Mode" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Curtain Mode"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Curtain Mode"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Curtain Mode"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Curtain Mode"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Curtain Mode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Curtain Mode"
           }
         }
       }
@@ -7873,6 +8233,86 @@
         }
       }
     },
+    "File Transfer" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dateiübertragung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transferencia de archivos"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイル転送"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bestandsoverdracht"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transferência de arquivos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件传输"
+          }
+        }
+      }
+    },
+    "File Transfer and Curtain Mode require Fast Connection." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dateiübertragung und Curtain Mode erfordern Schnellverbindung."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La transferencia de archivos y Curtain Mode requieren Conexión rápida."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイル転送とCurtain Modeには高速接続が必要です。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bestandsoverdracht en Curtain Mode vereisen Snelle verbinding."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A transferência de arquivos e o Curtain Mode requerem Conexão rápida."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件传输和 Curtain Mode 需要快速连接。"
+          }
+        }
+      }
+    },
     "Files copied on your Mac" : {
       "localizations" : {
         "de" : {
@@ -9185,6 +9625,46 @@
         }
       }
     },
+    "Glassy Desk for Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk für Mac"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk para Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk for Mac"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk voor Mac"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk para Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk for Mac"
+          }
+        }
+      }
+    },
     "Glassy Desk for Mac is an optional faster way to connect. Install it, then scan its code." : {
       "localizations" : {
         "de" : {
@@ -10291,6 +10771,46 @@
     "Install Tailscale on your Mac and this iPhone or iPad. Sign in with the same account on both." : {
 
     },
+    "Install the companion app on your Mac and choose Fast Connection for faster, more responsive sessions. Pair by scanning the code on your Mac or entering it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installiere die Begleit-App auf deinem Mac und wähle Schnellverbindung für schnellere, reaktionsfreudigere Sitzungen. Kopple, indem du den Code auf deinem Mac scannst oder eingibst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instala la app complementaria en tu Mac y elige Conexión rápida para sesiones más rápidas y fluidas. Enlázalos escaneando el código de tu Mac o introduciéndolo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macにコンパニオンアプリをインストールし、高速接続を選ぶと、より速く反応のよいセッションになります。Macに表示されるコードをスキャンするか入力してペアリングします。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installeer de begeleidende app op je Mac en kies Snelle verbinding voor snellere sessies die beter reageren. Koppel door de code op je Mac te scannen of in te voeren."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instale o app complementar no seu Mac e escolha Conexão rápida para sessões mais rápidas e responsivas. Emparelhe lendo o código no seu Mac ou digitando-o."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Mac 上安装配套 App 并选择快速连接，会话会更快、响应更灵敏。扫描或输入 Mac 上显示的代码即可配对。"
+          }
+        }
+      }
+    },
     "Interrupted" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10662,11 +11182,131 @@
         }
       }
     },
+    "Keep watching your Mac while you use other apps." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Behalte deinen Mac im Blick, während du andere Apps verwendest."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sigue viendo tu Mac mientras usas otras apps."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかのAppを使いながらMacの画面を表示し続けられます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Houd je Mac in beeld terwijl je andere apps gebruikt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue vendo seu Mac enquanto usa outros apps."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用其他 App 时也能继续查看 Mac。"
+          }
+        }
+      }
+    },
     "Keep your Mac awake and online, with Glassy Desk open and Allow connections enabled. Leave Tailscale connected on both devices, then open your saved Mac as usual." : {
 
     },
     "Keep your Mac awake, online, and Screen Sharing enabled. Leave Tailscale connected on both devices, then open your saved Mac in Glassy Desk." : {
 
+    },
+    "Keyboard and Trackpad Mode" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tastatur- und Trackpad-Modus"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo teclado y trackpad"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キーボードとトラックパッドモード"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toetsenbord- en trackpadmodus"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo teclado e trackpad"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "键盘和触控板模式"
+          }
+        }
+      }
+    },
+    "Layouts adapt to the fold. Half-folded, the lower half becomes a trackpad with an optional keyboard." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Layouts passen sich dem Falz an. Halb aufgeklappt wird die untere Hälfte zum Trackpad mit optionaler Tastatur."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El diseño se adapta al pliegue. Medio plegado, la mitad inferior se convierte en un trackpad con teclado opcional."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レイアウトが折り目に合わせて変わります。半分に折ると、下半分がトラックパッドになり、キーボードも表示できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lay-outs passen zich aan de vouw aan. Half gevouwen wordt de onderste helft een trackpad met optioneel toetsenbord."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os layouts se adaptam à dobra. Meio dobrado, a metade inferior vira um trackpad com teclado opcional."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "布局会随折叠方式自动调整。半折时，下半部分会变成触控板，还可显示键盘。"
+          }
+        }
+      }
     },
     "Leave your Mac ready" : {
 
@@ -11255,6 +11895,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mac 在此网络上广告屏幕共享。"
+          }
+        }
+      }
+    },
+    "Made for iPhone Duo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemacht für iPhone Duo"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pensado para iPhone Duo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone Duoに対応"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemaakt voor iPhone Duo"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feito para o iPhone Duo"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为 iPhone Duo 打造"
           }
         }
       }
@@ -14052,6 +14732,46 @@
         }
       }
     },
+    "Picture in Picture" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild-in-Bild"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imagen en imagen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ピクチャ・イン・ピクチャ"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beeld-in-beeld"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Picture in Picture"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画中画"
+          }
+        }
+      }
+    },
     "Picture in Picture, files, and Curtain Mode." : {
       "localizations" : {
         "de" : {
@@ -14544,6 +15264,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "产品"
+          }
+        }
+      }
+    },
+    "Protect Glassy Desk with Face ID, Touch ID, or your passcode." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schütze Glassy Desk mit Face ID, Touch ID oder deinem Code."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protege Glassy Desk con Face ID, Touch ID o tu código."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Face ID、Touch ID、またはパスコードでGlassy Deskを保護できます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beveilig Glassy Desk met Face ID, Touch ID of je toegangscode."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proteja o Glassy Desk com Face ID, Touch ID ou seu código."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用面容 ID、触控 ID 或密码保护 Glassy Desk。"
           }
         }
       }
@@ -17208,6 +17968,46 @@
         }
       }
     },
+    "Send files and photos to your Mac, and bring files from the Mac's Finder into the Files app." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sende Dateien und Fotos an deinen Mac und hole Dateien aus dem Finder des Mac in die Dateien-App."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envía archivos y fotos a tu Mac, y trae archivos del Finder del Mac a la app Archivos."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルや写真をMacに送ったり、MacのFinderにあるファイルを“ファイル”Appに取り込んだりできます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stuur bestanden en foto's naar je Mac en haal bestanden uit de Finder van de Mac naar de Bestanden-app."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envie arquivos e fotos para o seu Mac e traga arquivos do Finder do Mac para o app Arquivos."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将文件和照片发送到 Mac，或将 Mac“访达”中的文件存入“文件” App。"
+          }
+        }
+      }
+    },
     "Send Return" : {
       "localizations" : {
         "de" : {
@@ -17985,6 +18785,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用 macOS 凭据登录"
+          }
+        }
+      }
+    },
+    "Siri and Shortcuts in Every Window" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri und Kurzbefehle in jedem Fenster"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri y Atajos en todas las ventanas"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのウインドウでSiriとショートカット"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri en Opdrachten in elk venster"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri e Atalhos em todas as janelas"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在每个窗口中使用 Siri 和快捷指令"
+          }
+        }
+      }
+    },
+    "Siri and Shortcuts now work reliably when Glassy Desk has more than one window open." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri und Kurzbefehle funktionieren jetzt zuverlässig, wenn Glassy Desk mehrere Fenster geöffnet hat."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri y Atajos ahora funcionan bien cuando Glassy Desk tiene más de una ventana abierta."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Deskで複数のウインドウを開いていても、Siriとショートカットが確実に動作するようになりました。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri en Opdrachten werken nu betrouwbaar als Glassy Desk meer dan één venster open heeft."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A Siri e os Atalhos agora funcionam bem quando o Glassy Desk tem mais de uma janela aberta."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glassy Desk 打开多个窗口时，Siri 和快捷指令现在也能可靠运行。"
           }
         }
       }
@@ -21342,6 +22222,46 @@
         }
       }
     },
+    "Version %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versión %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バージョン %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versie %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versão %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %@"
+          }
+        }
+      }
+    },
     "Version %@ (%@)" : {
       "localizations" : {
         "de" : {
@@ -21511,6 +22431,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "VNC 主机或 IP 地址"
+          }
+        }
+      }
+    },
+    "VNC options are always visible, and saved Macs keep their connection type when you edit them." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VNC-Optionen sind immer sichtbar, und gesicherte Macs behalten ihren Verbindungstyp, wenn du sie bearbeitest."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las opciones de VNC siempre están visibles y los Mac guardados conservan su tipo de conexión al editarlos."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VNCのオプションが常に表示され、保存したMacを編集しても接続の種類が変わりません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VNC-opties zijn altijd zichtbaar en bewaarde Macs houden hun verbindingstype als je ze wijzigt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As opções de VNC ficam sempre visíveis, e os Macs salvos mantêm o tipo de conexão quando você os edita."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VNC 选项始终可见，编辑已存储的 Mac 时也会保留其连接类型。"
           }
         }
       }
@@ -22382,6 +23342,46 @@
         }
       }
     },
+    "With Standard VNC and an external display, your iPhone or iPad becomes a keyboard and trackpad while your desktop stays on the bigger screen." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit Standard-VNC und einem externen Display wird dein iPhone oder iPad zu Tastatur und Trackpad, während dein Schreibtisch auf dem größeren Bildschirm bleibt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con VNC estándar y una pantalla externa, tu iPhone o iPad se convierte en teclado y trackpad mientras el escritorio se queda en la pantalla grande."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標準 VNCと外部ディスプレイを使うと、デスクトップを大きな画面に表示したまま、iPhoneやiPadをキーボードとトラックパッドとして使えます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Met Standaard VNC en een extern scherm wordt je iPhone of iPad een toetsenbord en trackpad, terwijl je bureaublad op het grotere scherm blijft."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com VNC padrão e uma tela externa, seu iPhone ou iPad vira teclado e trackpad enquanto a mesa fica na tela maior."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用标准 VNC 和外接显示器时，iPhone 或 iPad 可用作键盘和触控板，桌面则保留在更大的屏幕上。"
+          }
+        }
+      }
+    },
     "Write a Review" : {
       "localizations" : {
         "de" : {
@@ -22591,6 +23591,46 @@
     },
     "You can still connect by entering the pairing code shown on your Mac." : {
 
+    },
+    "Your content stays visible and is easier to reposition while you type." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Inhalte bleiben beim Tippen sichtbar und lassen sich leichter verschieben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El contenido sigue visible y es más fácil de recolocar mientras escribes."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力中もコンテンツが隠れず、位置を調整しやすくなりました。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je inhoud blijft zichtbaar en is makkelijker te verplaatsen terwijl je typt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O conteúdo continua visível e fica mais fácil de reposicionar enquanto você digita."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入时内容保持可见，也更容易调整位置。"
+          }
+        }
+      }
     },
     "Your Mac is blocking this. In Privacy & Security on the Mac, set Glassy Desk to Allow under Paste from Other Apps." : {
       "localizations" : {
