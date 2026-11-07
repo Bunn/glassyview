@@ -26,7 +26,11 @@ struct HostClipboardPasteService: Sendable {
 
         // Use only Command even if the remote shortcut strip holds Shift or
         // Option; those modifiers would turn a plain paste into another action.
+        // Press and release Command itself: a flagged V alone leaves Quartz's
+        // global modifier state at Command, so later clicks become Command-clicks.
+        postKey(55, true, .maskCommand) // kVK_Command
         postKey(9, true, .maskCommand) // kVK_ANSI_V
         postKey(9, false, .maskCommand)
+        postKey(55, false, [])
     }
 }
