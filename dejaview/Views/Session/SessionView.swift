@@ -247,6 +247,13 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         .onChange(of: showsInputBar) { _, _ in
             logDisplayControlState(reason: "inputBarVisibilityChanged")
         }
+        .onChange(of: inputFocused) { wasFocused, focused in
+            // With instant keys there is no field to tap to bring the keyboard
+            // back, so dismissing it closes the bar and restores the controls.
+            if wasFocused, !focused, sendsKeystrokesInstantly, showsInputBar {
+                toggleInputBar()
+            }
+        }
         .onChange(of: foldedKeyboardFocused) { _, focused in
             // UIKit can also hide the keyboard when a menu or another window
             // takes focus. Never leave a remote modifier held without its keys.
@@ -936,52 +943,45 @@ struct SessionView<Session: RemoteSessionControlling>: View {
                                  heldModifierKeys: $heldModifierKeys,
                                  onSend: focusInputBar)
 
-            HStack(spacing: 10) {
-                if sendsKeystrokesInstantly {
-                    directKeystrokeInput
-                } else {
+            // Instant keys have no text to edit, so only the shortcut strip
+            // sits above the keyboard; the keyboard's own Return key sends Return.
+            if !sendsKeystrokesInstantly {
+                HStack(spacing: 10) {
                     RemoteSessionTextField("Type to send to the Mac…",
                                            text: $textToSend,
                                            isFocused: $inputFocused,
                                            onSubmit: submitSoftwareInput)
-                }
 
-                Button("Send Return", systemImage: "return", action: sendSoftwareReturn)
-                    .labelStyle(.iconOnly)
-                    .font(.body.weight(.medium))
+                    Button("Send Return", systemImage: "return", action: sendSoftwareReturn)
+                        .labelStyle(.iconOnly)
+                        .font(.body.weight(.medium))
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .fixedSize(horizontal: false, vertical: true)
+                .liquidGlass(in: Capsule())
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .fixedSize(horizontal: false, vertical: true)
-            .liquidGlass(in: Capsule())
+        }
+        .background(alignment: .bottomLeading) {
+            if sendsKeystrokesInstantly {
+                directKeystrokeInput
+            }
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
     }
 
     /// Sends every keystroke as it is typed, without a local text buffer.
+    /// An invisible responder: the keyboard itself is the only visible input.
     private var directKeystrokeInput: some View {
-        Button(action: focusInputBar) {
-            Label(inputFocused ? "Keys go straight to the Mac" : "Tap to type on the Mac",
-                  systemImage: "keyboard")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Shows the keyboard. Each key is sent to the Mac as you type.")
-        .background(alignment: .leading) {
-            RemoteSoftwareKeyboardInput(focusRequest: directInputFocusRequest,
-                                        isFocused: $inputFocused,
-                                        onInsertText: sendDirectText,
-                                        onDeleteBackward: { session.sendKey(.delete) },
-                                        onReturn: { session.sendReturn() },
-                                        onPasteText: session.supportsClipboardPaste ? session.pasteText : nil)
-                .frame(width: 1, height: 1)
-                .accessibilityHidden(true)
-        }
+        RemoteSoftwareKeyboardInput(focusRequest: directInputFocusRequest,
+                                    isFocused: $inputFocused,
+                                    onInsertText: sendDirectText,
+                                    onDeleteBackward: { session.sendKey(.delete) },
+                                    onReturn: { session.sendReturn() },
+                                    onPasteText: session.supportsClipboardPaste ? session.pasteText : nil)
+            .frame(width: 1, height: 1)
+            .accessibilityHidden(true)
     }
 
     private func sendDirectText(_ text: String) {

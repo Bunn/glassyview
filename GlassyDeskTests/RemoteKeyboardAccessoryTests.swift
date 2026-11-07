@@ -82,6 +82,10 @@ extension SessionLayoutTests {
         input.onInsertText = { streamedText.append($0) }
         input.setAccessoryContent(AnyView(Text("Replacement special keys")))
         input.deactivate()
+        // SwiftUI calls deactivate() from dismantleUIView mid graph teardown;
+        // resigning there queries the dying hosting graph and aborts. The
+        // resign must wait for the next main-actor turn.
+        #expect(input.isFirstResponder)
         input.setAccessoryContent(AnyView(Text("Late special keys")))
         input.setFocus(true, request: 2)
         input.insertText("late")
@@ -91,6 +95,7 @@ extension SessionLayoutTests {
         #expect(!input.canBecomeFirstResponder)
         #expect(streamedText.isEmpty)
     }
+
 }
 
 @MainActor
