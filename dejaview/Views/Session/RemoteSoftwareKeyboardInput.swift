@@ -231,11 +231,24 @@ struct RemoteSoftwareKeyboardInput: UIViewRepresentable {
             wantsFocus = false
             requestedFocus = false
             hasPendingFocusRequest = false
+            // The dismantled view's binding must not change session state.
+            onFocusChange = { _ in }
 
-            if isFirstResponder {
-                _ = resignFirstResponder()
+            guard isFirstResponder else {
+                accessoryController = nil
+                return
             }
-            accessoryController = nil
+            // SwiftUI calls this while tearing down the view graph. Resigning
+            // walks the responder chain into the hosting view, whose graph is
+            // mid-invalidation, and AttributeGraph aborts. Resign on the next
+            // main-actor turn, as RemoteSessionTextField does.
+            Task { @MainActor [inputView = self] in
+                await Task.yield()
+                if inputView.isFirstResponder {
+                    _ = inputView.resignFirstResponder()
+                }
+                inputView.accessoryController = nil
+            }
         }
 
         func insertText(_ text: String) {
