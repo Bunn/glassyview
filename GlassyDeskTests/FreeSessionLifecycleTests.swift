@@ -7,13 +7,13 @@ import Testing
 struct FreeSessionLifecycleTests {
     private let start = Date(timeIntervalSince1970: 10_000)
 
-    @Test("A connected free session gets one minute without extending on repeated updates")
+    @Test("A connected free session gets 90 seconds without extending on repeated updates")
     func startsOnce() {
         withLifecycle { lifecycle, _ in
             #expect(lifecycle.startIfNeeded(at: start))
             #expect(!lifecycle.startIfNeeded(at: start.addingTimeInterval(20)))
-            #expect(lifecycle.sessionEndDate == start.addingTimeInterval(60))
-            #expect(!lifecycle.endIfNeeded(at: start.addingTimeInterval(59.999)))
+            #expect(lifecycle.sessionEndDate == start.addingTimeInterval(90))
+            #expect(!lifecycle.endIfNeeded(at: start.addingTimeInterval(89.999)))
             #expect(lifecycle.cooldown == nil)
         }
     }
@@ -22,30 +22,30 @@ struct FreeSessionLifecycleTests {
     func expiresOnce() {
         withLifecycle { lifecycle, _ in
             lifecycle.startIfNeeded(at: start)
-            #expect(lifecycle.endIfNeeded(at: start.addingTimeInterval(60)))
+            #expect(lifecycle.endIfNeeded(at: start.addingTimeInterval(90)))
             #expect(lifecycle.sessionEndDate == nil)
-            #expect(lifecycle.cooldown?.endDate == start.addingTimeInterval(150))
-            #expect(!lifecycle.endIfNeeded(at: start.addingTimeInterval(65)))
-            #expect(!lifecycle.startIfNeeded(at: start.addingTimeInterval(65)))
-            #expect(lifecycle.cooldown?.endDate == start.addingTimeInterval(150))
+            #expect(lifecycle.cooldown?.endDate == start.addingTimeInterval(180))
+            #expect(!lifecycle.endIfNeeded(at: start.addingTimeInterval(95)))
+            #expect(!lifecycle.startIfNeeded(at: start.addingTimeInterval(95)))
+            #expect(lifecycle.cooldown?.endDate == start.addingTimeInterval(180))
         }
     }
 
-    @Test("Restart unlocks at zero and the next minute starts only after connecting")
+    @Test("Restart unlocks at zero and the next session starts only after connecting")
     func restartBoundary() {
         withLifecycle { lifecycle, _ in
             lifecycle.startIfNeeded(at: start)
-            lifecycle.endIfNeeded(at: start.addingTimeInterval(60))
-            #expect(!lifecycle.prepareNextSession(at: start.addingTimeInterval(149.999)))
-            #expect(lifecycle.prepareNextSession(at: start.addingTimeInterval(150)))
-            #expect(!lifecycle.prepareNextSession(at: start.addingTimeInterval(150)))
+            lifecycle.endIfNeeded(at: start.addingTimeInterval(90))
+            #expect(!lifecycle.prepareNextSession(at: start.addingTimeInterval(179.999)))
+            #expect(lifecycle.prepareNextSession(at: start.addingTimeInterval(180)))
+            #expect(!lifecycle.prepareNextSession(at: start.addingTimeInterval(180)))
             #expect(lifecycle.cooldown == nil)
             #expect(lifecycle.sessionEndDate == nil)
 
-            #expect(lifecycle.startIfNeeded(at: start.addingTimeInterval(155)))
-            #expect(lifecycle.sessionEndDate == start.addingTimeInterval(215))
-            #expect(lifecycle.endIfNeeded(at: start.addingTimeInterval(215)))
-            #expect(lifecycle.cooldown?.endDate == start.addingTimeInterval(305))
+            #expect(lifecycle.startIfNeeded(at: start.addingTimeInterval(185)))
+            #expect(lifecycle.sessionEndDate == start.addingTimeInterval(275))
+            #expect(lifecycle.endIfNeeded(at: start.addingTimeInterval(275)))
+            #expect(lifecycle.cooldown?.endDate == start.addingTimeInterval(365))
         }
     }
 
@@ -53,13 +53,13 @@ struct FreeSessionLifecycleTests {
     func persistsCooldown() {
         withLifecycle { lifecycle, defaults in
             lifecycle.startIfNeeded(at: start)
-            lifecycle.endIfNeeded(at: start.addingTimeInterval(60))
+            lifecycle.endIfNeeded(at: start.addingTimeInterval(90))
             lifecycle.resetActiveSession()
-            let reopened = FreeSessionLifecycle(defaults: defaults, now: start.addingTimeInterval(75))
+            let reopened = FreeSessionLifecycle(defaults: defaults, now: start.addingTimeInterval(105))
             #expect(reopened.cooldown == lifecycle.cooldown)
-            #expect(reopened.cooldown?.remainingSeconds(at: start.addingTimeInterval(75)) == 75)
-            #expect(!reopened.startIfNeeded(at: start.addingTimeInterval(75)))
-            #expect(!reopened.prepareNextSession(at: start.addingTimeInterval(75)))
+            #expect(reopened.cooldown?.remainingSeconds(at: start.addingTimeInterval(105)) == 75)
+            #expect(!reopened.startIfNeeded(at: start.addingTimeInterval(105)))
+            #expect(!reopened.prepareNextSession(at: start.addingTimeInterval(105)))
         }
     }
 
@@ -67,10 +67,10 @@ struct FreeSessionLifecycleTests {
     func delayedExpiry() {
         withLifecycle { lifecycle, _ in
             lifecycle.startIfNeeded(at: start)
-            lifecycle.endIfNeeded(at: start.addingTimeInterval(85))
-            #expect(lifecycle.cooldown?.remainingSeconds(at: start.addingTimeInterval(85)) == 65)
-            #expect(lifecycle.cooldown?.remainingSeconds(at: start.addingTimeInterval(155)) == 0)
-            #expect(lifecycle.prepareNextSession(at: start.addingTimeInterval(155)))
+            lifecycle.endIfNeeded(at: start.addingTimeInterval(115))
+            #expect(lifecycle.cooldown?.remainingSeconds(at: start.addingTimeInterval(115)) == 65)
+            #expect(lifecycle.cooldown?.remainingSeconds(at: start.addingTimeInterval(185)) == 0)
+            #expect(lifecycle.prepareNextSession(at: start.addingTimeInterval(185)))
         }
     }
 
@@ -78,10 +78,10 @@ struct FreeSessionLifecycleTests {
     func ignoresExpiredStoredCooldown() {
         withLifecycle { lifecycle, defaults in
             lifecycle.startIfNeeded(at: start)
-            lifecycle.endIfNeeded(at: start.addingTimeInterval(60))
-            let reopened = FreeSessionLifecycle(defaults: defaults, now: start.addingTimeInterval(150))
+            lifecycle.endIfNeeded(at: start.addingTimeInterval(90))
+            let reopened = FreeSessionLifecycle(defaults: defaults, now: start.addingTimeInterval(180))
             #expect(reopened.cooldown == nil)
-            #expect(reopened.startIfNeeded(at: start.addingTimeInterval(150)))
+            #expect(reopened.startIfNeeded(at: start.addingTimeInterval(180)))
         }
     }
 
@@ -92,10 +92,10 @@ struct FreeSessionLifecycleTests {
             lifecycle.clearLimits()
             #expect(lifecycle.sessionEndDate == nil)
             lifecycle.startIfNeeded(at: start)
-            lifecycle.endIfNeeded(at: start.addingTimeInterval(60))
+            lifecycle.endIfNeeded(at: start.addingTimeInterval(90))
             lifecycle.clearLimits()
             #expect(lifecycle.cooldown == nil)
-            let reopened = FreeSessionLifecycle(defaults: defaults, now: start.addingTimeInterval(61))
+            let reopened = FreeSessionLifecycle(defaults: defaults, now: start.addingTimeInterval(91))
             #expect(reopened.cooldown == nil)
         }
     }

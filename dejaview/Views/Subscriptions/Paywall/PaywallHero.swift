@@ -238,7 +238,7 @@ struct PaywallHeadline: View {
         case .freeSessionCooldown:
             "Skip the break and get back to your Mac now."
         case .sessionLimit:
-            "Your free minute is up. Pick up right where you left off."
+            "Your free session is up. Pick up right where you left off."
         }
     }
 }
