@@ -10,6 +10,9 @@ struct SettingsView: View {
     @AppStorage(RemotePictureInPictureCoordinator.startsAutomaticallyKey)
     private var startsPictureInPictureAutomatically = RemotePictureInPictureCoordinator.defaultStartsAutomatically
 
+    @AppStorage(KeyboardInputPreference.sendsKeystrokesInstantlyKey)
+    private var sendsKeystrokesInstantly = KeyboardInputPreference.defaultSendsKeystrokesInstantly
+
     @State private var isPaywallPresented = false
     @State private var appLock = AppLockController.shared
     @AppStorage(PencilShortcutAction.preferenceKey)
@@ -102,14 +105,21 @@ struct SettingsView: View {
                 Text("Security")
             }
 
-            if RemotePictureInPictureCoordinator.shared.isSupported {
-                Section {
+            Section {
+                Toggle(isOn: $sendsKeystrokesInstantly) {
+                    Label("Send Keys Instantly", systemImage: "keyboard")
+                }
+                .accessibilityIdentifier("settings.sendKeysInstantly")
+
+                if RemotePictureInPictureCoordinator.shared.isSupported {
                     Toggle(isOn: $startsPictureInPictureAutomatically) {
                         Label("Picture in Picture When Leaving", systemImage: "pip")
                     }
-                } header: {
-                    Text("Sessions")
                 }
+            } header: {
+                Text("Sessions")
+            } footer: {
+                Text("When on, each key you type on the on-screen keyboard goes straight to the Mac instead of into a text field you send with Return.")
             }
 
             if UIDevice.current.userInterfaceIdiom == .pad {

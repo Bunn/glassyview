@@ -27,6 +27,9 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     @State private var heldModifierKeys: Set<RemoteModifierKey> = []
     @State private var showsInputBar = false
     @State private var textToSend = ""
+    @State private var directInputFocusRequest = 0
+    @AppStorage(KeyboardInputPreference.sendsKeystrokesInstantlyKey)
+    private var sendsKeystrokesInstantly = KeyboardInputPreference.defaultSendsKeystrokesInstantly
     @State private var streamZoomScale: CGFloat = 1
     @State private var zoomScaleBeforeInputBar: CGFloat?
     @State private var followsCursorWhenZoomed = true
@@ -870,7 +873,11 @@ struct SessionView<Session: RemoteSessionControlling>: View {
             zoomScaleBeforeInputBar = streamZoomScale
             showsInputBar = true
         }
-        inputFocused = showsInputBar
+        if showsInputBar {
+            focusInputBar()
+        } else {
+            inputFocused = false
+        }
 
         if !showsInputBar {
             releaseHeldModifierKeys()
@@ -926,15 +933,18 @@ struct SessionView<Session: RemoteSessionControlling>: View {
     private var inputBar: some View {
         VStack(spacing: 8) {
             SessionShortcutStrip(session: session,
-                                 heldModifierKeys: $heldModifierKeys) {
-                inputFocused = true
-            }
+                                 heldModifierKeys: $heldModifierKeys,
+                                 onSend: focusInputBar)
 
             HStack(spacing: 10) {
-                RemoteSessionTextField("Type to send to the Mac…",
-                                       text: $textToSend,
-                                       isFocused: $inputFocused,
-                                       onSubmit: submitSoftwareInput)
+                if sendsKeystrokesInstantly {
+                    directKeystrokeInput
+                } else {
+                    RemoteSessionTextField("Type to send to the Mac…",
+                                           text: $textToSend,
+                                           isFocused: $inputFocused,
+                                           onSubmit: submitSoftwareInput)
+                }
 
                 Button("Send Return", systemImage: "return", action: sendSoftwareReturn)
                     .labelStyle(.iconOnly)
@@ -947,6 +957,41 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
+    }
+
+    /// Sends every keystroke as it is typed, without a local text buffer.
+    private var directKeystrokeInput: some View {
+        Button(action: focusInputBar) {
+            Label(inputFocused ? "Keys go straight to the Mac" : "Tap to type on the Mac",
+                  systemImage: "keyboard")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Shows the keyboard. Each key is sent to the Mac as you type.")
+        .background(alignment: .leading) {
+            RemoteSoftwareKeyboardInput(focusRequest: directInputFocusRequest,
+                                        isFocused: $inputFocused,
+                                        onInsertText: sendDirectText,
+                                        onDeleteBackward: { session.sendKey(.delete) },
+                                        onReturn: { session.sendReturn() },
+                                        onPasteText: session.supportsClipboardPaste ? session.pasteText : nil)
+                .frame(width: 1, height: 1)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private func sendDirectText(_ text: String) {
+        guard !text.isEmpty else { return }
+        session.sendText(text)
+    }
+
+    private func focusInputBar() {
+        inputFocused = true
+        directInputFocusRequest += 1
     }
 
     // MARK: - File transfer
@@ -1009,12 +1054,12 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         AppLog.ui.debug("Software input submitted; characterCount=\(self.textToSend.count, privacy: .public)")
         session.sendText(textToSend)
         textToSend = ""
-        inputFocused = true
+        focusInputBar()
     }
 
     private func sendSoftwareReturn() {
         AppLog.ui.debug("Software return key tapped")
         session.sendReturn()
-        inputFocused = true
+        focusInputBar()
     }
 }
