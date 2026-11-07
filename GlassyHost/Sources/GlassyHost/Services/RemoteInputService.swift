@@ -206,11 +206,17 @@ final class RemoteInputService: @unchecked Sendable {
             pressedOrdinaryKeys.removeValue(forKey: mapping.keyCode)
         }
 
-        postKeyboard(
-            keyCode: mapping.keyCode,
-            isDown: input.isDown,
-            flags: currentModifierFlags.union(mapping.requiredFlags)
-        )
+        if mapping.modifierFlag != nil {
+            postKeyboard(keyCode: mapping.keyCode,
+                         isDown: input.isDown,
+                         flags: currentModifierFlags)
+            return
+        }
+
+        let flags = currentModifierFlags.union(mapping.requiredFlags)
+        withTransientModifiers(flags) {
+            postKeyboard(keyCode: mapping.keyCode, isDown: input.isDown, flags: flags)
+        }
     }
 
     private func handleText(_ input: HostProtocol.TextInput) {
@@ -222,16 +228,20 @@ final class RemoteInputService: @unchecked Sendable {
            scalar.value <= 0x7F,
            let mapping = Self.keyMapping(for: scalar.value) {
             let strokeFlags = flags.union(mapping.requiredFlags)
-            postKeyboard(keyCode: mapping.keyCode,
-                         isDown: true,
-                         flags: strokeFlags)
-            postKeyboard(keyCode: mapping.keyCode,
-                         isDown: false,
-                         flags: strokeFlags)
+            withTransientModifiers(strokeFlags) {
+                postKeyboard(keyCode: mapping.keyCode,
+                             isDown: true,
+                             flags: strokeFlags)
+                postKeyboard(keyCode: mapping.keyCode,
+                             isDown: false,
+                             flags: strokeFlags)
+            }
             return
         }
 
-        postUnicode(input.text, flags: flags)
+        withTransientModifiers(flags) {
+            postUnicode(input.text, flags: flags)
+        }
     }
 
     private func postUnicode(_ text: String, flags: CGEventFlags) {
@@ -286,9 +296,10 @@ final class RemoteInputService: @unchecked Sendable {
         // Release ordinary keys before their modifiers, preserving the chord
         // flags for each balancing key-up. Each physical key is released once.
         for keyCode in pressedOrdinaryKeys.keys.sorted() {
-            postKeyboard(keyCode: keyCode,
-                         isDown: false,
-                         flags: currentModifierFlags.union(pressedOrdinaryKeys[keyCode] ?? []))
+            let flags = currentModifierFlags.union(pressedOrdinaryKeys[keyCode] ?? [])
+            withTransientModifiers(flags) {
+                postKeyboard(keyCode: keyCode, isDown: false, flags: flags)
+            }
         }
         pressedOrdinaryKeys.removeAll()
 
@@ -299,6 +310,28 @@ final class RemoteInputService: @unchecked Sendable {
             postKeyboard(keyCode: mapping.keyCode,
                          isDown: false,
                          flags: currentModifierFlags)
+        }
+    }
+
+    /// Quartz adopts the flags of every keyboard event posted at the HID tap
+    /// as the Mac's global modifier state. A Command-C sent as a flagged "c"
+    /// alone would leave Command logically held, turning later remote clicks
+    /// into Command-clicks until the Mac's own input resets it. Press each
+    /// modifier the stroke needs but the remote does not hold, and release it
+    /// afterwards, exactly as a physical keyboard would.
+    private func withTransientModifiers(_ flags: CGEventFlags, _ post: () -> Void) {
+        var active = currentModifierFlags
+        let transient = Self.modifierKeys.filter {
+            flags.contains($0.flag) && !active.contains($0.flag)
+        }
+        for modifier in transient {
+            active.insert(modifier.flag)
+            postKeyboard(keyCode: modifier.keyCode, isDown: true, flags: active)
+        }
+        post()
+        for modifier in transient.reversed() {
+            active.remove(modifier.flag)
+            postKeyboard(keyCode: modifier.keyCode, isDown: false, flags: active)
         }
     }
 
@@ -350,6 +383,11 @@ private extension RemoteInputService {
         var requiredFlags: CGEventFlags = []
         var modifierFlag: CGEventFlags?
     }
+
+    // Left-hand modifier keys, pressed in this order and released in reverse.
+    static let modifierKeys: [(flag: CGEventFlags, keyCode: CGKeyCode)] = [
+        (.maskControl, 59), (.maskAlternate, 58), (.maskShift, 56), (.maskCommand, 55),
+    ]
 
     // Derive both character variants from the same ANSI mapping used for
     // incoming text/keysyms. This stays on the input queue without calling

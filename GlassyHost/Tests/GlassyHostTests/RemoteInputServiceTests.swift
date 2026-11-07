@@ -6,8 +6,10 @@ import Testing
       arguments: ["d", "D", "!", "@", "_", "?", "{"])
 @MainActor
 func remoteInputTypedCharacters(text: String) throws {
-    let events = keyboardEvents(for: [.text(.init(modifierMask: [], text: text))])
+    let posted = keyboardEvents(for: [.text(.init(modifierMask: [], text: text))])
+    let events = characterEvents(posted)
     #expect(events.count == 2)
+    expectModifiersBalanced(posted)
     for event in events {
         #expect(keyboardText(event) == text)
         let appKitEvent = try #require(NSEvent(cgEvent: event))
@@ -18,7 +20,9 @@ func remoteInputTypedCharacters(text: String) throws {
 @Test("Shift applies to text modifiers and held modifier key events", arguments: [UInt32(0xFFE1), 0xFFE2])
 @MainActor
 func remoteInputShiftedText(shiftKeysym: UInt32) throws {
-    let transient = keyboardEvents(for: [.text(.init(modifierMask: .shift, text: "d"))])
+    let transientEvents = keyboardEvents(for: [.text(.init(modifierMask: .shift, text: "d"))])
+    expectModifiersBalanced(transientEvents)
+    let transient = characterEvents(transientEvents)
     let held = keyboardEvents(for: [
         .key(.init(keysym: shiftKeysym, isDown: true)),
         .text(.init(modifierMask: [], text: "d")),
@@ -41,10 +45,12 @@ func remoteInputShiftedText(shiftKeysym: UInt32) throws {
 @Test("Printable keysyms preserve capitals on key down and key up")
 @MainActor
 func remoteInputShiftedKeysym() {
-    let events = keyboardEvents(for: [
+    let posted = keyboardEvents(for: [
         .key(.init(keysym: 0x44, isDown: true)),
         .key(.init(keysym: 0x44, isDown: false)),
     ])
+    expectModifiersBalanced(posted)
+    let events = characterEvents(posted)
     #expect(events.map(\.type) == [.keyDown, .keyUp])
     for event in events {
         #expect(event.getIntegerValueField(.keyboardEventKeycode) == 2)
@@ -58,7 +64,9 @@ func remoteInputShiftedKeysym() {
                   [.command, .shift], [.control, .shift], [.option, .shift]])
 @MainActor
 func remoteInputShortcutCharacters(modifiers: HostProtocol.TextModifierMask) throws {
-    let events = keyboardEvents(for: [.text(.init(modifierMask: modifiers, text: "d"))])
+    let posted = keyboardEvents(for: [.text(.init(modifierMask: modifiers, text: "d"))])
+    expectModifiersBalanced(posted)
+    let events = characterEvents(posted)
     #expect(events.count == 2)
     for event in events {
         let appKitEvent = try #require(NSEvent(cgEvent: event))
@@ -99,7 +107,9 @@ func remoteInputUnicodeText() {
 
 @Test("Disconnect balances ordinary held keys", arguments: [UInt32(0x61), 0x44, 0xFF51, 0xFFBE])
 func remoteInputReleasesOrdinaryKey(keysym: UInt32) throws {
-    let events = keyboardEvents(for: [.key(.init(keysym: keysym, isDown: true))])
+    let posted = keyboardEvents(for: [.key(.init(keysym: keysym, isDown: true))])
+    expectModifiersBalanced(posted)
+    let events = characterEvents(posted)
     #expect(events.map(\.type) == [.keyDown, .keyUp])
     let keyCode = try #require(RemoteInputService.mappedKeyCode(forX11Keysym: keysym))
     #expect(events.allSatisfy { $0.getIntegerValueField(.keyboardEventKeycode) == keyCode })
@@ -111,12 +121,13 @@ func remoteInputOrdinaryKeyReleaseIsIdempotent() {
         .key(.init(keysym: 0x61, isDown: true)),
         .key(.init(keysym: 0x61, isDown: true)),
     ])
-    #expect(repeated.map(\.type) == [.keyDown, .keyDown, .keyUp])
+    #expect(characterEvents(repeated).map(\.type) == [.keyDown, .keyDown, .keyUp])
     let shifted = keyboardEvents(for: [
         .key(.init(keysym: 0x44, isDown: true)),
         .key(.init(keysym: 0x64, isDown: false)),
     ])
-    #expect(shifted.map(\.type) == [.keyDown, .keyUp])
+    #expect(characterEvents(shifted).map(\.type) == [.keyDown, .keyUp])
+    expectModifiersBalanced(shifted)
 }
 
 @Test("Disabling input releases the key before its chord modifier exactly once")
@@ -134,6 +145,41 @@ func remoteInputDisableReleasesChord() {
     #expect(events.map(\.type) == [.flagsChanged, .keyDown, .keyUp, .flagsChanged])
     #expect(events[2].flags.contains(.maskShift))
     #expect(events[3].flags.isEmpty)
+}
+
+@Test("A Command shortcut presses and releases Command so later clicks are plain clicks")
+func remoteInputShortcutReleasesCommand() throws {
+    // iPad hardware Cmd-C arrives as text "c" with the Command modifier.
+    let events = keyboardEvents(for: [.text(.init(modifierMask: .command, text: "c"))])
+    #expect(events.map(\.type) == [.flagsChanged, .keyDown, .keyUp, .flagsChanged])
+    #expect(events.map { $0.getIntegerValueField(.keyboardEventKeycode) } == [55, 8, 8, 55])
+    #expect(events[0].flags.contains(.maskCommand))
+    #expect(try #require(events.last).flags.isEmpty)
+}
+
+@Test("Shortcut modifiers already held on the remote are not pressed again")
+func remoteInputShortcutKeepsHeldModifier() {
+    let events = keyboardEvents(for: [
+        .key(.init(keysym: 0xFFE7, isDown: true)),
+        .text(.init(modifierMask: .command, text: "c")),
+    ])
+    // Command down, c down/up, then disconnect releases Command once.
+    #expect(events.map(\.type) == [.flagsChanged, .keyDown, .keyUp, .flagsChanged])
+    #expect(events[1].flags.contains(.maskCommand))
+    #expect(events[3].flags.isEmpty)
+}
+
+/// Quartz adopts each posted keyboard event's flags as the global modifier
+/// state, so the final event must leave no modifier that is not held.
+private func expectModifiersBalanced(_ events: [CGEvent],
+                                     sourceLocation: SourceLocation = #_sourceLocation) {
+    let modifiers: CGEventFlags = [.maskCommand, .maskShift, .maskControl, .maskAlternate]
+    guard let last = events.last else { return }
+    #expect(last.flags.intersection(modifiers).isEmpty, sourceLocation: sourceLocation)
+}
+
+private func characterEvents(_ events: [CGEvent]) -> [CGEvent] {
+    events.filter { $0.type == .keyDown || $0.type == .keyUp }
 }
 
 private func keyboardEvents(for inputs: [HostProtocol.RemoteInputEvent]) -> [CGEvent] {

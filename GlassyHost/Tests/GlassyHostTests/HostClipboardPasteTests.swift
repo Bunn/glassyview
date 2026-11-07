@@ -48,8 +48,9 @@ func clipboardWritePrecedesPaste() {
     service.paste(text)
     service.paste(text)
     let expected: [ClipboardEventRecorder.Event] = [
-        .write(text), .key(9, true, CGEventFlags.maskCommand.rawValue),
-        .key(9, false, CGEventFlags.maskCommand.rawValue)
+        .write(text), .key(55, true, CGEventFlags.maskCommand.rawValue),
+        .key(9, true, CGEventFlags.maskCommand.rawValue),
+        .key(9, false, CGEventFlags.maskCommand.rawValue), .key(55, false, 0)
     ]
     #expect(recorder.events == expected + expected)
 }
