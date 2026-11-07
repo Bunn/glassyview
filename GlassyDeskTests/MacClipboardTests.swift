@@ -10,15 +10,15 @@ struct MacClipboardTests {
         #expect(copy == .init(outcome: .text, isAutomatic: true, text: "héllo\n"))
         #expect(try GlassyStreamWire.decodeClipboardCopy(Data([3, 0, 0, 0]))
             == .init(outcome: .tooLarge, isAutomatic: false))
-        #expect(GlassyStreamWire.encodeClipboardCopyRequest(.sendNow) == Data([2, 0, 0, 0]))
+        #expect(GlassyStreamWire.encodeClipboardCopyRequest(.follow) == Data([1, 0, 0, 0]))
     }
 
     private static let malformedCopies: [Data] = {
         let oversized = Data([0, 0, 0, 0])
             + Data(repeating: 0x61, count: GlassyStreamWire.maximumClipboardTextLength + 1)
         let invalid: [[UInt8]] = [
-            [], [0, 0, 0], [8, 0, 0, 0], [0, 2, 0, 0], [0, 0, 1, 0],
-            [0, 0, 0, 0], [0, 0, 0, 0, 0xFF], [1, 0, 0, 0, 0x61]
+            [], [0, 0, 0], [8, 0, 0, 0], [2, 0, 0, 0], [5, 0, 0, 0], [0, 2, 0, 0], [0, 0, 1, 0],
+            [0, 0, 0, 0], [0, 0, 0, 0, 0xFF], [3, 0, 0, 0, 0x61]
         ]
         return invalid.map { Data($0) } + [oversized]
     }()
@@ -62,12 +62,9 @@ struct MacClipboardTests {
         controller.onClipboardCopy?(.init(outcome: .text, isAutomatic: true, text: "late"))
         #expect(written == ["one"])
 
-        // Asking still works with automatic copying off.
-        controller.onClipboardCopy?(.init(outcome: .text, isAutomatic: false, text: "asked"))
-        #expect(written == ["one", "asked"])
-
-        controller.onClipboardCopy?(.init(outcome: .concealed, isAutomatic: false))
-        #expect(written == ["one", "asked"])
+        session.setFollowsMacClipboard(true)
+        controller.onClipboardCopy?(.init(outcome: .tooLarge, isAutomatic: true))
+        #expect(written == ["one"])
         if case .problem = session.macClipboardNotice?.kind {} else { Issue.record("Expected a problem notice") }
         session.clearMacClipboardNotice()
         #expect(session.macClipboardNotice == nil)

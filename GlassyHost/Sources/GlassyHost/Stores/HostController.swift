@@ -1452,8 +1452,8 @@ final class HostController {
 
         let fileTransfers = fileTransfers
         let clipboardCopy = clipboardCopy
-        hostServer.setClipboardCopyRequestHandler { clientID, request, isInputOwner in
-            clipboardCopy.handle(request, from: clientID, isInputOwner: isInputOwner)
+        hostServer.setClipboardCopyRequestHandler { clientID, request in
+            clipboardCopy.handle(request, from: clientID)
         }
         hostServer.setClientEndedHandler { clientID in
             fileTransfers.clientEnded(clientID)

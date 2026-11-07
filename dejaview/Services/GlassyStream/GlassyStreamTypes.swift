@@ -75,24 +75,19 @@ enum GlassyStreamEvent: Equatable, Sendable {
 enum GlassyStreamClipboardCopyRequest: UInt8, Sendable {
     case stopFollowing = 0
     case follow = 1
-    case sendNow = 2
 }
 
 /// The Mac's answer about its clipboard. Only `.text` carries content.
 struct GlassyStreamClipboardCopy: Equatable, Sendable {
     enum Outcome: UInt8, Sendable {
+        // 1, 2, 4, 5, and 7 are retired answers to a request for the clipboard.
         case text = 0
-        case empty = 1
-        case files = 2
         case tooLarge = 3
-        case concealed = 4
-        case notAllowed = 5
         case blockedByMac = 6
-        case unsupported = 7
     }
 
     let outcome: Outcome
-    /// False when this device asked for the clipboard.
+    /// Set on every copy the Mac sends because this device copied something.
     let isAutomatic: Bool
     var text: String?
 }

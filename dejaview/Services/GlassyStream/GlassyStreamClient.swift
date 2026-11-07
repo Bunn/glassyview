@@ -217,7 +217,7 @@ final class GlassyStreamClient: @unchecked Sendable {
         }
     }
 
-    /// Follows the Mac's clipboard or asks for it once. Ignored by hosts
+    /// Starts or stops following the Mac's clipboard. Ignored by hosts
     /// without the capability, which would reject the message.
     func requestClipboardCopy(_ request: GlassyStreamClipboardCopyRequest) {
         queue.async { [weak self] in

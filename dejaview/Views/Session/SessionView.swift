@@ -114,8 +114,6 @@ struct SessionView<Session: RemoteSessionControlling>: View {
         }
         .overlay(alignment: .top) {
             MacClipboardToast(notice: session.macClipboardNotice,
-                              canGetFiles: session.supportsFileTransfer,
-                              getFiles: { session.fileTransferCenter?.getSelectedFilesFromMac() },
                               dismiss: session.clearMacClipboardNotice)
         }
         .background { Color.black.ignoresSafeArea() }

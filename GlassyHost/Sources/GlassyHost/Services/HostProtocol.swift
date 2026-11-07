@@ -105,7 +105,7 @@ enum HostProtocol {
         case curtainRequest = 0x25
         /// Host → client. Sent only to clients that sent a curtain request.
         case curtainStatus = 0x26
-        /// Client → host. Follows the Mac's clipboard or asks for it once.
+        /// Client → host. Starts or stops following the Mac's clipboard.
         case clipboardCopyRequest = 0x27
         /// Host → client. Sent only to clients that sent a copy request.
         case clipboardCopy = 0x28
@@ -230,19 +230,15 @@ enum HostProtocol {
     enum ClipboardCopyRequest: UInt8, CaseIterable, Sendable {
         case stopFollowing = 0
         case follow = 1
-        case sendNow = 2
     }
 
     /// What a clipboard copy message carries. Only `.text` has a payload.
+    /// Values 1, 2, 4, 5, and 7 are retired; they answered a request for the
+    /// clipboard, which no released client could send.
     enum ClipboardCopyOutcome: UInt8, CaseIterable, Sendable {
         case text = 0
-        case empty = 1
-        case files = 2
         case tooLarge = 3
-        case concealed = 4
-        case notAllowed = 5
         case blockedByMac = 6
-        case unsupported = 7
     }
 
     struct ClipboardCopy: Equatable, Sendable {

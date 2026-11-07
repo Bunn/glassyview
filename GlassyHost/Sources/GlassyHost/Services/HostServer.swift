@@ -32,8 +32,8 @@ final class HostServer: @unchecked Sendable {
     /// Connection identifier, requested state, and whether that connection
     /// currently owns input.
     typealias CurtainRequestHandler = @Sendable (UUID, Bool, Bool) -> Void
-    /// Client, request, and whether that client controls this Mac.
-    typealias ClipboardCopyRequestHandler = @Sendable (UUID, HostProtocol.ClipboardCopyRequest, Bool) -> Void
+    /// Client and request.
+    typealias ClipboardCopyRequestHandler = @Sendable (UUID, HostProtocol.ClipboardCopyRequest) -> Void
 
     struct PairingCode: Equatable, Sendable {
         let value: String
@@ -553,7 +553,7 @@ private extension HostServer {
             queue.async { [weak self] in
                 // Control may have moved since the Mac read its clipboard.
                 guard let self, let client = clients[clientID],
-                      copy.outcome == .notAllowed || inputOwnerID == clientID else { return }
+                      inputOwnerID == clientID else { return }
                 _ = enqueueEncrypted(HostProtocol.encodeClipboardCopy(copy), kind: .clipboardCopy,
                                      flags: [], policy: .bulk, for: client)
             }
@@ -1511,7 +1511,7 @@ private extension HostServer {
                 curtainRequestHandler?(client.id, enabled, inputOwnerID == client.id)
             case .clipboardCopyRequest:
                 let request = try HostProtocol.decodeClipboardCopyRequest(plaintext)
-                clipboardCopyRequestHandler?(client.id, request, inputOwnerID == client.id)
+                clipboardCopyRequestHandler?(client.id, request)
             case .fileTransferOffer, .fileTransferChunk, .fileTransferAcknowledge,
                  .fileTransferComplete, .fileTransferResult, .fileTransferRequest:
                 let message: FileTransferWire.Message

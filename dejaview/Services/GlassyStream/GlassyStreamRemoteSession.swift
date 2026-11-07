@@ -527,10 +527,6 @@ final class GlassyStreamRemoteSession: ObservableObject, @MainActor RemoteSessio
 
     // MARK: - Mac clipboard
 
-    func copyMacClipboard() {
-        controller.requestClipboardCopy(.sendNow)
-    }
-
     func setFollowsMacClipboard(_ follows: Bool) {
         guard follows != followsMacClipboard else { return }
         followsMacClipboard = follows

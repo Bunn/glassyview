@@ -40,8 +40,6 @@ struct SessionOptionsMenu<Session: RemoteSessionControlling>: View {
             }
             if session.supportsMacClipboard {
                 Section("Clipboard") {
-                    Button("Copy from Mac", systemImage: "doc.on.clipboard", action: session.copyMacClipboard)
-                        .accessibilityHint("Puts the text on your Mac's clipboard on this device's clipboard.")
                     Toggle("Copy Automatically", systemImage: "arrow.triangle.2.circlepath", isOn: Binding(
                         get: { session.followsMacClipboard },
                         set: { session.setFollowsMacClipboard($0) }

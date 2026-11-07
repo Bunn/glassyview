@@ -7,7 +7,6 @@ import UniformTypeIdentifiers
 struct MacClipboardNotice: Identifiable, Equatable {
     enum Kind: Equatable {
         case copied(preview: String)
-        case filesCopied
         case problem(String)
     }
 
@@ -20,20 +19,10 @@ struct MacClipboardNotice: Identifiable, Equatable {
         case .text:
             guard let text = copy.text else { return nil }
             kind = .copied(preview: Self.preview(of: text))
-        case .files:
-            kind = .filesCopied
-        case .empty:
-            kind = .problem(String(localized: "Your Mac's clipboard is empty."))
         case .tooLarge:
             kind = .problem(String(localized: "That's too much text to copy at once. Copy up to 1 MB."))
-        case .concealed:
-            kind = .problem(String(localized: "This item is marked private on your Mac, so it stayed there."))
-        case .notAllowed:
-            kind = .problem(String(localized: "Copying is turned off on this Mac, or another device controls it."))
         case .blockedByMac:
             kind = .problem(String(localized: "Your Mac is blocking this. In Privacy & Security on the Mac, set Glassy Desk to Allow under Paste from Other Apps."))
-        case .unsupported:
-            kind = .problem(String(localized: "Only text can be copied from your Mac for now."))
         }
     }
 

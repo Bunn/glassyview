@@ -1945,6 +1945,46 @@
         }
       }
     },
+    "Anything a password manager marks as private stays on your Mac. Turn copying off anytime in the session menu." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alles, was ein Passwortmanager als privat markiert, bleibt auf deinem Mac. Im Sitzungsmenü kannst du das Kopieren jederzeit ausschalten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo lo que un gestor de contraseñas marca como privado se queda en tu Mac. Desactiva la copia cuando quieras en el menú de la sesión."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パスワードマネージャがプライベートとしてマークした項目はMacから送られません。コピーはセッションメニューからいつでもオフにできます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alles wat een wachtwoordbeheerder als privé markeert, blijft op je Mac. Zet kopiëren op elk moment uit in het sessiemenu."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tudo o que um gerenciador de senhas marca como privado fica no seu Mac. Desative a cópia quando quiser no menu da sessão."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码管理器标记为私密的内容会留在 Mac 上。你可以随时在会话菜单中关闭拷贝。"
+          }
+        }
+      }
+    },
     "App Lock" : {
       "localizations" : {
         "de" : {
@@ -2606,46 +2646,6 @@
         }
       }
     },
-    "Bring Over Copied Files" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kopierte Dateien holen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trae los archivos copiados"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コピーしたファイルを取得"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Haal gekopieerde bestanden op"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Traga arquivos copiados"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "获取拷贝的文件"
-          }
-        }
-      }
-    },
     "Camera Access Needed" : {
 
     },
@@ -3188,46 +3188,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择已保存的 Tailscale 100.64–100.127 地址、Tailscale IPv6 地址或完整的 .ts.net 名称。使用附近或其他路线的一次性代码。"
-          }
-        }
-      }
-    },
-    "Choose Copy from Mac in the session menu to fetch what's already there, such as something a long-running job copied." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wähle „Vom Mac kopieren“ im Sitzungsmenü, um zu holen, was dort bereits liegt, etwa das Ergebnis eines lange laufenden Auftrags."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elige Copiar del Mac en el menú de la sesión para obtener lo que ya está allí, como algo que haya copiado un proceso largo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "セッションメニューで「Macからコピー」を選ぶと、時間のかかる処理がコピーした内容など、すでにある内容を取得できます。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kies Kopieer van Mac in het sessiemenu om op te halen wat er al staat, zoals iets dat een langlopende taak heeft gekopieerd."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escolha Copiar do Mac no menu da sessão para obter o que já está lá, como algo copiado por uma tarefa demorada."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在会话菜单中选择“从 Mac 拷贝”，即可获取其中已有的内容，例如长时间运行的任务拷贝的内容。"
           }
         }
       }
@@ -4961,86 +4921,6 @@
         }
       }
     },
-    "Copy files in Finder, then tap Get Files to bring them to this device." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kopiere Dateien im Finder und tippe dann auf „Dateien holen“, um sie auf dieses Gerät zu übertragen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copia archivos en el Finder y toca Obtener archivos para traerlos a este dispositivo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finderでファイルをコピーし、「ファイルを取得」をタップすると、このデバイスに取り込めます。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kopieer bestanden in de Finder en tik op Haal bestanden op om ze naar dit apparaat te halen."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copie arquivos no Finder e toque em Obter Arquivos para trazê-los para este dispositivo."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在“访达”中拷贝文件，然后轻点“获取文件”，即可将它们传到这台设备上。"
-          }
-        }
-      }
-    },
-    "Copy from Mac" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vom Mac kopieren"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copiar del Mac"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Macからコピー"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kopieer van Mac"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copiar do Mac"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从 Mac 拷贝"
-          }
-        }
-      }
-    },
     "Copy from Your Mac" : {
       "localizations" : {
         "de" : {
@@ -5117,46 +4997,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在会话期间拷贝 Mac 上的文本，即可粘贴到这台设备上。"
-          }
-        }
-      }
-    },
-    "Copying is turned off on this Mac, or another device controls it." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kopieren ist auf diesem Mac deaktiviert oder ein anderes Gerät steuert ihn."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La copia está desactivada en este Mac o lo controla otro dispositivo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このMacではコピーがオフになっているか、別のデバイスが操作しています。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kopiëren staat uit op deze Mac, of een ander apparaat bedient hem."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A cópia está desativada neste Mac ou outro dispositivo o controla."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此 Mac 已关闭拷贝，或由其他设备控制。"
           }
         }
       }
@@ -8313,46 +8153,6 @@
         }
       }
     },
-    "Files copied on your Mac" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dateien auf dem Mac kopiert"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Archivos copiados en el Mac"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Macでファイルをコピーしました"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bestanden gekopieerd op je Mac"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arquivos copiados no Mac"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已在 Mac 上拷贝文件"
-          }
-        }
-      }
-    },
     "Fills the Mac address and port." : {
       "localizations" : {
         "de" : {
@@ -9086,46 +8886,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "功能键"
-          }
-        }
-      }
-    },
-    "Get Files" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dateien holen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Obtener archivos"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ファイルを取得"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Haal bestanden op"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Obter Arquivos"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "获取文件"
           }
         }
       }
@@ -10073,46 +9833,6 @@
     },
     "Good to Know" : {
 
-    },
-    "Grab the Mac's Clipboard" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zwischenablage des Mac holen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Obtén el portapapeles del Mac"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Macのクリップボードを取得"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Haal het klembord van de Mac op"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Obtenha a área de transferência do Mac"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "获取 Mac 的剪贴板"
-          }
-        }
-      }
     },
     "Held" : {
       "localizations" : {
@@ -13514,46 +13234,6 @@
         }
       }
     },
-    "Only text can be copied from your Mac for now." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vom Mac kann derzeit nur Text kopiert werden."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Por ahora solo se puede copiar texto del Mac."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現在、Macからコピーできるのはテキストのみです。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Van je Mac kan voorlopig alleen tekst worden gekopieerd."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Por enquanto, só é possível copiar texto do Mac."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "目前只能从 Mac 拷贝文本。"
-          }
-        }
-      }
-    },
     "Open" : {
       "localizations" : {
         "de" : {
@@ -15107,6 +14787,46 @@
     "Privacy Policy" : {
 
     },
+    "Private Items Stay Private" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privates bleibt privat"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo privado sigue siendo privado"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プライベートな項目は送られません"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privé blijft privé"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que é privado continua privado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私密内容保持私密"
+          }
+        }
+      }
+    },
     "Pro" : {
       "localizations" : {
         "de" : {
@@ -15474,46 +15194,6 @@
     },
     "Purchases Unavailable" : {
 
-    },
-    "Puts the text on your Mac's clipboard on this device's clipboard." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Legt den Text aus der Zwischenablage deines Mac in die Zwischenablage dieses Geräts."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pone el texto del portapapeles del Mac en el portapapeles de este dispositivo."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Macのクリップボードのテキストをこのデバイスのクリップボードに入れます。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zet de tekst op het klembord van je Mac op het klembord van dit apparaat."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Coloca o texto da Área de Transferência do Mac na Área de Transferência deste dispositivo."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将 Mac 剪贴板上的文本放到此设备的剪贴板。"
-          }
-        }
-      }
     },
     "Rate Glassy Desk" : {
       "localizations" : {
@@ -20392,46 +20072,6 @@
     "This isn’t a valid Glassy Desk pairing QR code. Scan the code displayed in Glassy Desk on your Mac." : {
 
     },
-    "This item is marked private on your Mac, so it stayed there." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Objekt ist auf deinem Mac als privat markiert und bleibt dort."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este elemento está marcado como privado en el Mac, así que se quedó allí."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "この項目はMacで非公開に設定されているため、Macに残っています。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dit onderdeel is op je Mac als privé gemarkeerd en is daar gebleven."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Este item está marcado como privado no Mac, por isso ficou lá."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此项目在 Mac 上被标记为私密，因此留在了 Mac 上。"
-          }
-        }
-      }
-    },
     "This Mac uses a newer pairing format. Update Glassy Desk on your iPhone or iPad, then scan the QR code again." : {
 
     },
@@ -23668,46 +23308,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mac 阻止了此操作。请在 Mac 的“隐私与安全性”中，将“从其他 App 粘贴”下的 Glassy Desk 设为“允许”。"
-          }
-        }
-      }
-    },
-    "Your Mac's clipboard is empty." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Zwischenablage deines Mac ist leer."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El portapapeles del Mac está vacío."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Macのクリップボードは空です。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Het klembord van je Mac is leeg."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A Área de Transferência do Mac está vazia."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mac 的剪贴板为空。"
           }
         }
       }

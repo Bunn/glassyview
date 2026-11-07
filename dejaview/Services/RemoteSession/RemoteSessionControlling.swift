@@ -36,7 +36,6 @@ protocol RemoteSessionControlling: ObservableObject, RemoteSessionInputControlli
     var followsMacClipboard: Bool { get }
     /// What just happened with the Mac's clipboard, for a brief confirmation.
     var macClipboardNotice: MacClipboardNotice? { get }
-    func copyMacClipboard()
     func setFollowsMacClipboard(_ follows: Bool)
     func clearMacClipboardNotice()
 
@@ -117,7 +116,6 @@ extension RemoteSessionControlling {
     var supportsMacClipboard: Bool { false }
     var followsMacClipboard: Bool { false }
     var macClipboardNotice: MacClipboardNotice? { nil }
-    func copyMacClipboard() {}
     func setFollowsMacClipboard(_ follows: Bool) {}
     func clearMacClipboardNotice() {}
     // Standard VNC has no file transfer.

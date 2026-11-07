@@ -107,7 +107,7 @@ final class HostClipboardCopyService: @unchecked Sendable {
         inputLock.withLock { lastInputTime = time }
     }
 
-    func handle(_ request: HostProtocol.ClipboardCopyRequest, from client: UUID, isInputOwner: Bool) {
+    func handle(_ request: HostProtocol.ClipboardCopyRequest, from client: UUID) {
         queue.async { [self] in
             switch request {
             case .follow:
@@ -119,8 +119,6 @@ final class HostClipboardCopyService: @unchecked Sendable {
                 followers.remove(client)
                 toldDenied.remove(client)
                 updateTimer()
-            case .sendNow:
-                send(requestedCopy(isInputOwner: isInputOwner), client)
             }
         }
     }
@@ -160,8 +158,6 @@ final class HostClipboardCopyService: @unchecked Sendable {
 
         let outcome: HostProtocol.ClipboardCopy
         switch HostClipboardCopyPolicy.contents(ofTypes: pasteboard.types()) {
-        case .files:
-            outcome = .init(outcome: .files, isAutomatic: true)
         case .text:
             guard !pasteboard.isDenied() else {
                 // Explain once per device; every later copy would say the same.
@@ -171,11 +167,12 @@ final class HostClipboardCopyService: @unchecked Sendable {
                 toldDenied.formUnion(followers)
                 return
             }
-            outcome = textCopy(isAutomatic: true)
-        case .fromDevice, .concealed, .unsupported, .empty:
+            guard let copy = textCopy() else { return }
+            outcome = copy
+        case .fromDevice, .concealed, .files, .unsupported, .empty:
+            // Copied files stay on the Mac; file transfer gets the files selected in Finder.
             return
         }
-        guard outcome.outcome != .empty else { return }
         for client in followers { send(outcome, client) }
     }
 
@@ -186,27 +183,12 @@ final class HostClipboardCopyService: @unchecked Sendable {
         }
     }
 
-    /// Someone asked, so say what happened even when nothing can be sent.
-    private func requestedCopy(isInputOwner: Bool) -> HostProtocol.ClipboardCopy {
-        guard allowsCopy, isInputOwner else { return .init(outcome: .notAllowed, isAutomatic: false) }
-        switch HostClipboardCopyPolicy.contents(ofTypes: pasteboard.types()) {
-        case .empty: return .init(outcome: .empty, isAutomatic: false)
-        case .concealed: return .init(outcome: .concealed, isAutomatic: false)
-        case .files: return .init(outcome: .files, isAutomatic: false)
-        case .unsupported: return .init(outcome: .unsupported, isAutomatic: false)
-        case .fromDevice, .text:
-            guard !pasteboard.isDenied() else { return .init(outcome: .blockedByMac, isAutomatic: false) }
-            return textCopy(isAutomatic: false)
-        }
-    }
-
-    private func textCopy(isAutomatic: Bool) -> HostProtocol.ClipboardCopy {
-        guard let text = pasteboard.readText(), !text.isEmpty else {
-            return .init(outcome: .empty, isAutomatic: isAutomatic)
-        }
+    /// Nil when there turns out to be no text to send.
+    private func textCopy() -> HostProtocol.ClipboardCopy? {
+        guard let text = pasteboard.readText(), !text.isEmpty else { return nil }
         guard text.utf8.count <= HostProtocol.maximumClipboardTextLength else {
-            return .init(outcome: .tooLarge, isAutomatic: isAutomatic)
+            return .init(outcome: .tooLarge, isAutomatic: true)
         }
-        return .init(outcome: .text, isAutomatic: isAutomatic, text: text)
+        return .init(outcome: .text, isAutomatic: true, text: text)
     }
 }

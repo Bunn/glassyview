@@ -112,10 +112,10 @@ struct GlassyStreamRouteLoopbackTests {
         #expect(authentication.supportsClipboardCopy == supported)
 
         client.requestClipboardCopy(.follow)
-        client.requestClipboardCopy(.sendNow)
+        client.requestClipboardCopy(.stopFollowing)
         client.sendPing()
         try await waitForPing(host)
-        #expect(host.clipboardCopyRequests == (supported ? [Data([1, 0, 0, 0]), Data([2, 0, 0, 0])] : []))
+        #expect(host.clipboardCopyRequests == (supported ? [Data([1, 0, 0, 0]), Data([0, 0, 0, 0])] : []))
 
         try host.sendRaw(kind: .clipboardCopy, payload: Data([0, 1, 0, 0]) + Data("hello".utf8))
         let deadline = ContinuousClock.now.advanced(by: .seconds(3))

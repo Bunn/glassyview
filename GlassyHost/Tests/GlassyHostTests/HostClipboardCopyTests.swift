@@ -55,7 +55,7 @@ func clipboardCopyCodec() throws {
     for request in HostProtocol.ClipboardCopyRequest.allCases {
         #expect(try HostProtocol.decodeClipboardCopyRequest(HostProtocol.encodeClipboardCopyRequest(request)) == request)
     }
-    for invalid in [Data(), Data([3, 0, 0, 0]), Data([1, 0, 1, 0]), Data([1, 0, 0])] {
+    for invalid in [Data(), Data([2, 0, 0, 0]), Data([3, 0, 0, 0]), Data([1, 0, 1, 0]), Data([1, 0, 0])] {
         #expect(throws: HostProtocol.ProtocolError.self) { try HostProtocol.decodeClipboardCopyRequest(invalid) }
     }
     #expect(HostProtocol.encodeClipboardCopy(.init(outcome: .text, isAutomatic: true, text: "é"))
@@ -82,7 +82,7 @@ func clipboardCopyFollowsDeviceInput() {
     let service = clipboard.makeService(defaults: isolatedDefaults())
     let device = UUID()
 
-    service.handle(.follow, from: device, isInputOwner: true)
+    service.handle(.follow, from: device)
     service.checkForChangesAndWait()
     #expect(clipboard.received.isEmpty) // Already on the clipboard before following.
 
@@ -110,7 +110,7 @@ func clipboardCopySkipsWithoutReading() {
     let defaults = isolatedDefaults()
     let service = clipboard.makeService(defaults: defaults)
     let device = UUID()
-    service.handle(.follow, from: device, isInputOwner: true)
+    service.handle(.follow, from: device)
     service.checkForChangesAndWait()
     service.noteRemoteInput()
 
@@ -126,11 +126,11 @@ func clipboardCopySkipsWithoutReading() {
     service.checkForChangesAndWait()
     service.allowsCopy = true
 
-    service.handle(.stopFollowing, from: device, isInputOwner: true)
+    service.handle(.stopFollowing, from: device)
     clipboard.copy("stopped")
     service.checkForChangesAndWait()
 
-    service.handle(.follow, from: device, isInputOwner: true)
+    service.handle(.follow, from: device)
     service.clientEnded(device)
     clipboard.copy("gone")
     service.checkForChangesAndWait()
@@ -139,12 +139,12 @@ func clipboardCopySkipsWithoutReading() {
     #expect(clipboard.received.isEmpty)
 }
 
-@Test("Copied files are announced by name-free notice, and too much text is explained")
+@Test("Copied files stay on the Mac, and too much text is explained")
 func clipboardCopyFilesAndLimits() {
     let clipboard = FakeClipboard()
     let service = clipboard.makeService(defaults: isolatedDefaults())
     let device = UUID()
-    service.handle(.follow, from: device, isInputOwner: true)
+    service.handle(.follow, from: device)
     service.checkForChangesAndWait()
     service.noteRemoteInput()
 
@@ -156,9 +156,11 @@ func clipboardCopyFilesAndLimits() {
     service.checkForChangesAndWait()
     clipboard.copy(String(repeating: "a", count: HostProtocol.maximumClipboardTextLength + 1))
     service.checkForChangesAndWait()
+    clipboard.copy("")
+    service.checkForChangesAndWait()
 
-    #expect(clipboard.received.map(\.outcome) == [.files, .text, .tooLarge])
-    #expect(clipboard.received[2].text == nil)
+    #expect(clipboard.received.map(\.outcome) == [.text, .tooLarge])
+    #expect(clipboard.received[1].text == nil)
 }
 
 @Test("A macOS denial is explained once per device and never reads")
@@ -167,7 +169,7 @@ func clipboardCopyDenied() {
     let service = clipboard.makeService(defaults: isolatedDefaults())
     let device = UUID()
     clipboard.deny()
-    service.handle(.follow, from: device, isInputOwner: true)
+    service.handle(.follow, from: device)
     service.checkForChangesAndWait()
     service.noteRemoteInput()
 
@@ -178,38 +180,4 @@ func clipboardCopyDenied() {
 
     #expect(clipboard.reads == 0)
     #expect(clipboard.received == [.init(outcome: .blockedByMac, isAutomatic: true)])
-}
-
-@Test("Asking for the clipboard always gets an answer, and only the controller gets content")
-func clipboardCopyOnRequest() async {
-    let clipboard = FakeClipboard()
-    let defaults = isolatedDefaults()
-    let service = clipboard.makeService(defaults: defaults)
-    let device = UUID()
-
-    func ask(isInputOwner: Bool = true) -> HostProtocol.ClipboardCopy? {
-        service.handle(.sendNow, from: device, isInputOwner: isInputOwner)
-        service.checkForChangesAndWait()
-        return clipboard.received.last
-    }
-
-    #expect(ask(isInputOwner: false) == .init(outcome: .notAllowed, isAutomatic: false))
-    #expect(clipboard.reads == 0)
-    #expect(ask() == .init(outcome: .text, isAutomatic: false, text: "first"))
-
-    clipboard.copy("secret", types: ["org.nspasteboard.ConcealedType"])
-    #expect(ask() == .init(outcome: .concealed, isAutomatic: false))
-    clipboard.copy(nil, types: [])
-    #expect(ask() == .init(outcome: .empty, isAutomatic: false))
-    clipboard.copy(nil, types: ["public.png"])
-    #expect(ask() == .init(outcome: .unsupported, isAutomatic: false))
-    clipboard.copy("a.txt", types: ["public.file-url"])
-    #expect(ask() == .init(outcome: .files, isAutomatic: false))
-
-    service.allowsCopy = false
-    clipboard.copy("off")
-    #expect(ask() == .init(outcome: .notAllowed, isAutomatic: false))
-    service.allowsCopy = true
-    clipboard.deny()
-    #expect(ask() == .init(outcome: .blockedByMac, isAutomatic: false))
 }
