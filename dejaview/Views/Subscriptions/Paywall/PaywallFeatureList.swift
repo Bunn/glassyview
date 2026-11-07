@@ -44,7 +44,7 @@ enum PaywallFeature: CaseIterable {
     /// The app icon row shows the icons themselves instead.
     var detail: LocalizedStringKey? {
         switch self {
-        case .unlimited: "No one-minute cap. No 90-second break."
+        case .unlimited: "No time limit. No 90-second break."
         case .longJobs: "Watch builds, renders, and AI agents finish."
         case .everyFeature: "Picture in Picture, files, and Curtain Mode."
         case .appIcons: nil
