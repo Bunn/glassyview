@@ -5001,6 +5001,46 @@
         }
       }
     },
+    "Copying from your Mac requires Fast Connection and Glassy Desk for Mac 3.1 or later." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieren vom Mac erfordert Schnellverbindung und Glassy Desk für Mac 3.1 oder neuer."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar desde tu Mac requiere Conexión rápida y Glassy Desk para Mac 3.1 o posterior."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macからのコピーには、高速接続とGlassy Desk for Mac 3.1以降が必要です。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopiëren van je Mac vereist Snelle verbinding en Glassy Desk voor Mac 3.1 of nieuwer."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar do seu Mac requer Conexão rápida e Glassy Desk para Mac 3.1 ou posterior."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Mac 拷贝需要快速连接和 Glassy Desk for Mac 3.1 或更高版本。"
+          }
+        }
+      }
+    },
     "Correct the address or TCP port before selecting a Mac." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -10988,6 +11028,46 @@
         }
       }
     },
+    "Keys go straight to the Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tasten gehen direkt an den Mac"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las teclas van directamente al Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キーはそのままMacに送られます"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toetsen gaan direct naar de Mac"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As teclas vão direto para o Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按键直接发送到 Mac"
+          }
+        }
+      }
+    },
     "Layouts adapt to the fold. Half-folded, the lower half becomes a trackpad with an optional keyboard." : {
       "localizations" : {
         "de" : {
@@ -16248,46 +16328,6 @@
         }
       }
     },
-    "Requires Fast Connection and Glassy Desk for Mac 3.1 or later." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Erfordert Schnellverbindung und Glassy Desk für Mac 3.1 oder neuer."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Requiere Conexión rápida y Glassy Desk para Mac 3.1 o posterior."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高速接続とGlassy Desk for Mac 3.1以降が必要です。"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vereist Snelle verbinding en Glassy Desk voor Mac 3.1 of nieuwer."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Requer Conexão rápida e Glassy Desk para Mac 3.1 ou posterior."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "需要快速连接和 Glassy Desk for Mac 3.1 或更高版本。"
-          }
-        }
-      }
-    },
     "Requires Glassy Desk for Mac. Download once, then pair by QR code or manually." : {
       "localizations" : {
         "de" : {
@@ -17688,6 +17728,46 @@
         }
       }
     },
+    "Send Keys Instantly" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tasten sofort senden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar teclas al instante"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キーをすぐに送信"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toetsen direct versturen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar teclas na hora"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即时发送按键"
+          }
+        }
+      }
+    },
     "Send Return" : {
       "localizations" : {
         "de" : {
@@ -18343,6 +18423,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "查看会话无时间限制的 Pro 方案。"
+          }
+        }
+      }
+    },
+    "Shows the keyboard. Each key is sent to the Mac as you type." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt die Tastatur. Jede Taste wird beim Tippen an den Mac gesendet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muestra el teclado. Cada tecla se envía al Mac mientras escribes."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キーボードを表示します。入力したキーはすぐにMacに送信されます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toont het toetsenbord. Elke toets wordt tijdens het typen naar de Mac verstuurd."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra o teclado. Cada tecla é enviada ao Mac enquanto você digita."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示键盘。键入时每个按键都会发送到 Mac。"
           }
         }
       }
@@ -19156,6 +19276,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "点击附近的 Mac，或选择“新计算机”并输入主机名、IP 地址和端口。屏幕共享通常使用端口 5900。"
+          }
+        }
+      }
+    },
+    "Tap to type on the Mac" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tippen, um auf dem Mac zu schreiben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toca para escribir en el Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タップしてMacに入力"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tik om op de Mac te typen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque para digitar no Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轻点以在 Mac 上输入"
           }
         }
       }
@@ -20609,6 +20769,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "调整每个会话"
+          }
+        }
+      }
+    },
+    "Turn it on in Settings, and each key you type on the on-screen keyboard goes straight to your Mac, no Return needed." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktiviere es in den Einstellungen, und jede Taste, die du auf der Bildschirmtastatur tippst, geht direkt an deinen Mac – ganz ohne Return."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actívalo en Configuración y cada tecla que pulses en el teclado en pantalla irá directamente a tu Mac, sin necesidad de pulsar Retorno."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定でオンにすると、画面上のキーボードで入力したキーがそのままMacに送られます。Returnを押す必要はありません。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zet het aan in Instellingen, en elke toets die je op het schermtoetsenbord typt gaat direct naar je Mac, zonder Return."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ative em Configurações, e cada tecla digitada no teclado na tela vai direto para o seu Mac, sem precisar de Return."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在“设置”中开启后，在屏幕键盘上键入的每个按键都会直接发送到你的 Mac，无需按回车。"
           }
         }
       }
@@ -22683,6 +22883,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新功能"
+          }
+        }
+      }
+    },
+    "When on, each key you type on the on-screen keyboard goes straight to the Mac instead of into a text field you send with Return." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn aktiviert, geht jede Taste, die du auf der Bildschirmtastatur tippst, direkt an den Mac statt in ein Textfeld, das du mit Return sendest."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si está activado, cada tecla que pulses en el teclado en pantalla va directamente al Mac, en lugar de a un campo de texto que envías con Retorno."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンにすると、画面上のキーボードで入力したキーが、Returnで送信するテキストフィールドを経由せず、そのままMacに送られます。"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als dit aanstaat, gaat elke toets die je op het schermtoetsenbord typt direct naar de Mac in plaats van naar een tekstveld dat je met Return verstuurt."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando ativado, cada tecla digitada no teclado na tela vai direto para o Mac, em vez de para um campo de texto enviado com Return."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启后，在屏幕键盘上键入的每个按键都会直接发送到 Mac，而不是先输入到文本框再按回车发送。"
           }
         }
       }

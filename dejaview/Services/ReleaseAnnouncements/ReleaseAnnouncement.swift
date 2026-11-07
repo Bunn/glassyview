@@ -33,8 +33,11 @@ struct WhatsNewRelease: Equatable, Identifiable {
                 Feature(systemImage: "lock.shield",
                         title: "Private Items Stay Private",
                         detail: "Anything a password manager marks as private stays on your Mac. Turn copying off anytime in the session menu."),
+                Feature(systemImage: "keyboard",
+                        title: "Send Keys Instantly",
+                        detail: "Turn it on in Settings, and each key you type on the on-screen keyboard goes straight to your Mac, no Return needed."),
             ],
-            footnote: "Requires Fast Connection and Glassy Desk for Mac 3.1 or later."
+            footnote: "Copying from your Mac requires Fast Connection and Glassy Desk for Mac 3.1 or later."
         ),
         WhatsNewRelease(
             id: "3.0",
